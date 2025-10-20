@@ -1,0 +1,370 @@
+-- Remote Logger (список ВСЕХ ремоутов + лог вызовов)
+-- • Показывает отдельное окно-список всех RemoteEvent/RemoteFunction (даже если ещё не вызывались)
+-- • Слушает входящие (OnClientEvent), OUT перехватывает при наличии hookmetamethod
+-- • Поиск по списку, клик по строке — копирует ВЕСЬ текст строки (тип, IN/OUT, путь, аргументы)
+-- • Окно перетаскивается. Без AutomaticCanvasSize. Есть хоткей (RightShift) на показ/скрытие.
+-- • Надёжный запуск: окно работает даже если Rayfield не загрузился
+
+-- ===== безопасная загрузка Rayfield (не блокирует весь скрипт при ошибке)
+local Rayfield
+do
+    local ok, lib = pcall(function()
+        return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+    end)
+    if ok and lib then Rayfield = lib end
+end
+
+-- ===== Window / Tab в Rayfield (если есть)
+local Tab
+if Rayfield then
+    local Window = Rayfield:CreateWindow({
+        Name = "Riley Hub",
+        LoadingTitle = "Rayfield Interface Suite",
+        LoadingSubtitle = "by Riley",
+        ConfigurationSaving = { Enabled = true, FolderName = nil, FileName = "RileyHub" },
+        Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+        KeySystem = false
+    })
+    Tab = Window:CreateTab("Tools", 4483362458)
+end
+
+-- ===== utils/state
+if not game:IsLoaded() then
+    pcall(game.Loaded.Wait, game.Loaded)
+end
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Http = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+
+local HAS_HOOK = (typeof(hookmetamethod)=="function") and (typeof(getnamecallmethod)=="function") and (typeof(checkcaller)=="function")
+
+local function J(v, max)
+    max = max or 260
+    local ok,s = pcall(function() return Http:JSONEncode(v) end)
+    s = ok and s or tostring(v)
+    if #s>max then s = s:sub(1,max).." …" end
+    return s
+end
+
+local function copy(text)
+    local ok=false
+    ok = pcall(function() setclipboard(text) end) or ok
+    ok = (syn and syn.write_clipboard and pcall(function() syn.write_clipboard(text) end)) or ok
+    if not ok then warn("[RemoteLogger] copy:", text) end
+end
+
+-- безопасный родитель для GUI (CoreGui / gethui)
+local function getGuiParent()
+    local ok,hui = pcall(function() return gethui and gethui() end)
+    if ok and typeof(hui)=="Instance" then return hui end
+    return CoreGui
+end
+
+-- ===== HUD
+local Gui = Instance.new("ScreenGui")
+Gui.IgnoreGuiInset = true
+Gui.ResetOnSpawn = false
+Gui.Name = "RemoteLoggerHUD"
+Gui.Parent = getGuiParent()
+pcall(function() if syn and syn.protect_gui then syn.protect_gui(Gui) end end)
+
+local Frame = Instance.new("Frame", Gui)
+Frame.BackgroundColor3 = Color3.fromRGB(16,16,22)
+Frame.Size = UDim2.new(0, 640, 0, 460)
+Frame.Position = UDim2.new(0.5, -320, 0.2, 0)
+Frame.Visible = true -- сразу показываем окно
+local FCorner = Instance.new("UICorner", Frame) FCorner.CornerRadius = UDim.new(0,10)
+local FStroke = Instance.new("UIStroke", Frame) FStroke.Thickness = 1.5 FStroke.Color = Color3.fromRGB(90,130,255) FStroke.Transparency = 0.35
+
+local TitleBar = Instance.new("Frame", Frame)
+TitleBar.BackgroundColor3 = Color3.fromRGB(20,22,32)
+TitleBar.Size = UDim2.new(1, -12, 0, 36)
+TitleBar.Position = UDim2.new(0, 6, 0, 6)
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0,8)
+
+local Title = Instance.new("TextLabel", TitleBar)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextColor3 = Color3.fromRGB(220,230,255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Text = "Remote Logger  •  IN всегда, OUT при наличии hookmetamethod  •  RightShift — показать/скрыть"
+Title.Size = UDim2.new(1, -200, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+
+local CloseBtn = Instance.new("TextButton", TitleBar)
+CloseBtn.Text = "×"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.TextColor3 = Color3.fromRGB(255,255,255)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(36,42,64)
+CloseBtn.Size = UDim2.fromOffset(32,28)
+CloseBtn.Position = UDim2.new(1,-36,0.5,-14)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
+
+local CopyAllBtn = Instance.new("TextButton", TitleBar)
+CopyAllBtn.Text = "Copy All"
+CopyAllBtn.Font = Enum.Font.Gotham
+CopyAllBtn.TextSize = 12
+CopyAllBtn.TextColor3 = Color3.fromRGB(230,235,255)
+CopyAllBtn.BackgroundColor3 = Color3.fromRGB(30,34,56)
+CopyAllBtn.Size = UDim2.fromOffset(80,28)
+CopyAllBtn.Position = UDim2.new(1,-160,0.5,-14)
+Instance.new("UICorner", CopyAllBtn).CornerRadius = UDim.new(0,6)
+
+local RescanBtn = Instance.new("TextButton", TitleBar)
+RescanBtn.Text = "Rescan"
+RescanBtn.Font = Enum.Font.Gotham
+RescanBtn.TextSize = 12
+RescanBtn.TextColor3 = Color3.fromRGB(230,235,255)
+RescanBtn.BackgroundColor3 = Color3.fromRGB(30,34,56)
+RescanBtn.Size = UDim2.fromOffset(68,28)
+RescanBtn.Position = UDim2.new(1,-246,0.5,-14)
+Instance.new("UICorner", RescanBtn).CornerRadius = UDim.new(0,6)
+
+local Search = Instance.new("TextBox", Frame)
+Search.PlaceholderText = "Search remotes…"
+Search.ClearTextOnFocus = false
+Search.Text = ""
+Search.TextColor3 = Color3.fromRGB(230,235,255)
+Search.BackgroundColor3 = Color3.fromRGB(22,22,30)
+Search.Font = Enum.Font.Gotham
+Search.TextSize = 14
+Search.Size = UDim2.new(1, -24, 0, 30)
+Search.Position = UDim2.new(0, 12, 0, 52)
+Instance.new("UICorner", Search).CornerRadius = UDim.new(0,6)
+
+local Header = Instance.new("TextLabel", Frame)
+Header.BackgroundTransparency = 1
+Header.Font = Enum.Font.Gotham
+Header.TextSize = 12
+Header.TextColor3 = Color3.fromRGB(170,190,255)
+Header.TextXAlignment = Enum.TextXAlignment.Left
+Header.Text = "Type   IN   OUT        Path  ::  Last args"
+Header.Size = UDim2.new(1, -24, 0, 16)
+Header.Position = UDim2.new(0, 12, 0, 86)
+
+local ListFrame = Instance.new("ScrollingFrame", Frame)
+ListFrame.BackgroundColor3 = Color3.fromRGB(10,10,14)
+ListFrame.BorderSizePixel = 0
+ListFrame.Size = UDim2.new(1, -24, 1, -152)
+ListFrame.Position = UDim2.new(0, 12, 0, 106)
+ListFrame.ScrollBarThickness = 6
+Instance.new("UICorner", ListFrame).CornerRadius = UDim.new(0,8)
+
+local Footer = Instance.new("TextLabel", Frame)
+Footer.BackgroundTransparency = 1
+Footer.Font = Enum.Font.Gotham
+Footer.TextSize = 12
+Footer.TextColor3 = Color3.fromRGB(180,200,255)
+Footer.TextXAlignment = Enum.TextXAlignment.Right
+Footer.Text = "IN: 0 • OUT: 0 • total: 0"
+Footer.Size = UDim2.new(1, -24, 0, 16)
+Footer.Position = UDim2.new(0, 12, 1, -34)
+
+local ListLayout = Instance.new("UIListLayout", ListFrame)
+ListLayout.Padding = UDim.new(0,6)
+ListLayout.FillDirection = Enum.FillDirection.Vertical
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function updateCanvasSize()
+    ListFrame.CanvasSize = UDim2.new(0,0,0, ListLayout.AbsoluteContentSize.Y + 12)
+end
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
+
+-- перетаскивание (по всей верхней панели)
+do
+    local dragging=false; local start; local pos
+    local dragArea = TitleBar
+    dragArea.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; start=i.Position; pos=Frame.Position end
+    end)
+    dragArea.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UIS.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+            local d = i.Position - start
+            Frame.Position = UDim2.new(pos.X.Scale, pos.X.Offset + d.X, pos.Y.Scale, pos.Y.Offset + d.Y)
+        end
+    end)
+end
+CloseBtn.MouseButton1Click:Connect(function() Frame.Visible = false end)
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Frame.Visible = not Frame.Visible
+    end
+end)
+
+-- ===== data model
+-- key = fullName
+-- item = {inst=Instance, type="RE"/"RF", inN=0, outN=0, last=""}
+local DB, WIDGETS = {}, {}
+local IN_SUM, OUT_SUM = 0, 0
+local insertedOrder = 0
+
+local function shorten(full)
+    local parts = string.split(full, ".")
+    if #parts <= 3 then return full end
+    return table.concat({parts[#parts-2], parts[#parts-1], parts[#parts]}, ".")
+end
+
+local function setFooter()
+    local total = 0
+    for _ in pairs(DB) do total += 1 end
+    Footer.Text = string.format("IN: %d • OUT: %d • total: %d", IN_SUM, OUT_SUM, total)
+end
+
+local function makeRow(key)
+    local it = DB[key]
+    local btn = Instance.new("TextButton")
+    btn.AutoButtonColor = true
+    btn.BackgroundColor3 = Color3.fromRGB(26,28,40)
+    btn.Size = UDim2.new(1, -8, 0, 34)
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(240,245,255)
+    btn.Parent = ListFrame
+    btn.LayoutOrder = it.order
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    -- КОПИРУЕМ ВЕСЬ ТЕКСТ СТРОКИ (как отображается в UI)
+    btn.MouseButton1Click:Connect(function()
+        copy(btn.Text)
+    end)
+
+    WIDGETS[key] = btn
+    return btn
+end
+
+local function render(key)
+    local it = DB[key]; if not it then return end
+    local btn = WIDGETS[key] or makeRow(key)
+    local last = it.last ~= "" and it.last or "-"
+    btn.Text = string.format("[%s] %3d %4d   %s   :: %s",
+        it.type, it.inN, it.outN, shorten(key), last)
+    btn.Visible = true
+end
+
+local function refilter()
+    local q = string.lower(Search.Text or "")
+    for key,btn in pairs(WIDGETS) do
+        if q == "" or string.find(string.lower(key), q, 1, true) then
+            btn.Visible = true
+        else
+            btn.Visible = false
+        end
+    end
+    updateCanvasSize()
+end
+Search:GetPropertyChangedSignal("Text"):Connect(refilter)
+
+local function touch(remote, side, args)
+    local key = remote:GetFullName()
+    local it = DB[key]
+    if not it then
+        insertedOrder += 1
+        it = {inst=remote, type=remote.ClassName=="RemoteFunction" and "RF" or "RE", inN=0, outN=0, last="", order=insertedOrder}
+        DB[key] = it
+    end
+    if side == "IN" then it.inN += 1 IN_SUM += 1 else it.outN += 1 OUT_SUM += 1 end
+    it.last = J(args)
+    render(key)
+    setFooter()
+    refilter()
+end
+
+-- ===== регистрация ВСЕХ ремоутов в списке (даже без вызовов)
+local function registerRemote(inst)
+    local key = inst:GetFullName()
+    if DB[key] then return end
+    insertedOrder += 1
+    DB[key] = {inst=inst, type=inst.ClassName=="RemoteFunction" and "RF" or "RE", inN=0, outN=0, last="", order=insertedOrder}
+    render(key)
+    setFooter()
+end
+
+-- ===== hooks
+local function hookRE(re)
+    registerRemote(re)
+    re.OnClientEvent:Connect(function(...) touch(re, "IN", {...}) end)
+end
+local function hookRF(rf)
+    registerRemote(rf)
+    -- входящие RF отследить нельзя без OnClientInvoke; ловим OUT через хук
+end
+
+for _,d in ipairs(game:GetDescendants()) do
+    if d:IsA("RemoteEvent") then hookRE(d) end
+    if d:IsA("RemoteFunction") then hookRF(d) end
+end
+game.DescendantAdded:Connect(function(obj)
+    if obj:IsA("RemoteEvent") then hookRE(obj) end
+    if obj:IsA("RemoteFunction") then hookRF(obj) end
+end)
+
+-- OUT перехват
+if HAS_HOOK then
+    local old
+    old = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if (method=="FireServer" or method=="InvokeServer") and typeof(self)=="Instance" and (self:IsA("RemoteEvent") or self:IsA("RemoteFunction")) then
+            local args = {...}
+            pcall(function() touch(self, "OUT", args) end)
+        end
+        return old(self, ...)
+    end)
+end
+
+-- ===== кнопки в шапке
+RescanBtn.MouseButton1Click:Connect(function()
+    for key,_ in pairs(WIDGETS) do WIDGETS[key]:Destroy() end
+    DB, WIDGETS, IN_SUM, OUT_SUM, insertedOrder = {}, {}, 0, 0, 0
+    for _,d in ipairs(game:GetDescendants()) do
+        if d:IsA("RemoteEvent") then hookRE(d) end
+        if d:IsA("RemoteFunction") then hookRF(d) end
+    end
+    setFooter()
+    refilter()
+end)
+
+CopyAllBtn.MouseButton1Click:Connect(function()
+    local list = {}
+    for key,_ in pairs(DB) do
+        local it = DB[key]
+        local line = string.format("[%s] %3d %4d   %s   :: %s",
+            it.type, it.inN, it.outN, key, (it.last ~= "" and it.last or "-"))
+        table.insert(list, line)
+    end
+    table.sort(list)
+    copy(table.concat(list, "\n"))
+end)
+
+-- ===== интеграция с Rayfield (если библиотека есть)
+if Tab then
+    local Toggle = Tab:CreateToggle({
+        Name = "Remote Logger (show/hide)",
+        CurrentValue = true,
+        Flag = "RemoteLoggerToggle",
+        Callback = function(v)
+            Frame.Visible = v and true or false
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "Rescan all remotes",
+        Callback = function()
+            RescanBtn:Activate()
+        end
+    })
+
+    Tab:CreateButton({
+        Name = "Copy all rows",
+        Callback = function()
+            CopyAllBtn:Activate()
+        end
+    })
+end
