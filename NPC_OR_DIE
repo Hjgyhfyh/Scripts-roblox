@@ -1,0 +1,1278 @@
+--!strict
+--[[
+tg: @sigmatik323 | by sigmatik323
+Polished utility interface for the CatFarmer experience
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Camera = Workspace.CurrentCamera
+end)
+
+local Window = Rayfield:CreateWindow({
+    Name = "tg: @sigmatik323 | by sigmatik323",
+    LoadingTitle = "Elegance in Motion",
+    LoadingSubtitle = "crafted for CatFarmer",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "Sigmatik323", -- persistent cache for player preferences
+        FileName = "CatFarmerInterface"
+    },
+    Discord = {
+        Enabled = false
+    },
+    KeySystem = false
+})
+
+Rayfield:Notify({
+    Title = "Welcome to the suite",
+    Content = "Every tool is tuned for style and precision.",
+    Duration = 6.5,
+    Image = 4483362458
+})
+
+--// Utility helpers
+local function isLobbyPlayer(player)
+    local team = player.Team
+    return team ~= nil and team.Name == "Lobby"
+end
+
+local function isValidOpponent(player)
+    if player == LocalPlayer then
+        return false
+    end
+    if isLobbyPlayer(player) then
+        return false
+    end
+    return true
+end
+
+local function captureColorFromValue(value)
+    local valueType = typeof(value)
+    if valueType == "Color3" then
+        return value
+    elseif valueType == "BrickColor" then
+        return value.Color
+    elseif valueType == "ColorSequence" then
+        return value.Keypoints[#value.Keypoints].Value
+    elseif valueType == "Vector3" then
+        return Color3.new(math.clamp(value.X, 0, 1), math.clamp(value.Y, 0, 1), math.clamp(value.Z, 0, 1))
+    elseif valueType == "UDim2" then
+        return Color3.fromRGB(math.clamp(value.X.Offset, 0, 255), math.clamp(value.Y.Offset, 0, 255), 200)
+    elseif valueType == "string" then
+        local hex = value:match("#?(%x%x%x%x%x%x)")
+        if hex then
+            local r = tonumber(hex:sub(1, 2), 16)
+            local g = tonumber(hex:sub(3, 4), 16)
+            local b = tonumber(hex:sub(5, 6), 16)
+            if r and g and b then
+                return Color3.fromRGB(r, g, b)
+            end
+        end
+        local rStr, gStr, bStr = value:match("(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+        if rStr and gStr and bStr then
+            return Color3.fromRGB(tonumber(rStr), tonumber(gStr), tonumber(bStr))
+        end
+    elseif valueType == "number" then
+        if value >= 0 and value <= 1 then
+            return Color3.new(value, value, value)
+        end
+        local success, brick = pcall(BrickColor.new, value)
+        if success and brick then
+            return brick.Color
+        end
+        local r = math.floor(value % 256)
+        local g = math.floor((value / 256) % 256)
+        local b = math.floor((value / 65536) % 256)
+        return Color3.fromRGB(r, g, b)
+    elseif valueType == "Instance" then
+        if value:IsA("Color3Value") then
+            return value.Value
+        elseif value:IsA("BrickColorValue") then
+            return value.Value.Color
+        end
+    end
+    return nil
+end
+
+local function getLeaderboardColor(player)
+    if player.Team and player.TeamColor then
+        return player.TeamColor.Color
+    end
+
+    local attributes = player:GetAttributes()
+    for key, attrValue in pairs(attributes) do
+        if key:lower():find("color") then
+            local color = captureColorFromValue(attrValue)
+            if color then
+                return color
+            end
+        end
+    end
+
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        for _, child in ipairs(leaderstats:GetChildren()) do
+            local color = captureColorFromValue(child)
+            if not color and child:IsA("ValueBase") then
+                color = captureColorFromValue(child.Value)
+            end
+            if color then
+                return color
+            end
+        end
+    end
+
+    return Color3.fromRGB(255, 170, 127)
+end
+
+local function getCharacterRoot(character)
+    if not character then
+        return nil
+    end
+    return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getCharacterHumanoid(character)
+    if not character then
+        return nil
+    end
+    return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function resetVelocity(part)
+    pcall(function()
+        part.AssemblyLinearVelocity = Vector3.zero
+        part.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+local function tweenRoot(root, targetCFrame, duration)
+    resetVelocity(root)
+    local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+        CFrame = targetCFrame
+    })
+    tween:Play()
+    local success = pcall(function()
+        tween.Completed:Wait()
+    end)
+    if not success then
+        tween:Cancel()
+    end
+end
+
+-- Character cache entries track the located model and the last search time.
+local characterCache = {}
+local modelToPlayer = {} -- Reverse lookup from tracked character models to their owners
+
+-- Alignment cache stores a player's inferred alignment and when it was last checked.
+local alignmentCache = {}
+
+local function isCharacterModel(instance)
+    if not (instance and instance:IsA("Model") and instance.Parent) then
+        return false
+    end
+    local model = instance
+    local humanoid = getCharacterHumanoid(model)
+    local root = getCharacterRoot(model)
+    return humanoid ~= nil and root ~= nil
+end
+
+local function modelBelongsToPlayer(model, player)
+    if model.Name == player.Name then
+        return true
+    end
+
+    local function checkAttribute(name, value)
+        if not name then
+            return false
+        end
+        local lowerName = name:lower()
+        if lowerName:find("player") or lowerName:find("owner") or lowerName:find("user") then
+            if typeof(value) == "Instance" and value == player then
+                return true
+            elseif typeof(value) == "number" and value == player.UserId then
+                return true
+            elseif typeof(value) == "string" and value:lower() == player.Name:lower() then
+                return true
+            end
+        end
+        return false
+    end
+
+    for attributeName, attributeValue in pairs(model:GetAttributes()) do
+        if checkAttribute(attributeName, attributeValue) then
+            return true
+        end
+        if typeof(attributeValue) == "string" and attributeValue:lower() == player.Name:lower() then
+            return true
+        elseif typeof(attributeValue) == "number" and attributeValue == player.UserId then
+            return true
+        end
+    end
+
+    local potentialTags = {"Owner", "Player", "PlayerOwner", "PlayerName", "Username"}
+    for _, tagName in ipairs(potentialTags) do
+        local tag = model:FindFirstChild(tagName)
+        if tag then
+            if tag:IsA("ObjectValue") and tag.Value == player then
+                return true
+            elseif tag:IsA("StringValue") and tag.Value:lower() == player.Name:lower() then
+                return true
+            elseif tag:IsA("NumberValue") and tag.Value == player.UserId then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function locateCharacterInWorkspace(player)
+    local byName = Workspace:FindFirstChild(player.Name, true)
+    if byName and byName:IsA("Model") and isCharacterModel(byName) then
+        return byName
+    end
+
+    for _, descendant in ipairs(Workspace:GetDescendants()) do
+        if descendant:IsA("Model") and isCharacterModel(descendant) then
+            local model = descendant
+            if modelBelongsToPlayer(model, player) then
+                return model
+            end
+        end
+    end
+
+    return nil
+end
+
+local function getCharacterCache(player)
+    local entry = characterCache[player]
+    if entry then
+        return entry
+    end
+    entry = {
+        model = nil,
+        lastSearch = 0
+    }
+    characterCache[player] = entry
+    return entry
+end
+
+local function assignCachedCharacter(player, character)
+    local entry = getCharacterCache(player)
+    if entry.model and modelToPlayer[entry.model] == player then
+        modelToPlayer[entry.model] = nil
+    end
+    entry.model = character
+    entry.lastSearch = os.clock()
+    if character then
+        modelToPlayer[character] = player
+    end
+end
+
+local function invalidateCachedCharacter(player, target)
+    local entry = characterCache[player]
+    if not entry then
+        return
+    end
+    if target == nil or entry.model == target then
+        if entry.model and modelToPlayer[entry.model] == player then
+            modelToPlayer[entry.model] = nil
+        end
+        entry.model = nil
+        entry.lastSearch = 0
+    end
+end
+
+local function resolveCharacter(player)
+    local entry = getCharacterCache(player)
+
+    local currentCharacter = player.Character
+    if isCharacterModel(currentCharacter) then
+        local model = currentCharacter
+        assignCachedCharacter(player, model)
+        return model
+    end
+
+    if entry.model and isCharacterModel(entry.model) then
+        return entry.model
+    end
+
+    local now = os.clock()
+    if now - entry.lastSearch < 1 then
+        return nil
+    end
+
+    local located = locateCharacterInWorkspace(player)
+    assignCachedCharacter(player, located)
+    return located
+end
+
+--// ESP system
+local espEnabled = false
+local highlightFolder = Instance.new("Folder")
+highlightFolder.Name = "Sigmatik323Highlights"
+highlightFolder.Parent = Workspace
+
+local playerConnections = {}
+local highlightMap = {}
+local colorUpdaterConnection = nil
+
+
+local function removeHighlight(player)
+    local highlight = highlightMap[player]
+    if highlight then
+        highlight:Destroy()
+        highlightMap[player] = nil
+    end
+end
+
+local function applyHighlight(player)
+    if not espEnabled then
+        return
+    end
+    if not isValidOpponent(player) then
+        removeHighlight(player)
+        return
+    end
+
+    local character = resolveCharacter(player)
+    if not character then
+        removeHighlight(player)
+        return
+    end
+
+    local humanoid = getCharacterHumanoid(character)
+    if not humanoid or humanoid.Health <= 0 then
+        removeHighlight(player)
+        return
+    end
+
+    local highlight = highlightMap[player]
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Name = `SigmatikESP_{player.Name}`
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.65
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = character
+        highlight.Parent = highlightFolder
+        highlightMap[player] = highlight
+    else
+        highlight.Adornee = character
+        highlight.Enabled = true
+    end
+
+    local color = getLeaderboardColor(player)
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+end
+
+local function updateAllHighlights()
+    for player, highlight in pairs(highlightMap) do
+        if highlight then
+            local character = resolveCharacter(player)
+            if character then
+                highlight.Adornee = character
+                highlight.Enabled = true
+                local color = getLeaderboardColor(player)
+                highlight.FillColor = color
+                highlight.OutlineColor = color
+            else
+                highlight.Enabled = false
+            end
+        end
+    end
+end
+
+local function disconnectConnection(connection)
+    if connection then
+        connection:Disconnect()
+    end
+end
+
+local function detachLeaderstatsConnections(connections)
+    if not connections then
+        return
+    end
+    disconnectConnection(connections.LeaderChildAdded)
+    connections.LeaderChildAdded = nil
+    disconnectConnection(connections.LeaderChildRemoved)
+    connections.LeaderChildRemoved = nil
+    if connections.LeaderValueSignals then
+        for _, signal in ipairs(connections.LeaderValueSignals) do
+            disconnectConnection(signal)
+        end
+        connections.LeaderValueSignals = nil
+    end
+end
+
+local function attachLeaderstatsConnections(player, leaderstats, connections)
+    detachLeaderstatsConnections(connections)
+    if not (leaderstats and leaderstats:IsA("Folder")) then
+        return
+    end
+
+    connections.LeaderValueSignals = {}
+
+    local function bindValue(valueObject)
+        table.insert(connections.LeaderValueSignals, valueObject:GetPropertyChangedSignal("Value"):Connect(function()
+            local alignmentEntry = alignmentCache[player]
+            if alignmentEntry then
+                alignmentEntry.lastCheck = 0
+            end
+            if espEnabled then
+                applyHighlight(player)
+            end
+        end))
+    end
+
+    for _, child in ipairs(leaderstats:GetChildren()) do
+        if child:IsA("ValueBase") then
+            bindValue(child)
+        end
+    end
+
+    connections.LeaderChildAdded = leaderstats.ChildAdded:Connect(function(child)
+        if child:IsA("ValueBase") then
+            bindValue(child)
+        end
+        local alignmentEntry = alignmentCache[player]
+        if alignmentEntry then
+            alignmentEntry.lastCheck = 0
+        end
+        if espEnabled then
+            task.defer(updateAllHighlights)
+        end
+    end)
+
+    connections.LeaderChildRemoved = leaderstats.ChildRemoved:Connect(function()
+        local alignmentEntry = alignmentCache[player]
+        if alignmentEntry then
+            alignmentEntry.lastCheck = 0
+        end
+        if espEnabled then
+            task.defer(updateAllHighlights)
+        end
+        attachLeaderstatsConnections(player, leaderstats, connections)
+    end)
+end
+
+local function setupPlayerConnections(player)
+    if player == LocalPlayer then
+        return
+    end
+
+    local connections = playerConnections[player]
+    if connections then
+        return
+    end
+
+    connections = {}
+
+    connections.CharacterAdded = player.CharacterAdded:Connect(function(character)
+        assignCachedCharacter(player, character)
+        if espEnabled then
+            task.wait(0.2)
+            applyHighlight(player)
+        end
+    end)
+
+    connections.CharacterRemoving = player.CharacterRemoving:Connect(function(character)
+        invalidateCachedCharacter(player, character)
+        local highlight = highlightMap[player]
+        if highlight then
+            highlight.Adornee = nil
+        end
+    end)
+
+    connections.TeamChanged = player:GetPropertyChangedSignal("Team"):Connect(function()
+        local alignmentEntry = alignmentCache[player]
+        if alignmentEntry then
+            alignmentEntry.lastCheck = 0
+        end
+        if espEnabled then
+            applyHighlight(player)
+        else
+            removeHighlight(player)
+        end
+    end)
+
+    connections.AttributeChanged = player.AttributeChanged:Connect(function()
+        local alignmentEntry = alignmentCache[player]
+        if alignmentEntry then
+            alignmentEntry.lastCheck = 0
+        end
+    end)
+
+    connections.PlayerChildAdded = player.ChildAdded:Connect(function(child)
+        if child.Name == "leaderstats" then
+            attachLeaderstatsConnections(player, child, connections)
+            if espEnabled then
+                task.defer(function()
+                    applyHighlight(player)
+                    updateAllHighlights()
+                end)
+            end
+        end
+        if child:IsA("Folder") or child:IsA("ValueBase") then
+            local alignmentEntry = alignmentCache[player]
+            if alignmentEntry then
+                alignmentEntry.lastCheck = 0
+            end
+        end
+    end)
+
+    connections.PlayerChildRemoved = player.ChildRemoved:Connect(function(child)
+        if child.Name == "leaderstats" then
+            detachLeaderstatsConnections(connections)
+        end
+        if child:IsA("Folder") or child:IsA("ValueBase") then
+            local alignmentEntry = alignmentCache[player]
+            if alignmentEntry then
+                alignmentEntry.lastCheck = 0
+            end
+        end
+    end)
+
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        attachLeaderstatsConnections(player, leaderstats, connections)
+    end
+
+    playerConnections[player] = connections
+
+    if espEnabled then
+        task.defer(function()
+            applyHighlight(player)
+        end)
+    end
+end
+
+local function clearPlayerConnections(player)
+    local connections = playerConnections[player]
+    if connections then
+        detachLeaderstatsConnections(connections)
+        for _, connection in pairs(connections) do
+            if typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            end
+        end
+        playerConnections[player] = nil
+    end
+    invalidateCachedCharacter(player, nil)
+    characterCache[player] = nil
+    alignmentCache[player] = nil
+    removeHighlight(player)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayerConnections(player)
+end
+
+Players.PlayerAdded:Connect(setupPlayerConnections)
+Players.PlayerRemoving:Connect(function(player)
+    clearPlayerConnections(player)
+end)
+
+local function setESP(state)
+    espEnabled = state
+    if state then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                applyHighlight(player)
+            end
+        end
+        if not colorUpdaterConnection then
+            colorUpdaterConnection = RunService.Heartbeat:Connect(function()
+                updateAllHighlights()
+            end)
+        end
+    else
+        for player, highlight in pairs(highlightMap) do
+            if highlight then
+                highlight:Destroy()
+            end
+            highlightMap[player] = nil
+        end
+        if colorUpdaterConnection then
+            colorUpdaterConnection:Disconnect()
+            colorUpdaterConnection = nil
+        end
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(instance)
+    if not instance:IsA("Model") then
+        return
+    end
+    if not isCharacterModel(instance) then
+        return
+    end
+    local model = instance
+    for _, player in ipairs(Players:GetPlayers()) do
+        if modelBelongsToPlayer(model, player) then
+            assignCachedCharacter(player, model)
+            if espEnabled then
+                task.defer(function()
+                    applyHighlight(player)
+                end)
+            end
+            break
+        end
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(instance)
+    if not instance:IsA("Model") then
+        return
+    end
+    local model = instance
+    local owner = modelToPlayer[model]
+    if owner then
+        invalidateCachedCharacter(owner, model)
+        modelToPlayer[model] = nil
+        local highlight = highlightMap[owner]
+        if highlight then
+            highlight.Enabled = false
+            highlight.Adornee = nil
+        end
+    end
+end)
+
+--// Aim assist
+local aimEnabled = false
+local aimConnection = nil
+
+local criminalKeywords = {"criminal", "crim", "outlaw", "thief", "villain"}
+
+local function considerAlignmentValue(name, value)
+    if typeof(value) ~= "string" then
+        return nil
+    end
+    local lowerName = name:lower()
+    if lowerName:find("team") or lowerName:find("role") or lowerName:find("class") or lowerName:find("status") or lowerName:find("alignment") or lowerName:find("faction") then
+        return value
+    end
+    return nil
+end
+
+local function captureAlignment(player)
+    local team = player.Team
+    if team then
+        return team.Name
+    end
+
+    for key, value in pairs(player:GetAttributes()) do
+        local considered = considerAlignmentValue(key, value)
+        if considered then
+            return considered
+        end
+    end
+
+    local folders = {"leaderstats", "Stats", "Data"}
+    for _, folderName in ipairs(folders) do
+        local container = player:FindFirstChild(folderName)
+        if container then
+            for _, child in ipairs(container:GetChildren()) do
+                if child:IsA("StringValue") then
+                    local considered = considerAlignmentValue(child.Name, child.Value)
+                    if considered then
+                        return considered
+                    end
+                elseif child:IsA("ValueBase") then
+                    local value = child.Value
+                    if typeof(value) == "string" then
+                        local considered = considerAlignmentValue(child.Name, value)
+                        if considered then
+                            return considered
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function getAlignmentCacheEntry(player)
+    local entry = alignmentCache[player]
+    if entry then
+        return entry
+    end
+    entry = {
+        value = nil,
+        lastCheck = 0
+    }
+    alignmentCache[player] = entry
+    return entry
+end
+
+local function fetchAlignment(player)
+    local entry = getAlignmentCacheEntry(player)
+    local now = os.clock()
+    if now - entry.lastCheck > 1 then
+        entry.value = captureAlignment(player)
+        entry.lastCheck = now
+    end
+    return entry.value
+end
+
+local function alignmentMatchesCriminal(alignment)
+    if not alignment then
+        return false
+    end
+    local lower = alignment:lower()
+    for _, keyword in ipairs(criminalKeywords) do
+        if lower:find(keyword) then
+            return true
+        end
+    end
+    return false
+end
+
+local function isCriminal(player)
+    if not isValidOpponent(player) then
+        return false
+    end
+
+    local team = player.Team
+    if team and alignmentMatchesCriminal(team.Name) then
+        return true
+    end
+
+    local alignment = fetchAlignment(player)
+    if alignmentMatchesCriminal(alignment) then
+        return true
+    end
+
+    return false
+end
+
+local function getBestCriminalTarget()
+    local camera = Camera
+    if not camera then
+        return nil
+    end
+
+    local viewportCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    local closestDistance = math.huge
+    local closestHead = nil
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if isCriminal(player) then
+            local character = resolveCharacter(player)
+            local humanoid = getCharacterHumanoid(character)
+            local root = getCharacterRoot(character)
+            if character and humanoid and humanoid.Health > 0 and root then
+                local head = character:FindFirstChild("Head")
+                local aimPart = root
+                if head and head:IsA("BasePart") then
+                    aimPart = head
+                end
+                local screenPosition, onScreen = camera:WorldToViewportPoint(aimPart.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - viewportCenter).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestHead = aimPart
+                    end
+                end
+            end
+        end
+    end
+
+    return closestHead
+end
+
+local function updateAim()
+    local head = getBestCriminalTarget()
+    if not head then
+        return
+    end
+
+    local camera = Camera
+    if not camera then
+        return
+    end
+
+    local currentCFrame = camera.CFrame
+    local desiredCFrame = CFrame.lookAt(currentCFrame.Position, head.Position)
+    camera.CFrame = currentCFrame:Lerp(desiredCFrame, 0.18)
+end
+
+local function aimCameraAtPart(part)
+    if not part then
+        return
+    end
+    local camera = Camera
+    if not camera then
+        return
+    end
+    local currentCFrame = camera.CFrame
+    local desiredCFrame = CFrame.lookAt(currentCFrame.Position, part.Position)
+    camera.CFrame = currentCFrame:Lerp(desiredCFrame, 0.4)
+end
+
+local function triggerPrimaryFire()
+    local camera = Camera
+    if not camera then
+        return
+    end
+    local viewportSize = camera.ViewportSize
+    local x = viewportSize.X / 2
+    local y = viewportSize.Y / 2
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.03)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+end
+
+local function setAim(state)
+    aimEnabled = state
+    if state then
+        if aimConnection then
+            aimConnection:Disconnect()
+        end
+        aimConnection = RunService.RenderStepped:Connect(updateAim)
+    elseif aimConnection then
+        aimConnection:Disconnect()
+        aimConnection = nil
+    end
+end
+
+local killAllCriminalsRunning = false
+local killAllCriminalsCancelled = false
+
+local function gatherCriminalTargets(originPosition)
+    local targets = {} -- each entry stores {player = Player, position = Vector3}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if isCriminal(player) then
+            local character = resolveCharacter(player)
+            local humanoid = getCharacterHumanoid(character)
+            local root = getCharacterRoot(character)
+            if character and humanoid and humanoid.Health > 0 and root then
+                table.insert(targets, {
+                    player = player,
+                    position = root.Position
+                })
+            end
+        end
+    end
+
+    if originPosition then
+        table.sort(targets, function(a, b)
+            return (a.position - originPosition).Magnitude < (b.position - originPosition).Magnitude
+        end)
+    end
+
+    return targets
+end
+
+local function killAllCriminals()
+    if killAllCriminalsRunning then
+        killAllCriminalsCancelled = true
+        killAllCriminalsRunning = false
+        return
+    end
+
+    local character = ensureCharacter()
+    local root = getCharacterRoot(character)
+    local humanoid = getCharacterHumanoid(character)
+    if not character or not root or not humanoid then
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "Your avatar is not ready. Spawn in before starting the sweep.",
+            Duration = 5,
+            Image = 4483362458
+        })
+        return
+    end
+
+    local targets = gatherCriminalTargets(root.Position)
+    if #targets == 0 then
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "No active criminals were found.",
+            Duration = 4,
+            Image = 4483362458
+        })
+        return
+    end
+
+    killAllCriminalsCancelled = false
+    killAllCriminalsRunning = true
+
+    local eliminatedAny = false
+    local originalCFrame = root.CFrame
+    local cycles = 0
+
+    local success, err = pcall(function()
+        while killAllCriminalsRunning do
+            cycles += 1
+            if cycles > 15 then
+                break
+            end
+
+            if #targets == 0 then
+                targets = gatherCriminalTargets(root.Position)
+                if #targets == 0 then
+                    break
+                end
+            end
+
+            for _, info in ipairs(targets) do
+                if not killAllCriminalsRunning then
+                    break
+                end
+
+                local targetPlayer = info.player
+                local targetCharacter = resolveCharacter(targetPlayer)
+                local targetHumanoid = getCharacterHumanoid(targetCharacter)
+                local targetRoot = getCharacterRoot(targetCharacter)
+                if targetCharacter and targetHumanoid and targetHumanoid.Health > 0 and targetRoot then
+                    eliminatedAny = true
+
+                    local offset = Vector3.new(0, 5.5, -7)
+                    local attackCFrame = CFrame.new(targetRoot.Position + offset, targetRoot.Position)
+                    root.CFrame = attackCFrame
+                    resetVelocity(root)
+                    humanoid.Sit = false
+                    humanoid.PlatformStand = false
+                    task.wait(0.1)
+
+                    local focusPart = targetRoot
+                    local head = targetCharacter:FindFirstChild("Head")
+                    if head and head:IsA("BasePart") then
+                        focusPart = head
+                    end
+
+                    for shot = 1, 6 do
+                        if not killAllCriminalsRunning then
+                            break
+                        end
+                        aimCameraAtPart(focusPart)
+                        triggerPrimaryFire()
+                        task.wait(0.12)
+
+                        local refreshedCharacter = resolveCharacter(targetPlayer)
+                        local refreshedHumanoid = getCharacterHumanoid(refreshedCharacter)
+                        if not refreshedHumanoid or refreshedHumanoid.Health <= 0 then
+                            break
+                        end
+                        local refreshedRoot = getCharacterRoot(refreshedCharacter)
+                        if refreshedRoot then
+                            local refreshedHead = refreshedCharacter:FindFirstChild("Head")
+                            if refreshedHead and refreshedHead:IsA("BasePart") then
+                                focusPart = refreshedHead
+                            else
+                                focusPart = refreshedRoot
+                            end
+                        end
+                    end
+
+                    task.wait(0.2)
+                end
+            end
+
+            targets = gatherCriminalTargets(root.Position)
+            task.wait(0.45)
+        end
+    end)
+
+    killAllCriminalsRunning = false
+    root.CFrame = originalCFrame
+    resetVelocity(root)
+    humanoid.Sit = false
+    humanoid.PlatformStand = false
+
+    if not success then
+        warn(`[KillAllCriminals] {err}`)
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "Sweep interrupted. Check the console for details.",
+            Duration = 5,
+            Image = 4483362458
+        })
+        return
+    end
+
+    if killAllCriminalsCancelled then
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "Criminal sweep cancelled.",
+            Duration = 4,
+            Image = 4483362458
+        })
+        return
+    end
+
+    if eliminatedAny then
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "Criminal sweep completed.",
+            Duration = 4,
+            Image = 4483362458
+        })
+    else
+        Rayfield:Notify({
+            Title = "Kill All Criminals",
+            Content = "No active criminals were found.",
+            Duration = 4,
+            Image = 4483362458
+        })
+    end
+end
+
+--// Movement toolkit
+local function ensureCharacter()
+    local character = LocalPlayer.Character
+    if character and character.Parent then
+        return character
+    end
+    character = LocalPlayer.CharacterAdded:Wait()
+    return character
+end
+
+local function gentleTeleportSequence(waypoints, tweenDuration)
+    local character = ensureCharacter()
+    if not character then
+        return
+    end
+
+    local root = getCharacterRoot(character)
+    local humanoid = getCharacterHumanoid(character)
+    if not root or not humanoid then
+        return
+    end
+
+    humanoid.Sit = false
+    humanoid.PlatformStand = false
+
+    for index, waypoint in ipairs(waypoints) do
+        if index == 1 then
+            root.CFrame = waypoint
+            resetVelocity(root)
+            task.wait(0.15)
+        else
+            tweenRoot(root, waypoint, tweenDuration)
+        end
+    end
+end
+
+local function autoCompleteObby()
+    local firstAnchor = CFrame.new(111, 4, 532)
+    local finalAnchor = CFrame.new(174, 9, 473)
+    gentleTeleportSequence({firstAnchor, finalAnchor}, 3.75)
+    Rayfield:Notify({
+        Title = "Obby completed",
+        Content = "Delivered you smoothly to the final checkpoint.",
+        Duration = 5,
+        Image = 4483362458
+    })
+end
+
+--// Auto farming
+local autoFarmEnabled = false
+local autoFarmThread = nil
+
+local function extractCollectablePosition(instance)
+    if instance:IsA("BasePart") then
+        return instance.Position
+    elseif instance:IsA("Model") then
+        local primary = instance.PrimaryPart
+        if primary then
+            return primary.Position
+        end
+        local part = instance:FindFirstChildWhichIsA("BasePart")
+        if part then
+            return part.Position
+        end
+    elseif instance:IsA("Attachment") then
+        local parent = instance.Parent
+        if parent and parent:IsA("BasePart") then
+            return parent.Position
+        end
+    end
+    return nil
+end
+
+local function collectableWaypoints(referencePosition)
+    local folder = Workspace:FindFirstChild("CollectableItems")
+    if not folder then
+        return {}
+    end
+
+    local rootPosition = referencePosition or Vector3.zero
+
+    local waypoints = {}
+    for _, item in ipairs(folder:GetChildren()) do
+        local position = extractCollectablePosition(item)
+        if position then
+            table.insert(waypoints, position)
+        end
+    end
+
+    table.sort(waypoints, function(a, b)
+        return (a - rootPosition).Magnitude < (b - rootPosition).Magnitude
+    end)
+
+    return waypoints
+end
+
+local function executeAutoFarm()
+    local character = ensureCharacter()
+    local root = getCharacterRoot(character)
+    local humanoid = getCharacterHumanoid(character)
+    if not root or not humanoid then
+        return
+    end
+
+    local waypoints = collectableWaypoints(root.Position)
+    if #waypoints == 0 then
+        Rayfield:Notify({
+            Title = "Collectables",
+            Content = "No collectable items were found in workspace.CollectableItems.",
+            Duration = 5,
+            Image = 4483362458
+        })
+        return
+    end
+
+    humanoid.Sit = false
+    humanoid.PlatformStand = false
+
+    for _, position in ipairs(waypoints) do
+        if not autoFarmEnabled then
+            break
+        end
+        local elevated = position + Vector3.new(0, 4.25, 0)
+        tweenRoot(root, CFrame.new(elevated), 0.32)
+        task.wait(0.08)
+    end
+end
+
+local function startAutoFarm()
+    if autoFarmThread then
+        task.cancel(autoFarmThread)
+    end
+
+    autoFarmThread = task.spawn(function()
+        while autoFarmEnabled do
+            executeAutoFarm()
+            if not autoFarmEnabled then
+                break
+            end
+            task.wait(1.5)
+        end
+    end)
+end
+
+local function setAutoFarm(state)
+    autoFarmEnabled = state
+    if state then
+        startAutoFarm()
+        Rayfield:Notify({
+            Title = "Auto Money Farm",
+            Content = "Sweeping collectables with graceful precision.",
+            Duration = 4,
+            Image = 4483362458
+        })
+    else
+        if autoFarmThread then
+            task.cancel(autoFarmThread)
+            autoFarmThread = nil
+        end
+        Rayfield:Notify({
+            Title = "Auto Money Farm",
+            Content = "Standby. Toggle again to resume farming.",
+            Duration = 4,
+            Image = 4483362458
+        })
+    end
+end
+
+--// Interface layout
+local visualsTab = Window:CreateTab("Visuals", 4483362458)
+visualsTab:CreateSection("Perception")
+
+visualsTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "SigmatikESP",
+    Callback = function(value)
+        setESP(value)
+    end
+})
+
+visualsTab:CreateParagraph({
+    Title = "ESP Styling",
+    Content = "Applies shimmering highlights to every visible opponent using their leaderboard colors, even when they hide behind cover."
+})
+
+local combatTab = Window:CreateTab("Combat", 4483362458)
+combatTab:CreateSection("Precision")
+
+combatTab:CreateToggle({
+    Name = "Criminal Aim Assist",
+    CurrentValue = false,
+    Flag = "SigmatikAim",
+    Callback = function(value)
+        setAim(value)
+    end
+})
+
+combatTab:CreateLabel("Smoothly aligns the camera with the nearest Criminal head while respecting Lobby players.")
+
+combatTab:CreateButton({
+    Name = "Kill All Criminals",
+    Callback = function()
+        task.spawn(killAllCriminals)
+    end
+})
+
+combatTab:CreateLabel("Teleports sequentially to every criminal, aims, and fires until the arena is secure.")
+
+local movementTab = Window:CreateTab("Movement", 4483362458)
+movementTab:CreateSection("Traversal")
+
+movementTab:CreateButton({
+    Name = "Auto Complete Obby",
+    Callback = function()
+        task.spawn(autoCompleteObby)
+    end
+})
+
+movementTab:CreateLabel("Teleports to the checkpoint before gliding to the finish line at a cinematic pace.")
+
+local economyTab = Window:CreateTab("Economy", 4483362458)
+economyTab:CreateSection("Collection")
+
+economyTab:CreateToggle({
+    Name = "Auto Farm Money",
+    CurrentValue = false,
+    Flag = "SigmatikFarm",
+    Callback = function(value)
+        setAutoFarm(value)
+    end
+})
+
+economyTab:CreateParagraph({
+    Title = "Collectable Sweep",
+    Content = "Loops through every item inside workspace.CollectableItems, teleporting with fluid, swift arcs so you gather wealth effortlessly."
+})
+
+Window:SelectTab(1)
+
+return Window
