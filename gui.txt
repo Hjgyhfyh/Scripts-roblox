@@ -1,4 +1,4 @@
-local Sigmatik = loadstring(game:HttpGet('https://example.com/sigmatik-interface'))()
+local Sigmatik = loadstring(game:HttpGet('https://raw.githubusercontent.com/Hjgyhfyh/Scripts-roblox/refs/heads/main/source.txt'))()
 
 local Window = Sigmatik:CreateWindow({
    Name = "Cat Farmer Controls | tg: @sigmatik323 | by sigmatik323",
