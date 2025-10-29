@@ -1,6 +1,6 @@
 --[[
 
-	tg: @sigmatik323 Interface Suite
+	sigmatik323 Interface Suite
 	by Sirius
 
 	shlex  | Designing + Programming
@@ -11,7 +11,7 @@
 ]]
 
 if debugX then
-	warn('Initialising tg: @sigmatik323')
+	warn('Initialising sigmatik323')
 end
 
 local function getService(name)
@@ -72,13 +72,13 @@ end
 local requestsDisabled = true --getgenv and getgenv().DISABLE_RAYFIELD_REQUESTS
 local InterfaceBuild = '3K3W'
 local Release = "Build 1.68"
-local tg: @sigmatik323Folder = "tg: @sigmatik323"
-local ConfigurationFolder = tg: @sigmatik323Folder.."/Configurations"
+local sigmatik323Folder = "sigmatik323"
+local ConfigurationFolder = sigmatik323Folder.."/Configurations"
 local ConfigurationExtension = ".rfld"
 local settingsTable = {
 	General = {
 		-- if needs be in order just make getSetting(name)
-		rayfieldOpen = {Type = 'bind', Value = 'K', Name = 'tg: @sigmatik323 Keybind'},
+		rayfieldOpen = {Type = 'bind', Value = 'K', Name = 'sigmatik323 Keybind'},
 		-- buildwarnings
 		-- rayfieldprompts
 
@@ -135,16 +135,16 @@ local function loadSettings()
 
 	local success, result =	pcall(function()
 		task.spawn(function()
-			if isfolder and isfolder(tg: @sigmatik323Folder) then
-				if isfile and isfile(tg: @sigmatik323Folder..'/settings'..ConfigurationExtension) then
-					file = readfile(tg: @sigmatik323Folder..'/settings'..ConfigurationExtension)
+			if isfolder and isfolder(sigmatik323Folder) then
+				if isfile and isfile(sigmatik323Folder..'/settings'..ConfigurationExtension) then
+					file = readfile(sigmatik323Folder..'/settings'..ConfigurationExtension)
 				end
 			end
 
 			-- for debug in studio
 			if useStudio then
 				file = [[
-		{"General":{"rayfieldOpen":{"Value":"K","Type":"bind","Name":"tg: @sigmatik323 Keybind","Element":{"HoldToInteract":false,"Ext":true,"Name":"tg: @sigmatik323 Keybind","Set":null,"CallOnChange":true,"Callback":null,"CurrentKeybind":"K"}}},"System":{"usageAnalytics":{"Value":false,"Type":"toggle","Name":"Anonymised Analytics","Element":{"Ext":true,"Name":"Anonymised Analytics","Set":null,"CurrentValue":false,"Callback":null}}}}
+		{"General":{"rayfieldOpen":{"Value":"K","Type":"bind","Name":"sigmatik323 Keybind","Element":{"HoldToInteract":false,"Ext":true,"Name":"sigmatik323 Keybind","Set":null,"CallOnChange":true,"Callback":null,"CurrentKeybind":"K"}}},"System":{"usageAnalytics":{"Value":false,"Type":"toggle","Name":"Anonymised Analytics","Element":{"Ext":true,"Name":"Anonymised Analytics","Set":null,"CurrentValue":false,"Callback":null}}}}
 	]]
 			end
 
@@ -184,7 +184,7 @@ local function loadSettings()
 
 	if not success then 
 		if writefile then
-			warn('tg: @sigmatik323 had an issue accessing configuration saving capability.')
+			warn('sigmatik323 had an issue accessing configuration saving capability.')
 		end
 	end
 end
@@ -237,9 +237,9 @@ if not requestsDisabled then
 		end
 	end
 	if cachedSettings and (#cachedSettings == 0 or (cachedSettings.System and cachedSettings.System.usageAnalytics and cachedSettings.System.usageAnalytics.Value)) then
-		sendReport("execution", "tg: @sigmatik323")
+		sendReport("execution", "sigmatik323")
 	elseif not cachedSettings then
-		sendReport("execution", "tg: @sigmatik323")
+		sendReport("execution", "sigmatik323")
 	end
 end
 
@@ -263,7 +263,7 @@ if debugX then
 	warn('Moving on to continue initialisation')
 end
 
-local tg: @sigmatik323Library = {
+local sigmatik323Library = {
 	Flags = {},
 	Theme = {
 		Default = {
@@ -654,15 +654,15 @@ local CoreGui = getService("CoreGui")
 
 -- Interface Management
 
-local tg: @sigmatik323 = useStudio and script.Parent:FindFirstChild('tg: @sigmatik323') or game:GetObjects("rbxassetid://10804731440")[1]
+local sigmatik323 = useStudio and script.Parent:FindFirstChild('sigmatik323') or game:GetObjects("rbxassetid://10804731440")[1]
 local buildAttempts = 0
 local correctBuild = false
 local warned
 local globalLoaded
-local rayfieldDestroyed = false -- True when tg: @sigmatik323Library:Destroy() is called
+local rayfieldDestroyed = false -- True when sigmatik323Library:Destroy() is called
 
 repeat
-	if tg: @sigmatik323:FindFirstChild('Build') and tg: @sigmatik323.Build.Value == InterfaceBuild then
+	if sigmatik323:FindFirstChild('Build') and sigmatik323.Build.Value == InterfaceBuild then
 		correctBuild = true
 		break
 	end
@@ -670,42 +670,42 @@ repeat
 	correctBuild = false
 
 	if not warned then
-		warn('tg: @sigmatik323 | Build Mismatch')
-		print('tg: @sigmatik323 may encounter issues as you are running an incompatible interface version ('.. ((tg: @sigmatik323:FindFirstChild('Build') and tg: @sigmatik323.Build.Value) or 'No Build') ..').\n\nThis version of tg: @sigmatik323 is intended for interface build '..InterfaceBuild..'.')
+		warn('sigmatik323 | Build Mismatch')
+		print('sigmatik323 may encounter issues as you are running an incompatible interface version ('.. ((sigmatik323:FindFirstChild('Build') and sigmatik323.Build.Value) or 'No Build') ..').\n\nThis version of sigmatik323 is intended for interface build '..InterfaceBuild..'.')
 		warned = true
 	end
 
-	toDestroy, tg: @sigmatik323 = tg: @sigmatik323, useStudio and script.Parent:FindFirstChild('tg: @sigmatik323') or game:GetObjects("rbxassetid://10804731440")[1]
+	toDestroy, sigmatik323 = sigmatik323, useStudio and script.Parent:FindFirstChild('sigmatik323') or game:GetObjects("rbxassetid://10804731440")[1]
 	if toDestroy and not useStudio then toDestroy:Destroy() end
 
 	buildAttempts = buildAttempts + 1
 until buildAttempts >= 2
 
-tg: @sigmatik323.Enabled = false
+sigmatik323.Enabled = false
 
 if gethui then
-	tg: @sigmatik323.Parent = gethui()
+	sigmatik323.Parent = gethui()
 elseif syn and syn.protect_gui then 
-	syn.protect_gui(tg: @sigmatik323)
-	tg: @sigmatik323.Parent = CoreGui
+	syn.protect_gui(sigmatik323)
+	sigmatik323.Parent = CoreGui
 elseif not useStudio and CoreGui:FindFirstChild("RobloxGui") then
-	tg: @sigmatik323.Parent = CoreGui:FindFirstChild("RobloxGui")
+	sigmatik323.Parent = CoreGui:FindFirstChild("RobloxGui")
 elseif not useStudio then
-	tg: @sigmatik323.Parent = CoreGui
+	sigmatik323.Parent = CoreGui
 end
 
 if gethui then
 	for _, Interface in ipairs(gethui():GetChildren()) do
-		if Interface.Name == tg: @sigmatik323.Name and Interface ~= tg: @sigmatik323 then
+		if Interface.Name == sigmatik323.Name and Interface ~= sigmatik323 then
 			Interface.Enabled = false
-			Interface.Name = "tg: @sigmatik323-Old"
+			Interface.Name = "sigmatik323-Old"
 		end
 	end
 elseif not useStudio then
 	for _, Interface in ipairs(CoreGui:GetChildren()) do
-		if Interface.Name == tg: @sigmatik323.Name and Interface ~= tg: @sigmatik323 then
+		if Interface.Name == sigmatik323.Name and Interface ~= sigmatik323 then
 			Interface.Enabled = false
-			Interface.Name = "tg: @sigmatik323-Old"
+			Interface.Name = "sigmatik323-Old"
 		end
 	end
 end
@@ -714,7 +714,7 @@ end
 local minSize = Vector2.new(1024, 768)
 local useMobileSizing
 
-if tg: @sigmatik323.AbsoluteSize.X < minSize.X and tg: @sigmatik323.AbsoluteSize.Y < minSize.Y then
+if sigmatik323.AbsoluteSize.X < minSize.X and sigmatik323.AbsoluteSize.Y < minSize.Y then
 	useMobileSizing = true
 end
 
@@ -725,20 +725,20 @@ end
 
 -- Object Variables
 
-local Main = tg: @sigmatik323.Main
-local MPrompt = tg: @sigmatik323:FindFirstChild('Prompt')
+local Main = sigmatik323.Main
+local MPrompt = sigmatik323:FindFirstChild('Prompt')
 local Topbar = Main.Topbar
 local Elements = Main.Elements
 local LoadingFrame = Main.LoadingFrame
 local TabList = Main.TabList
-local dragBar = tg: @sigmatik323:FindFirstChild('Drag')
+local dragBar = sigmatik323:FindFirstChild('Drag')
 local dragInteract = dragBar and dragBar.Interact or nil
 local dragBarCosmetic = dragBar and dragBar.Drag or nil
 
 local dragOffset = 255
 local dragOffsetMobile = 150
 
-tg: @sigmatik323.DisplayOrder = 100
+sigmatik323.DisplayOrder = 100
 LoadingFrame.Version.Text = Release
 
 -- Thanks to Latte Softworks for the Lucide integration for Roblox
@@ -751,28 +751,28 @@ local Minimised = false
 local Hidden = false
 local Debounce = false
 local searchOpen = false
-local Notifications = tg: @sigmatik323.Notifications
+local Notifications = sigmatik323.Notifications
 
-local SelectedTheme = tg: @sigmatik323Library.Theme.Default
+local SelectedTheme = sigmatik323Library.Theme.Default
 
 local function ChangeTheme(Theme)
 	if typeof(Theme) == 'string' then
-		SelectedTheme = tg: @sigmatik323Library.Theme[Theme]
+		SelectedTheme = sigmatik323Library.Theme[Theme]
 	elseif typeof(Theme) == 'table' then
 		SelectedTheme = Theme
 	end
 
-	tg: @sigmatik323.Main.BackgroundColor3 = SelectedTheme.Background
-	tg: @sigmatik323.Main.Topbar.BackgroundColor3 = SelectedTheme.Topbar
-	tg: @sigmatik323.Main.Topbar.CornerRepair.BackgroundColor3 = SelectedTheme.Topbar
-	tg: @sigmatik323.Main.Shadow.Image.ImageColor3 = SelectedTheme.Shadow
+	sigmatik323.Main.BackgroundColor3 = SelectedTheme.Background
+	sigmatik323.Main.Topbar.BackgroundColor3 = SelectedTheme.Topbar
+	sigmatik323.Main.Topbar.CornerRepair.BackgroundColor3 = SelectedTheme.Topbar
+	sigmatik323.Main.Shadow.Image.ImageColor3 = SelectedTheme.Shadow
 
-	tg: @sigmatik323.Main.Topbar.ChangeSize.ImageColor3 = SelectedTheme.TextColor
-	tg: @sigmatik323.Main.Topbar.Hide.ImageColor3 = SelectedTheme.TextColor
-	tg: @sigmatik323.Main.Topbar.Search.ImageColor3 = SelectedTheme.TextColor
+	sigmatik323.Main.Topbar.ChangeSize.ImageColor3 = SelectedTheme.TextColor
+	sigmatik323.Main.Topbar.Hide.ImageColor3 = SelectedTheme.TextColor
+	sigmatik323.Main.Topbar.Search.ImageColor3 = SelectedTheme.TextColor
 	if Topbar:FindFirstChild('Settings') then
-		tg: @sigmatik323.Main.Topbar.Settings.ImageColor3 = SelectedTheme.TextColor
-		tg: @sigmatik323.Main.Topbar.Divider.BackgroundColor3 = SelectedTheme.ElementStroke
+		sigmatik323.Main.Topbar.Settings.ImageColor3 = SelectedTheme.TextColor
+		sigmatik323.Main.Topbar.Divider.BackgroundColor3 = SelectedTheme.ElementStroke
 	end
 
 	Main.Search.BackgroundColor3 = SelectedTheme.TextColor
@@ -785,7 +785,7 @@ local function ChangeTheme(Theme)
 		Main.Notice.BackgroundColor3 = SelectedTheme.Background
 	end
 
-	for _, text in ipairs(tg: @sigmatik323:GetDescendants()) do
+	for _, text in ipairs(sigmatik323:GetDescendants()) do
 		if text.Parent.Parent ~= Notifications then
 			if text:IsA('TextLabel') or text:IsA('TextBox') then text.TextColor3 = SelectedTheme.TextColor end
 		end
@@ -837,9 +837,9 @@ local function getAssetUri(id: any): string
 	if type(id) == "number" then
 		assetUri = "rbxassetid://" .. id
 	elseif type(id) == "string" and not Icons then
-		warn("tg: @sigmatik323 | Cannot use Lucide icons as icons library is not loaded")
+		warn("sigmatik323 | Cannot use Lucide icons as icons library is not loaded")
 	else
-		warn("tg: @sigmatik323 | The icon argument must either be an icon ID (number) or a Lucide icon name (string)")
+		warn("sigmatik323 | The icon argument must either be an icon ID (number) or a Lucide icon name (string)")
 	end
 	return assetUri
 end
@@ -935,10 +935,10 @@ local function LoadConfiguration(Configuration)
 	local success, Data = pcall(function() return HttpService:JSONDecode(Configuration) end)
 	local changed
 
-	if not success then warn('tg: @sigmatik323 had an issue decoding the configuration file, please try delete the file and reopen tg: @sigmatik323.') return end
+	if not success then warn('sigmatik323 had an issue decoding the configuration file, please try delete the file and reopen sigmatik323.') return end
 
 	-- Iterate through current UI elements' flags
-	for FlagName, Flag in pairs(tg: @sigmatik323Library.Flags) do
+	for FlagName, Flag in pairs(sigmatik323Library.Flags) do
 		local FlagValue = Data[FlagName]
 
 		if (typeof(FlagValue) == 'boolean' and FlagValue == false) or FlagValue then
@@ -954,9 +954,9 @@ local function LoadConfiguration(Configuration)
 				end
 			end)
 		else
-			warn("tg: @sigmatik323 | Unable to find '"..FlagName.. "' in the save file.")
+			warn("sigmatik323 | Unable to find '"..FlagName.. "' in the save file.")
 			print("The error above may not be an issue if new elements have been added or not been set values.")
-			--tg: @sigmatik323Library:Notify({Title = "tg: @sigmatik323 Flags", Content = "tg: @sigmatik323 was unable to find '"..FlagName.. "' in the save file. Check sirius.menu/discord for help.", Image = 3944688398})
+			--sigmatik323Library:Notify({Title = "sigmatik323 Flags", Content = "sigmatik323 was unable to find '"..FlagName.. "' in the save file. Check sirius.menu/discord for help.", Image = 3944688398})
 		end
 	end
 
@@ -971,7 +971,7 @@ local function SaveConfiguration()
 	end
 
 	local Data = {}
-	for i, v in pairs(tg: @sigmatik323Library.Flags) do
+	for i, v in pairs(sigmatik323Library.Flags) do
 		if v.Type == "ColorPicker" then
 			Data[i] = PackColor(v.Color)
 		else
@@ -1012,7 +1012,7 @@ local function SaveConfiguration()
 	end
 end
 
-function tg: @sigmatik323Library:Notify(data) -- action e.g open messages
+function sigmatik323Library:Notify(data) -- action e.g open messages
 	task.spawn(function()
 
 		-- Notification Object Creation
@@ -1062,7 +1062,7 @@ function tg: @sigmatik323Library:Notify(data) -- action e.g open messages
 		newNotification.Visible = true
 
 		if data.Actions then
-			warn('tg: @sigmatik323 | Not seeing your actions in notifications?')
+			warn('sigmatik323 | Not seeing your actions in notifications?')
 			print("Notification Actions are being sunset for now, keep up to date on when they're back in the discord. (sirius.menu/discord)")
 		end
 
@@ -1188,9 +1188,9 @@ local function Hide(notify: boolean?)
 	Debounce = true
 	if notify then
 		if useMobilePrompt then 
-			tg: @sigmatik323Library:Notify({Title = "Interface Hidden", Content = "The interface has been hidden, you can unhide the interface by tapping 'Show'.", Duration = 7, Image = 4400697855})
+			sigmatik323Library:Notify({Title = "Interface Hidden", Content = "The interface has been hidden, you can unhide the interface by tapping 'Show'.", Duration = 7, Image = 4400697855})
 		else
-			tg: @sigmatik323Library:Notify({Title = "Interface Hidden", Content = `The interface has been hidden, you can unhide the interface by tapping {getSetting("General", "rayfieldOpen")}.`, Duration = 7, Image = 4400697855})
+			sigmatik323Library:Notify({Title = "Interface Hidden", Content = `The interface has been hidden, you can unhide the interface by tapping {getSetting("General", "rayfieldOpen")}.`, Duration = 7, Image = 4400697855})
 		end
 	end
 
@@ -1484,7 +1484,7 @@ local function saveSettings() -- Save settings to config file
 			end
 		end
 		if writefile then
-			writefile(tg: @sigmatik323Folder..'/settings'..ConfigurationExtension, encoded)
+			writefile(sigmatik323Folder..'/settings'..ConfigurationExtension, encoded)
 		end
 	end
 end
@@ -1506,14 +1506,14 @@ local function createSettings(window)
 		return
 	end
 
-	local newTab = window:CreateTab('tg: @sigmatik323 Settings', 0, true)
+	local newTab = window:CreateTab('sigmatik323 Settings', 0, true)
 
-	if TabList['tg: @sigmatik323 Settings'] then
-		TabList['tg: @sigmatik323 Settings'].LayoutOrder = 1000
+	if TabList['sigmatik323 Settings'] then
+		TabList['sigmatik323 Settings'].LayoutOrder = 1000
 	end
 
-	if Elements['tg: @sigmatik323 Settings'] then
-		Elements['tg: @sigmatik323 Settings'].LayoutOrder = 1000
+	if Elements['sigmatik323 Settings'] then
+		Elements['sigmatik323 Settings'].LayoutOrder = 1000
 	end
 
 	-- Create sections and elements
@@ -1563,15 +1563,15 @@ end
 
 
 
-function tg: @sigmatik323Library:CreateWindow(Settings)
+function sigmatik323Library:CreateWindow(Settings)
 	print('creating window')
-	if tg: @sigmatik323:FindFirstChild('Loading') then
+	if sigmatik323:FindFirstChild('Loading') then
 		if getgenv and not getgenv().rayfieldCached then
-			tg: @sigmatik323.Enabled = true
-			tg: @sigmatik323.Loading.Visible = true
+			sigmatik323.Enabled = true
+			sigmatik323.Loading.Visible = true
 
 			task.wait(1.4)
-			tg: @sigmatik323.Loading.Visible = false
+			sigmatik323.Loading.Visible = false
 		end
 	end
 
@@ -1580,7 +1580,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 	if not correctBuild and not Settings.DisableBuildWarnings then
 		task.delay(3, 
 			function() 
-				tg: @sigmatik323Library:Notify({Title = 'Build Mismatch', Content = 'tg: @sigmatik323 may encounter issues as you are running an incompatible interface version ('.. ((tg: @sigmatik323:FindFirstChild('Build') and tg: @sigmatik323.Build.Value) or 'No Build') ..').\n\nThis version of tg: @sigmatik323 is intended for interface build '..InterfaceBuild..'.\n\nTry rejoining and then run the script twice.', Image = 4335487866, Duration = 15})		
+				sigmatik323Library:Notify({Title = 'Build Mismatch', Content = 'sigmatik323 may encounter issues as you are running an incompatible interface version ('.. ((sigmatik323:FindFirstChild('Build') and sigmatik323.Build.Value) or 'No Build') ..').\n\nThis version of sigmatik323 is intended for interface build '..InterfaceBuild..'.\n\nTry rejoining and then run the script twice.', Image = 4335487866, Duration = 15})		
 			end)
 	end
 
@@ -1600,8 +1600,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 		end
 	end
 
-	if isfolder and not isfolder(tg: @sigmatik323Folder) then
-		makefolder(tg: @sigmatik323Folder)
+	if isfolder and not isfolder(sigmatik323Folder) then
+		makefolder(sigmatik323Folder)
 	end
 
 	-- Attempt to report an event to analytics
@@ -1625,11 +1625,11 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 	end
 
 	LoadingFrame.Version.TextTransparency = 1
-	LoadingFrame.Title.Text = Settings.LoadingTitle or "tg: @sigmatik323"
+	LoadingFrame.Title.Text = Settings.LoadingTitle or "sigmatik323"
 	LoadingFrame.Subtitle.Text = Settings.LoadingSubtitle or "Interface Suite"
 
-	if Settings.LoadingTitle ~= "tg: @sigmatik323 Interface Suite" then
-		LoadingFrame.Version.Text = "tg: @sigmatik323 UI"
+	if Settings.LoadingTitle ~= "sigmatik323 Interface Suite" then
+		LoadingFrame.Version.Text = "sigmatik323 UI"
 	end
 
 	if Settings.Icon and Settings.Icon ~= 0 and Topbar:FindFirstChild('Icon') then
@@ -1674,12 +1674,12 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 	Elements.Visible = false
 	LoadingFrame.Visible = true
 
-	if not Settings.Disabletg: @sigmatik323Prompts then
+	if not Settings.Disablesigmatik323Prompts then
 		task.spawn(function()
 			while true do
 				task.wait(math.random(180, 600))
-				tg: @sigmatik323Library:Notify({
-					Title = "tg: @sigmatik323 Interface",
+				sigmatik323Library:Notify({
+					Title = "sigmatik323 Interface",
 					Content = "Enjoying this UI library? Find it at sirius.menu/discord",
 					Duration = 7,
 					Image = 4370033185,
@@ -1722,11 +1722,11 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 	end
 
 	if Settings.Discord and Settings.Discord.Enabled and not useStudio then
-		if isfolder and not isfolder(tg: @sigmatik323Folder.."/Discord Invites") then
-			makefolder(tg: @sigmatik323Folder.."/Discord Invites")
+		if isfolder and not isfolder(sigmatik323Folder.."/Discord Invites") then
+			makefolder(sigmatik323Folder.."/Discord Invites")
 		end
 
-		if isfile and not isfile(tg: @sigmatik323Folder.."/Discord Invites".."/"..Settings.Discord.Invite..ConfigurationExtension) then
+		if isfile and not isfile(sigmatik323Folder.."/Discord Invites".."/"..Settings.Discord.Invite..ConfigurationExtension) then
 			if requestFunc then
 				pcall(function()
 					requestFunc({
@@ -1746,7 +1746,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			end
 
 			if Settings.Discord.RememberJoins then -- We do logic this way so if the developer changes this setting, the user still won't be prompted, only new users
-				writefile(tg: @sigmatik323Folder.."/Discord Invites".."/"..Settings.Discord.Invite..ConfigurationExtension,"tg: @sigmatik323 RememberJoins is true for this invite, this invite will not ask you to join again")
+				writefile(sigmatik323Folder.."/Discord Invites".."/"..Settings.Discord.Invite..ConfigurationExtension,"sigmatik323 RememberJoins is true for this invite, this invite will not ask you to join again")
 			end
 		end
 	end
@@ -1757,8 +1757,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			return
 		end
 
-		if isfolder and not isfolder(tg: @sigmatik323Folder.."/Key System") then
-			makefolder(tg: @sigmatik323Folder.."/Key System")
+		if isfolder and not isfolder(sigmatik323Folder.."/Key System") then
+			makefolder(sigmatik323Folder.."/Key System")
 		end
 
 		if typeof(Settings.KeySettings.Key) == "string" then Settings.KeySettings.Key = {Settings.KeySettings.Key} end
@@ -1770,8 +1770,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					Settings.KeySettings.Key[i] = string.gsub(Settings.KeySettings.Key[i], " ", "")
 				end)
 				if not Success then
-					print("tg: @sigmatik323 | "..Key.." Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..Key.." Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 				end
 			end
 		end
@@ -1780,9 +1780,9 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			Settings.KeySettings.FileName = "No file name specified"
 		end
 
-		if isfile and isfile(tg: @sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension) then
+		if isfile and isfile(sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension) then
 			for _, MKey in ipairs(Settings.KeySettings.Key) do
-				if string.find(readfile(tg: @sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension), MKey) then
+				if string.find(readfile(sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension), MKey) then
 					Passthrough = true
 				end
 			end
@@ -1790,7 +1790,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 		if not Passthrough then
 			local AttemptsRemaining = math.random(2, 5)
-			tg: @sigmatik323.Enabled = false
+			sigmatik323.Enabled = false
 			local KeyUI = useStudio and script.Parent:FindFirstChild('Key') or game:GetObjects("rbxassetid://11380036235")[1]
 
 			KeyUI.Enabled = true
@@ -1893,9 +1893,9 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					KeyMain.Visible = false
 					if Settings.KeySettings.SaveKey then
 						if writefile then
-							writefile(tg: @sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension, FoundKey)
+							writefile(sigmatik323Folder.."/Key System".."/"..Settings.KeySettings.FileName..ConfigurationExtension, FoundKey)
 						end
-						tg: @sigmatik323Library:Notify({Title = "Key System", Content = "The key for this script has been saved successfully.", Image = 3605522284})
+						sigmatik323Library:Notify({Title = "Key System", Content = "The key for this script has been saved successfully.", Image = 3605522284})
 					end
 				else
 					if AttemptsRemaining == 0 then
@@ -1941,7 +1941,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 				TweenService:Create(KeyMain.NoteMessage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 				TweenService:Create(KeyMain.Hide, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 				task.wait(0.51)
-				tg: @sigmatik323Library:Destroy()
+				sigmatik323Library:Destroy()
 				KeyUI:Destroy()
 			end)
 		else
@@ -1954,7 +1954,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 	Notifications.Template.Visible = false
 	Notifications.Visible = true
-	tg: @sigmatik323.Enabled = true
+	sigmatik323.Enabled = true
 
 	task.wait(0.5)
 	TweenService:Create(Main, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
@@ -2116,7 +2116,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			Button.Interact.MouseButton1Click:Connect(function()
 				local Success, Response = pcall(ButtonSettings.Callback)
-				-- Prevents animation from trying to play if the button's callback called tg: @sigmatik323Library:Destroy()
+				-- Prevents animation from trying to play if the button's callback called sigmatik323Library:Destroy()
 				if rayfieldDestroyed then
 					return
 				end
@@ -2125,8 +2125,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Button.ElementIndicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 					TweenService:Create(Button.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Button.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..ButtonSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..ButtonSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Button.Title.Text = ButtonSettings.Name
 					TweenService:Create(Button, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -2224,7 +2224,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(ColorPicker.HexInput, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 17, 0, 73)}):Play()
 					TweenService:Create(ColorPicker.Interact, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Size = UDim2.new(0.574, 0, 1, 0)}):Play()
 					TweenService:Create(Main.MainPoint, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-					TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {ImageTransparency = SelectedTheme ~= tg: @sigmatik323Library.Theme.Default and 0.25 or 0.1}):Play()
+					TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {ImageTransparency = SelectedTheme ~= sigmatik323Library.Theme.Default and 0.25 or 0.1}):Play()
 					TweenService:Create(Background, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 				else
 					opened = false
@@ -2384,7 +2384,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			if Settings.ConfigurationSaving then
 				if Settings.ConfigurationSaving.Enabled and ColorPickerSettings.Flag then
-					tg: @sigmatik323Library.Flags[ColorPickerSettings.Flag] = ColorPickerSettings
+					sigmatik323Library.Flags[ColorPickerSettings.Flag] = ColorPickerSettings
 				end
 			end
 
@@ -2403,7 +2403,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 				TweenService:Create(ColorPicker, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
 			end)
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				for _, rgbinput in ipairs(ColorPicker.RGB:GetChildren()) do
 					if rgbinput:IsA("Frame") then
 						rgbinput.BackgroundColor3 = SelectedTheme.InputBackground
@@ -2551,7 +2551,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 				end
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Label.BackgroundColor3 = IgnoreTheme and (Color or Label.BackgroundColor3) or SelectedTheme.SecondaryElementBackground
 				Label.UIStroke.Color = IgnoreTheme and (Color or Label.BackgroundColor3) or SelectedTheme.SecondaryElementStroke
 			end)
@@ -2587,7 +2587,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 				Paragraph.Content.Text = NewParagraphSettings.Content
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Paragraph.BackgroundColor3 = SelectedTheme.SecondaryElementBackground
 				Paragraph.UIStroke.Color = SelectedTheme.SecondaryElementStroke
 			end)
@@ -2629,8 +2629,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Input, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 					TweenService:Create(Input.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Input.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..InputSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..InputSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Input.Title.Text = InputSettings.Name
 					TweenService:Create(Input, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -2673,11 +2673,11 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			if Settings.ConfigurationSaving then
 				if Settings.ConfigurationSaving.Enabled and InputSettings.Flag then
-					tg: @sigmatik323Library.Flags[InputSettings.Flag] = InputSettings
+					sigmatik323Library.Flags[InputSettings.Flag] = InputSettings
 				end
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Input.InputFrame.BackgroundColor3 = SelectedTheme.InputBackground
 				Input.InputFrame.UIStroke.Color = SelectedTheme.InputStroke
 			end)
@@ -2869,8 +2869,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 							TweenService:Create(Dropdown, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 							TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 							Dropdown.Title.Text = "Callback Error"
-							print("tg: @sigmatik323 | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
-							warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+							print("sigmatik323 | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
+							warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 							task.wait(0.5)
 							Dropdown.Title.Text = DropdownSettings.Name
 							TweenService:Create(Dropdown, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -2903,7 +2903,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 						end
 					end)
 
-					tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+					sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 						DropdownOption.UIStroke.Color = SelectedTheme.ElementStroke
 					end)
 				end
@@ -2918,7 +2918,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 						droption.BackgroundColor3 = SelectedTheme.DropdownSelected
 					end
 
-					tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+					sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 						if not table.find(DropdownSettings.CurrentOption, droption.Name) then
 							droption.BackgroundColor3 = SelectedTheme.DropdownUnselected
 						else
@@ -2959,8 +2959,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Dropdown, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 					TweenService:Create(Dropdown.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Dropdown.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..DropdownSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Dropdown.Title.Text = DropdownSettings.Name
 					TweenService:Create(Dropdown, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -2991,11 +2991,11 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			if Settings.ConfigurationSaving then
 				if Settings.ConfigurationSaving.Enabled and DropdownSettings.Flag then
-					tg: @sigmatik323Library.Flags[DropdownSettings.Flag] = DropdownSettings
+					sigmatik323Library.Flags[DropdownSettings.Flag] = DropdownSettings
 				end
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Dropdown.Toggle.ImageColor3 = SelectedTheme.TextColor
 				TweenService:Create(Dropdown, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
 			end)
@@ -3080,8 +3080,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 							TweenService:Create(Keybind, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 							TweenService:Create(Keybind.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 							Keybind.Title.Text = "Callback Error"
-							print("tg: @sigmatik323 | "..KeybindSettings.Name.." Callback Error " ..tostring(Response))
-							warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+							print("sigmatik323 | "..KeybindSettings.Name.." Callback Error " ..tostring(Response))
+							warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 							task.wait(0.5)
 							Keybind.Title.Text = KeybindSettings.Name
 							TweenService:Create(Keybind, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -3122,11 +3122,11 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			if Settings.ConfigurationSaving then
 				if Settings.ConfigurationSaving.Enabled and KeybindSettings.Flag then
-					tg: @sigmatik323Library.Flags[KeybindSettings.Flag] = KeybindSettings
+					sigmatik323Library.Flags[KeybindSettings.Flag] = KeybindSettings
 				end
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Keybind.KeybindFrame.BackgroundColor3 = SelectedTheme.InputBackground
 				Keybind.KeybindFrame.UIStroke.Color = SelectedTheme.InputStroke
 			end)
@@ -3149,7 +3149,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			Toggle.Title.TextTransparency = 1
 			Toggle.Switch.BackgroundColor3 = SelectedTheme.ToggleBackground
 
-			if SelectedTheme ~= tg: @sigmatik323Library.Theme.Default then
+			if SelectedTheme ~= sigmatik323Library.Theme.Default then
 				Toggle.Switch.Shadow.Visible = false
 			end
 
@@ -3210,8 +3210,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Toggle, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Toggle.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Toggle.Title.Text = ToggleSettings.Name
 					TweenService:Create(Toggle, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -3260,8 +3260,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Toggle, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 					TweenService:Create(Toggle.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Toggle.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..ToggleSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Toggle.Title.Text = ToggleSettings.Name
 					TweenService:Create(Toggle, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -3276,16 +3276,16 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			if not ToggleSettings.Ext then
 				if Settings.ConfigurationSaving then
 					if Settings.ConfigurationSaving.Enabled and ToggleSettings.Flag then
-						tg: @sigmatik323Library.Flags[ToggleSettings.Flag] = ToggleSettings
+						sigmatik323Library.Flags[ToggleSettings.Flag] = ToggleSettings
 					end
 				end
 			end
 
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 				Toggle.Switch.BackgroundColor3 = SelectedTheme.ToggleBackground
 
-				if SelectedTheme ~= tg: @sigmatik323Library.Theme.Default then
+				if SelectedTheme ~= sigmatik323Library.Theme.Default then
 					Toggle.Switch.Shadow.Visible = false
 				end
 
@@ -3318,7 +3318,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			Slider.UIStroke.Transparency = 1
 			Slider.Title.TextTransparency = 1
 
-			if SelectedTheme ~= tg: @sigmatik323Library.Theme.Default then
+			if SelectedTheme ~= sigmatik323Library.Theme.Default then
 				Slider.Main.Shadow.Visible = false
 			end
 
@@ -3409,8 +3409,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 								TweenService:Create(Slider, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 								TweenService:Create(Slider.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 								Slider.Title.Text = "Callback Error"
-								print("tg: @sigmatik323 | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-								warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+								print("sigmatik323 | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
+								warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 								task.wait(0.5)
 								Slider.Title.Text = SliderSettings.Name
 								TweenService:Create(Slider, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -3443,8 +3443,8 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 					TweenService:Create(Slider, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(85, 0, 0)}):Play()
 					TweenService:Create(Slider.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 					Slider.Title.Text = "Callback Error"
-					print("tg: @sigmatik323 | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
-					warn('Check docs.sirius.menu for help with tg: @sigmatik323 specific development.')
+					print("sigmatik323 | "..SliderSettings.Name.." Callback Error " ..tostring(Response))
+					warn('Check docs.sirius.menu for help with sigmatik323 specific development.')
 					task.wait(0.5)
 					Slider.Title.Text = SliderSettings.Name
 					TweenService:Create(Slider, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {BackgroundColor3 = SelectedTheme.ElementBackground}):Play()
@@ -3459,12 +3459,12 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 
 			if Settings.ConfigurationSaving then
 				if Settings.ConfigurationSaving.Enabled and SliderSettings.Flag then
-					tg: @sigmatik323Library.Flags[SliderSettings.Flag] = SliderSettings
+					sigmatik323Library.Flags[SliderSettings.Flag] = SliderSettings
 				end
 			end
 
-			tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
-				if SelectedTheme ~= tg: @sigmatik323Library.Theme.Default then
+			sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+				if SelectedTheme ~= sigmatik323Library.Theme.Default then
 					Slider.Main.Shadow.Visible = false
 				end
 
@@ -3477,7 +3477,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 			return SliderSettings
 		end
 
-		tg: @sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
+		sigmatik323.Main:GetPropertyChangedSignal('BackgroundColor3'):Connect(function()
 			TabButton.UIStroke.Color = SelectedTheme.TabStroke
 
 			if Elements.UIPageLayout.CurrentPage == TabPage then
@@ -3546,9 +3546,9 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 	function Window.ModifyTheme(NewTheme)
 		local success = pcall(ChangeTheme, NewTheme)
 		if not success then
-			tg: @sigmatik323Library:Notify({Title = 'Unable to Change Theme', Content = 'We are unable find a theme on file.', Image = 4400704299})
+			sigmatik323Library:Notify({Title = 'Unable to Change Theme', Content = 'We are unable find a theme on file.', Image = 4400704299})
 		else
-			tg: @sigmatik323Library:Notify({Title = 'Theme Changed', Content = 'Successfully changed theme to '..(typeof(NewTheme) == 'string' and NewTheme or 'Custom Theme')..'.', Image = 4483362748})
+			sigmatik323Library:Notify({Title = 'Theme Changed', Content = 'Successfully changed theme to '..(typeof(NewTheme) == 'string' and NewTheme or 'Custom Theme')..'.', Image = 4483362748})
 		end
 	end
 
@@ -3556,7 +3556,7 @@ function tg: @sigmatik323Library:CreateWindow(Settings)
 		createSettings(Window)
 	end)
 
-	if not success then warn('tg: @sigmatik323 had an issue creating settings.') end
+	if not success then warn('sigmatik323 had an issue creating settings.') end
 
 	return Window
 end
@@ -3572,19 +3572,19 @@ local function setVisibility(visibility: boolean, notify: boolean?)
 	end
 end
 
-function tg: @sigmatik323Library:SetVisibility(visibility: boolean)
+function sigmatik323Library:SetVisibility(visibility: boolean)
 	setVisibility(visibility, false)
 end
 
-function tg: @sigmatik323Library:IsVisible(): boolean
+function sigmatik323Library:IsVisible(): boolean
 	return not Hidden
 end
 
 local hideHotkeyConnection -- Has to be initialized here since the connection is made later in the script
-function tg: @sigmatik323Library:Destroy()
+function sigmatik323Library:Destroy()
 	rayfieldDestroyed = true
 	hideHotkeyConnection:Disconnect()
-	tg: @sigmatik323:Destroy()
+	sigmatik323:Destroy()
 end
 
 Topbar.ChangeSize.MouseButton1Click:Connect(function()
@@ -3667,7 +3667,7 @@ if Topbar:FindFirstChild('Settings') then
 				end
 			end
 
-			Elements.UIPageLayout:JumpTo(Elements['tg: @sigmatik323 Settings'])
+			Elements.UIPageLayout:JumpTo(Elements['sigmatik323 Settings'])
 		end)
 	end)
 
@@ -3714,7 +3714,7 @@ for _, TopbarButton in ipairs(Topbar:GetChildren()) do
 end
 
 
-function tg: @sigmatik323Library:LoadConfiguration()
+function sigmatik323Library:LoadConfiguration()
 	local config
 
 	if debugX then
@@ -3741,15 +3741,15 @@ function tg: @sigmatik323Library:LoadConfiguration()
 				end
 			else
 				notified = true
-				tg: @sigmatik323Library:Notify({Title = "tg: @sigmatik323 Configurations", Content = "We couldn't enable Configuration Saving as you are not using software with filesystem support.", Image = 4384402990})
+				sigmatik323Library:Notify({Title = "sigmatik323 Configurations", Content = "We couldn't enable Configuration Saving as you are not using software with filesystem support.", Image = 4384402990})
 			end
 		end)
 
 		if success and loaded and not notified then
-			tg: @sigmatik323Library:Notify({Title = "tg: @sigmatik323 Configurations", Content = "The configuration file for this script has been loaded from a previous session.", Image = 4384403532})
+			sigmatik323Library:Notify({Title = "sigmatik323 Configurations", Content = "The configuration file for this script has been loaded from a previous session.", Image = 4384403532})
 		elseif not success and not notified then
-			warn('tg: @sigmatik323 Configurations Error | '..tostring(result))
-			tg: @sigmatik323Library:Notify({Title = "tg: @sigmatik323 Configurations", Content = "We've encountered an issue loading your configuration correctly.\n\nCheck the Developer Console for more information.", Image = 4384402990})
+			warn('sigmatik323 Configurations Error | '..tostring(result))
+			sigmatik323Library:Notify({Title = "sigmatik323 Configurations", Content = "We've encountered an issue loading your configuration correctly.\n\nCheck the Developer Console for more information.", Image = 4384402990})
 		end
 	end
 
@@ -3763,9 +3763,9 @@ if useStudio then
 	-- Feel free to place your own script here to see how it'd work in Roblox Studio before running it on your execution software.
 
 
-	--local Window = tg: @sigmatik323Library:CreateWindow({
-	--	Name = "tg: @sigmatik323 Example Window",
-	--	LoadingTitle = "tg: @sigmatik323 Interface Suite",
+	--local Window = sigmatik323Library:CreateWindow({
+	--	Name = "sigmatik323 Example Window",
+	--	LoadingTitle = "sigmatik323 Interface Suite",
 	--	Theme = 'Default',
 	--	Icon = 0,
 	--	LoadingSubtitle = "by Sirius",
@@ -3784,9 +3784,9 @@ if useStudio then
 	--		Title = "Untitled",
 	--		Subtitle = "Key System",
 	--		Note = "No method of obtaining the key is provided",
-	--		FileName = "Key", -- It is recommended to use something unique as other scripts using tg: @sigmatik323 may overwrite your key file
+	--		FileName = "Key", -- It is recommended to use something unique as other scripts using sigmatik323 may overwrite your key file
 	--		SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-	--		GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like tg: @sigmatik323 to get the key from
+	--		GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like sigmatik323 to get the key from
 	--		Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
 	--	}
 	--})
@@ -3833,7 +3833,7 @@ if useStudio then
 	--})
 
 
-	----tg: @sigmatik323Library:Notify({Title = "tg: @sigmatik323 Interface", Content = "Welcome to tg: @sigmatik323. These - are the brand new notification design for tg: @sigmatik323, with custom sizing and tg: @sigmatik323 calculated wait times.", Image = 4483362458})
+	----sigmatik323Library:Notify({Title = "sigmatik323 Interface", Content = "Welcome to sigmatik323. These - are the brand new notification design for sigmatik323, with custom sizing and sigmatik323 calculated wait times.", Image = 4483362458})
 
 	--local Section = Tab:CreateSection("Section Example")
 
@@ -3891,7 +3891,7 @@ if useStudio then
 	--})
 
 	--local thoptions = {}
-	--for themename, theme in pairs(tg: @sigmatik323Library.Theme) do
+	--for themename, theme in pairs(sigmatik323Library.Theme) do
 	--	table.insert(thoptions, themename)
 	--end
 
@@ -3985,7 +3985,7 @@ end
 --end
 
 task.delay(4, function()
-	tg: @sigmatik323Library.LoadConfiguration()
+	sigmatik323Library.LoadConfiguration()
 	if Main:FindFirstChild('Notice') and Main.Notice.Visible then
 		TweenService:Create(Main.Notice, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {Size = UDim2.new(0, 100, 0, 25), Position = UDim2.new(0.5, 0, 0, -100), BackgroundTransparency = 1}):Play()
 		TweenService:Create(Main.Notice.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
@@ -3995,4 +3995,4 @@ task.delay(4, function()
 	end
 end)
 
-return tg: @sigmatik323Library
+return sigmatik323Library
