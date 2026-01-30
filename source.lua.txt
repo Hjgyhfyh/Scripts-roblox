@@ -761,6 +761,10 @@ local dragOffsetMobile = 150
 Rayfield.DisplayOrder = 100
 LoadingFrame.Version.Text = Release
 
+-- Immediately set default loading text to prevent "Rayfield" flash
+LoadingFrame.Title.Text = "Sigmatik"
+LoadingFrame.Subtitle.Text = "Interface Suite"
+
 -- Thanks to Latte Softworks for the Lucide integration for Roblox
 local Icons = useStudio and require(script.Parent.icons) or loadWithTimeout('https://raw.githubusercontent.com/Hjgyhfyh/Scripts-roblox/refs/heads/main/icons.lua.txt')
 -- Variables
