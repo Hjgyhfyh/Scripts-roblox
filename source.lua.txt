@@ -761,7 +761,9 @@ local dragOffsetMobile = 150
 Rayfield.DisplayOrder = 100
 LoadingFrame.Version.Text = Release
 
--- Immediately set default loading text to prevent "Rayfield" flash
+-- Immediately hide loading text to prevent "Rayfield" flash (will be shown in CreateWindow with correct text)
+LoadingFrame.Title.TextTransparency = 1
+LoadingFrame.Subtitle.TextTransparency = 1
 LoadingFrame.Title.Text = "Sigmatik"
 LoadingFrame.Subtitle.Text = "Interface Suite"
 
