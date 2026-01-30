@@ -675,6 +675,14 @@ local CoreGui = getService("CoreGui")
 -- Interface Management
 
 local Rayfield = useStudio and script.Parent:FindFirstChild('Rayfield') or game:GetObjects("rbxassetid://10804731440")[1]
+
+-- IMMEDIATELY hide and replace "Rayfield" text before anything else
+Rayfield.Enabled = false
+if Rayfield:FindFirstChild('Main') and Rayfield.Main:FindFirstChild('LoadingFrame') then
+	Rayfield.Main.LoadingFrame.Title.Text = "Sigmatik"
+	Rayfield.Main.LoadingFrame.Subtitle.Text = "Interface Suite"
+end
+
 local buildAttempts = 0
 local correctBuild = false
 local warned
@@ -696,6 +704,12 @@ repeat
 	end
 
 	toDestroy, Rayfield = Rayfield, useStudio and script.Parent:FindFirstChild('Rayfield') or game:GetObjects("rbxassetid://10804731440")[1]
+	-- Hide and replace text immediately after reload
+	Rayfield.Enabled = false
+	if Rayfield:FindFirstChild('Main') and Rayfield.Main:FindFirstChild('LoadingFrame') then
+		Rayfield.Main.LoadingFrame.Title.Text = "Sigmatik"
+		Rayfield.Main.LoadingFrame.Subtitle.Text = "Interface Suite"
+	end
 	if toDestroy and not useStudio then toDestroy:Destroy() end
 
 	buildAttempts = buildAttempts + 1
