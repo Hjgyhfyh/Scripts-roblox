@@ -50,6 +50,9 @@ local function arrayCopy(source)
 end
 
 local function parseHex(hex)
+	if type(hex) ~= "string" then
+		return Color3.fromRGB(255, 255, 255), 0
+	end
 	local clean = (hex or "#ffffffff"):gsub("#", "")
 	if #clean == 6 then
 		clean = clean .. "ff"
@@ -63,18 +66,22 @@ local function parseHex(hex)
 	return Color3.fromRGB(r, g, b), 1 - (a / 255)
 end
 
-local function colorToHex(color)
-	return string.format("#%02x%02x%02xff", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+local function colorToHex(color, alpha)
+	local a = alpha or 1
+	return string.format("#%02x%02x%02x%02x", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255), math.floor(math.clamp(a, 0, 1) * 255))
 end
 
-local function hueToHex(hue)
-	return colorToHex(Color3.fromHSV(hue, 0.72, 1))
+local function hueToHex(hue, alpha)
+	return colorToHex(Color3.fromHSV(hue, 0.72, 1), alpha)
 end
 
 local function hexToHue(hex)
 	local color = select(1, parseHex(hex))
-	local hue = color:ToHSV()
-	return hue
+	local hue, sat = color:ToHSV()
+	if sat < 0.05 then
+		return 0, sat
+	end
+	return hue, sat
 end
 
 local function mixColors(base, target, alpha)
@@ -85,11 +92,37 @@ local function mixColors(base, target, alpha)
 	)
 end
 
+local function roundNearest(x)
+	if x >= 0 then
+		return math.floor(x + 0.5)
+	end
+	return -math.floor(-x + 0.5)
+end
+
 local function clampRound(value, minimum, maximum, increment)
+	if maximum < minimum then
+		maximum = minimum
+	end
 	local clamped = math.clamp(value, minimum, maximum)
 	local step = increment and increment > 0 and increment or 1
-	local rounded = minimum + math.floor(((clamped - minimum) / step) + 0.5) * step
+	local rounded = minimum + roundNearest((clamped - minimum) / step) * step
 	return math.clamp(rounded, minimum, maximum)
+end
+
+local function formatSliderValue(value, increment)
+	local step = increment or 1
+	if step == math.floor(step) then
+		return tostring(math.floor(roundNearest(value)))
+	end
+	local decimals = 0
+	local s = tostring(step)
+	local dot = s:find("%.")
+	if dot then
+		decimals = #s - dot
+	end
+	if decimals < 1 then decimals = 1 end
+	if decimals > 6 then decimals = 6 end
+	return string.format("%." .. decimals .. "f", value)
 end
 
 local function findColorValue(palette, value)
@@ -115,6 +148,9 @@ local function destroyExisting()
 	local protectedParent = gethui and gethui()
 	local existing = (protectedParent and protectedParent:FindFirstChild(GUI_NAME)) or CoreGui:FindFirstChild(GUI_NAME)
 	if existing then
+		pcall(function()
+			existing:SetAttribute("SigmatikDestroyed", true)
+		end)
 		existing:Destroy()
 	end
 
@@ -215,10 +251,15 @@ end
 
 local function addGradient(parent, rotation, hexList)
 	local keypoints = {}
-	local count = math.max(#hexList - 1, 1)
-
-	for index, hex in ipairs(hexList) do
-		table.insert(keypoints, ColorSequenceKeypoint.new((index - 1) / count, select(1, parseHex(hex))))
+	if #hexList < 2 then
+		local soleColor = select(1, parseHex(hexList[1] or WHITE))
+		table.insert(keypoints, ColorSequenceKeypoint.new(0, soleColor))
+		table.insert(keypoints, ColorSequenceKeypoint.new(1, soleColor))
+	else
+		local count = #hexList - 1
+		for index, hex in ipairs(hexList) do
+			table.insert(keypoints, ColorSequenceKeypoint.new((index - 1) / count, select(1, parseHex(hex))))
+		end
 	end
 
 	return create("UIGradient", {
@@ -445,7 +486,14 @@ local function normalizeControl(control)
 		normalized.Min = control.Min or 0
 		normalized.Max = control.Max or 100
 		normalized.Increment = control.Increment or 1
+		if normalized.Increment <= 0 then
+			normalized.Increment = 1
+		end
+		if normalized.Max < normalized.Min then
+			normalized.Max = normalized.Min
+		end
 		normalized.Value = clampRound(control.Value or control.CurrentValue or normalized.Min, normalized.Min, normalized.Max, normalized.Increment)
+		normalized.CurrentValue = normalized.Value
 	elseif kind == "colorpicker" then
 		normalized.Palette = arrayCopy(control.Palette or DEFAULT_PALETTE)
 		normalized.Value = tostring(control.Value or control.CurrentValue or normalized.Palette[1])
@@ -484,6 +532,9 @@ local function normalizeModule(module)
 
 	for _, section in ipairs(module.Sections or {}) do
 		local normalizedSection = normalizeSection(section)
+		if normalized.SectionLookup[normalizedSection.Name] then
+			warn("[Sigmatik] duplicate section name: " .. tostring(normalizedSection.Name))
+		end
 		table.insert(normalized.Sections, normalizedSection)
 		normalized.SectionLookup[normalizedSection.Name] = normalizedSection
 	end
@@ -501,6 +552,9 @@ local function normalizeTab(tab)
 
 	for _, module in ipairs(tab.Modules or {}) do
 		local normalizedModule = normalizeModule(module)
+		if normalized.ModuleLookup[normalizedModule.Name] then
+			warn("[Sigmatik] duplicate module name: " .. tostring(normalizedModule.Name))
+		end
 		table.insert(normalized.Modules, normalizedModule)
 		normalized.ModuleLookup[normalizedModule.Name] = normalizedModule
 	end
@@ -510,9 +564,12 @@ end
 
 function Controller:_setConfigLabel(text)
 	local label = self.ui.configLabel
+	self.configLabelSerial = (self.configLabelSerial or 0) + 1
+	local serial = self.configLabelSerial
 	tween(label, FADE_TWEEN, { TextTransparency = 1 })
 	task.delay(0.06, function()
-		if not label.Parent then
+		if self.closing then return end
+		if not label.Parent or serial ~= self.configLabelSerial then
 			return
 		end
 
@@ -520,13 +577,15 @@ function Controller:_setConfigLabel(text)
 		tween(label, FADE_TWEEN, { TextTransparency = getFillTransparency("#ffffff80") })
 	end)
 	task.delay(1.2, function()
-		if not label.Parent then
+		if self.closing then return end
+		if not label.Parent or serial ~= self.configLabelSerial then
 			return
 		end
 
 		tween(label, FADE_TWEEN, { TextTransparency = 1 })
 		task.delay(0.06, function()
-			if label.Parent then
+			if self.closing then return end
+			if label.Parent and serial == self.configLabelSerial then
 				label.Text = self.config.ConfigName
 				tween(label, FADE_TWEEN, { TextTransparency = getFillTransparency("#ffffff80") })
 			end
@@ -568,6 +627,8 @@ function Controller:_updateSearchPlaceholder(instant)
 	local placeholder = self.ui.searchPlaceholder
 	local empty = self.ui.searchInput.Text == ""
 	placeholder.Visible = true
+	self.placeholderSerial = (self.placeholderSerial or 0) + 1
+	local serial = self.placeholderSerial
 
 	if empty then
 		if instant then
@@ -586,7 +647,8 @@ function Controller:_updateSearchPlaceholder(instant)
 
 	tween(placeholder, FADE_TWEEN, { TextTransparency = 1 })
 	task.delay(0.14, function()
-		if placeholder.Parent and self.ui.searchInput.Text ~= "" then
+		if self.closing then return end
+		if placeholder.Parent and self.ui.searchInput.Text ~= "" and serial == self.placeholderSerial then
 			placeholder.Visible = false
 		end
 	end)
@@ -612,6 +674,10 @@ end
 function Controller:_setSelectedTab(tab)
 	self.selectedTab = tab
 	self.selectedModule = tab and tab.Modules[1] or nil
+	if self.settingsVisible then
+		self.settingsVisible = false
+		self:_updateModulePanelLayout()
+	end
 	self:_refreshCategoryTabs()
 	self:_renderModuleRows(true)
 	self:_renderSettingsPanel()
@@ -689,6 +755,8 @@ function Controller:_setControlValue(control, value, silent)
 	else
 		control.Value = not not value
 	end
+
+	control.CurrentValue = control.Value
 
 	if control._refresh then
 		control._refresh(true)
@@ -769,20 +837,20 @@ function Controller:_createHeaderIconButton(parent, name, fillHex, iconName, ico
 		animateScale(self.scale, mode == "pressed" and 0.94 or (mode == "hover" and 1.06 or (self.active and 1.03 or 1)), FAST_TWEEN)
 	end
 
-	button.MouseEnter:Connect(function()
+	table.insert(self.connections, button.MouseEnter:Connect(function()
 		control:applyVisual("hover")
-	end)
-	button.MouseLeave:Connect(function()
+	end))
+	table.insert(self.connections, button.MouseLeave:Connect(function()
 		control:applyVisual("default")
-	end)
-	button.MouseButton1Down:Connect(function()
+	end))
+	table.insert(self.connections, button.MouseButton1Down:Connect(function()
 		control:applyVisual("pressed")
-	end)
-	button.MouseButton1Up:Connect(function()
+	end))
+	table.insert(self.connections, button.MouseButton1Up:Connect(function()
 		if button.Parent then
 			control:applyVisual("hover")
 		end
-	end)
+	end))
 
 	control:applyVisual("default")
 	return control
@@ -1033,7 +1101,7 @@ function Controller:_createCategoryTab(tab)
 		hovered = false,
 	}
 
-	button.MouseEnter:Connect(function()
+	table.insert(self.connections, button.MouseEnter:Connect(function()
 		entry.hovered = true
 		animateScale(scale, 1.015, FAST_TWEEN)
 		if self.selectedTab ~= tab then
@@ -1041,9 +1109,9 @@ function Controller:_createCategoryTab(tab)
 			animateStroke(stroke, "#ffffff18", FAST_TWEEN)
 			icon:setColor(WHITE, true)
 		end
-	end)
+	end))
 
-	button.MouseLeave:Connect(function()
+	table.insert(self.connections, button.MouseLeave:Connect(function()
 		entry.hovered = false
 		animateScale(scale, self.selectedTab == tab and 1.02 or 1, SOFT_TWEEN)
 		if self.selectedTab ~= tab then
@@ -1051,11 +1119,11 @@ function Controller:_createCategoryTab(tab)
 			animateStroke(stroke, "#ffffff14", SOFT_TWEEN)
 			icon:setColor("#ffffffb3", true)
 		end
-	end)
+	end))
 
-	button.MouseButton1Click:Connect(function()
+	table.insert(self.connections, button.MouseButton1Click:Connect(function()
 		self:_setSelectedTab(tab)
-	end)
+	end))
 
 	table.insert(self.ui.categoryEntries, entry)
 end
@@ -1267,30 +1335,30 @@ function Controller:_createModuleRow(module, order, animateEntrance)
 		refreshVisual(false)
 	end
 
-	rowButton.MouseEnter:Connect(function()
+	table.insert(self.transientConnections, rowButton.MouseEnter:Connect(function()
 		hovered = true
 		refreshVisual(true)
-	end)
-	rowButton.MouseLeave:Connect(function()
+	end))
+	table.insert(self.transientConnections, rowButton.MouseLeave:Connect(function()
 		hovered = false
 		refreshVisual(true)
-	end)
-	rowButton.MouseButton1Click:Connect(function()
+	end))
+	table.insert(self.transientConnections, rowButton.MouseButton1Click:Connect(function()
 		self.selectedModule = module
 		self:_renderModuleRows(false)
 		self:_renderSettingsPanel()
 		pulse(rowScale, 1.02)
-	end)
+	end))
 
-	settingsButton.MouseEnter:Connect(function()
+	table.insert(self.transientConnections, settingsButton.MouseEnter:Connect(function()
 		settingsHovered = true
 		refreshVisual(true)
-	end)
-	settingsButton.MouseLeave:Connect(function()
+	end))
+	table.insert(self.transientConnections, settingsButton.MouseLeave:Connect(function()
 		settingsHovered = false
 		refreshVisual(true)
-	end)
-	settingsButton.MouseButton1Click:Connect(function()
+	end))
+	table.insert(self.transientConnections, settingsButton.MouseButton1Click:Connect(function()
 		if self.selectedModule == module and self.settingsVisible then
 			self.settingsVisible = false
 		else
@@ -1302,17 +1370,25 @@ function Controller:_createModuleRow(module, order, animateEntrance)
 		self:_renderModuleRows(false)
 		self:_renderSettingsPanel()
 		pulse(settingsScale, 1.12)
-	end)
+	end))
 
-	toggle.button.MouseButton1Click:Connect(function()
+	table.insert(self.transientConnections, toggle.button.MouseButton1Click:Connect(function()
 		self.selectedModule = module
 		self:_setModuleEnabled(module, not module.Enabled, false)
-		toggle:setState(module.Enabled, false)
 		self:_setConfigLabel(module.Enabled and "Module Enabled" or "Module Disabled")
-	end)
+	end))
 end
 
 function Controller:_renderModuleRows(animateEntrance)
+	if self.transientConnections then
+		for _, conn in ipairs(self.transientConnections) do
+			pcall(function() conn:Disconnect() end)
+		end
+		self.transientConnections = {}
+	else
+		self.transientConnections = {}
+	end
+
 	clearChildren(self.ui.moduleContainer)
 
 	if not self.selectedTab then
@@ -1321,11 +1397,26 @@ function Controller:_renderModuleRows(animateEntrance)
 
 	local query = string.lower(self.ui.searchInput.Text)
 	local visibleIndex = 0
+	local visibleModules = {}
 
 	for _, module in ipairs(self.selectedTab.Modules) do
 		if query == "" or string.find(string.lower(module.Name), query, 1, true) then
 			visibleIndex = visibleIndex + 1
+			table.insert(visibleModules, module)
 			self:_createModuleRow(module, visibleIndex, animateEntrance)
+		end
+	end
+
+	if self.selectedModule then
+		local stillVisible = false
+		for _, m in ipairs(visibleModules) do
+			if m == self.selectedModule then
+				stillVisible = true
+				break
+			end
+		end
+		if not stillVisible then
+			self.selectedModule = visibleModules[1] or nil
 		end
 	end
 end
@@ -1389,10 +1480,9 @@ function Controller:_createEnabledRow(parent, module)
 
 	local switch = self:_makeSwitch(row, UDim2.fromOffset(256, 6), 5)
 	switch:setState(module.Enabled, true)
-	switch.button.MouseButton1Click:Connect(function()
+	table.insert(self.transientConnections, switch.button.MouseButton1Click:Connect(function()
 		self:_setModuleEnabled(module, not module.Enabled, false)
-		switch:setState(module.Enabled, false)
-	end)
+	end))
 end
 
 function Controller:_createToggleRow(parent, control)
@@ -1430,9 +1520,9 @@ function Controller:_createToggleRow(parent, control)
 		switch:setState(control.Value, instant)
 	end
 
-	switch.button.MouseButton1Click:Connect(function()
+	table.insert(self.transientConnections, switch.button.MouseButton1Click:Connect(function()
 		self:_setControlValue(control, not control.Value, false)
-	end)
+	end))
 end
 
 function Controller:_createCheckboxRow(parent, control)
@@ -1465,9 +1555,9 @@ function Controller:_createCheckboxRow(parent, control)
 		checkbox:setState(control.Value, instant)
 	end
 
-	checkbox.button.MouseButton1Click:Connect(function()
+	table.insert(self.transientConnections, checkbox.button.MouseButton1Click:Connect(function()
 		self:_setControlValue(control, not control.Value, false)
-	end)
+	end))
 end
 
 function Controller:_createSliderCard(parent, control)
@@ -1579,11 +1669,11 @@ function Controller:_createSliderCard(parent, control)
 	local hovered = false
 
 	local function refresh(instant)
-		local progress = (control.Value - control.Min) / math.max(control.Max - control.Min, 0.001)
+		local progress = math.clamp((control.Value - control.Min) / math.max(control.Max - control.Min, 0.001), 0, 1)
 		local accentColor = select(1, parseHex(self.theme.Accent))
 		local lightAccent = mixColors(accentColor, Color3.new(1, 1, 1), 0.42)
 		updateGradient(fillGradient, self.theme.Accent, colorToHex(lightAccent))
-		valueLabel.Text = tostring(control.Value)
+		valueLabel.Text = formatSliderValue(control.Value, control.Increment)
 
 		if instant then
 			fill.Size = UDim2.fromScale(progress, 1)
@@ -1607,13 +1697,14 @@ function Controller:_createSliderCard(parent, control)
 	refresh(true)
 
 	local function updateFromPointer(pointerX, instant)
-		local relative = math.clamp((pointerX - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		local relative = math.clamp((pointerX - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
 		local nextValue = control.Min + ((control.Max - control.Min) * relative)
 		control.Value = clampRound(nextValue, control.Min, control.Max, control.Increment)
+		control.CurrentValue = control.Value
 		refresh(instant)
 	end
 
-	hitbox.InputBegan:Connect(function(input)
+	table.insert(self.transientConnections, hitbox.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			self.draggingSlider = {
 				update = function(pointerX)
@@ -1629,16 +1720,16 @@ function Controller:_createSliderCard(parent, control)
 			animateScale(knobGlowScale, 1.2, FAST_TWEEN)
 			updateFromPointer(input.Position.X, true)
 		end
-	end)
+	end))
 
-	hitbox.MouseEnter:Connect(function()
+	table.insert(self.transientConnections, hitbox.MouseEnter:Connect(function()
 		hovered = true
 		animateScale(trackScale, self.draggingSlider and 1.03 or 1.02, FAST_TWEEN)
 		animateScale(knobScale, 1.08, FAST_TWEEN)
 		animateScale(knobGlowScale, 1.14, FAST_TWEEN)
-	end)
+	end))
 
-	hitbox.MouseLeave:Connect(function()
+	table.insert(self.transientConnections, hitbox.MouseLeave:Connect(function()
 		hovered = false
 		if self.draggingSlider then
 			return
@@ -1647,7 +1738,7 @@ function Controller:_createSliderCard(parent, control)
 		animateScale(trackScale, 1, SOFT_TWEEN)
 		animateScale(knobScale, 1, SOFT_TWEEN)
 		animateScale(knobGlowScale, 1, SOFT_TWEEN)
-	end)
+	end))
 
 	table.insert(self.sliderResetters, function()
 		animateScale(trackScale, hovered and 1.02 or 1, SOFT_TWEEN)
@@ -1761,16 +1852,23 @@ function Controller:_createColorPickerRow(parent, control)
 	local hovered = false
 
 	local function refresh(instant)
-		local hue = hexToHue(control.Value)
-		local offset = math.clamp(hue, 0, 1) * track.AbsoluteSize.X
+		local hue, sat = hexToHue(control.Value)
 		local accent = control.Value
+		local moveKnob = sat >= 0.05
+		local offset = math.clamp(control._lastHue or hue, 0, 1) * track.AbsoluteSize.X
+		if moveKnob then
+			control._lastHue = hue
+			offset = math.clamp(hue, 0, 1) * track.AbsoluteSize.X
+		end
 
 		if instant then
 			preview.BackgroundColor3 = select(1, parseHex(accent))
 			preview.BackgroundTransparency = select(2, parseHex(accent))
 			applyStroke(previewStroke, "#ffffff60")
-			knob.Position = UDim2.fromOffset(offset, 6)
-			knobGlow.Position = UDim2.fromOffset(offset, 6)
+			if moveKnob then
+				knob.Position = UDim2.fromOffset(offset, 6)
+				knobGlow.Position = UDim2.fromOffset(offset, 6)
+			end
 			applyFill(knobGlow, accent:sub(1, 7) .. "38")
 			applyStroke(trackStroke, accent:sub(1, 7) .. "28")
 			return
@@ -1778,22 +1876,28 @@ function Controller:_createColorPickerRow(parent, control)
 
 		animateFill(preview, accent, FAST_TWEEN)
 		animateStroke(previewStroke, "#ffffff60", FAST_TWEEN)
-		animatePosition(knob, UDim2.fromOffset(offset, 6), FAST_TWEEN)
-		animatePosition(knobGlow, UDim2.fromOffset(offset, 6), FAST_TWEEN)
+		if moveKnob then
+			animatePosition(knob, UDim2.fromOffset(offset, 6), FAST_TWEEN)
+			animatePosition(knobGlow, UDim2.fromOffset(offset, 6), FAST_TWEEN)
+		end
 		animateFill(knobGlow, accent:sub(1, 7) .. "38", FAST_TWEEN)
 		animateStroke(trackStroke, accent:sub(1, 7) .. "28", FAST_TWEEN)
 	end
 
 	local function updateFromPointer(pointerX, instant)
 		local relative = math.clamp((pointerX - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
-		control.Value = hueToHex(relative)
+		local _, currentAlpha = parseHex(control.Value)
+		local alpha = 1 - currentAlpha
+		control._lastHue = relative
+		control.Value = hueToHex(relative, alpha)
+		control.CurrentValue = control.Value
 		refresh(instant)
 	end
 
 	control._refresh = refresh
 	refresh(true)
 
-	hitbox.InputBegan:Connect(function(input)
+	table.insert(self.transientConnections, hitbox.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			self.draggingSlider = {
 				update = function(pointerX)
@@ -1808,22 +1912,22 @@ function Controller:_createColorPickerRow(parent, control)
 			animateScale(knobGlowScale, 1.2, FAST_TWEEN)
 			updateFromPointer(input.Position.X, true)
 		end
-	end)
+	end))
 
-	hitbox.MouseEnter:Connect(function()
+	table.insert(self.transientConnections, hitbox.MouseEnter:Connect(function()
 		hovered = true
 		animateScale(knobScale, 1.08, FAST_TWEEN)
 		animateScale(knobGlowScale, 1.16, FAST_TWEEN)
-	end)
+	end))
 
-	hitbox.MouseLeave:Connect(function()
+	table.insert(self.transientConnections, hitbox.MouseLeave:Connect(function()
 		hovered = false
 		if self.draggingSlider then
 			return
 		end
 		animateScale(knobScale, 1, SOFT_TWEEN)
 		animateScale(knobGlowScale, 1, SOFT_TWEEN)
-	end)
+	end))
 
 	table.insert(self.sliderResetters, function()
 		animateScale(knobScale, hovered and 1.08 or 1, SOFT_TWEEN)
@@ -1909,6 +2013,14 @@ function Controller:_createControl(parent, control)
 end
 
 function Controller:_renderSettingsPanel()
+	if self.transientConnections then
+		for _, conn in ipairs(self.transientConnections) do
+			pcall(function() conn:Disconnect() end)
+		end
+		self.transientConnections = {}
+	else
+		self.transientConnections = {}
+	end
 	clearChildren(self.ui.settingsContent)
 	self.sliderResetters = {}
 	self.ui.settingsTitle = create("TextLabel", {
@@ -1948,6 +2060,13 @@ function Controller:_renderSettingsPanel()
 	end
 
 	self.ui.settingsScroll.CanvasSize = UDim2.fromOffset(0, self.ui.settingsLayout.AbsoluteContentSize.Y + 28)
+
+	task.defer(function()
+		if self.closing then return end
+		if self.ui and self.ui.settingsLayout and self.ui.settingsScroll and self.ui.settingsScroll.Parent then
+			self.ui.settingsScroll.CanvasSize = UDim2.fromOffset(0, self.ui.settingsLayout.AbsoluteContentSize.Y + 28)
+		end
+	end)
 end
 
 function Controller:_close()
@@ -1957,6 +2076,23 @@ function Controller:_close()
 
 	self.closing = true
 	self.appSettingsVisible = false
+
+	if self.connections then
+		for _, conn in ipairs(self.connections) do
+			pcall(function() conn:Disconnect() end)
+		end
+		self.connections = {}
+	end
+	if self.transientConnections then
+		for _, conn in ipairs(self.transientConnections) do
+			pcall(function() conn:Disconnect() end)
+		end
+		self.transientConnections = {}
+	end
+
+	self.draggingWindow = false
+	self.draggingSlider = nil
+
 	animateFill(self.ui.backdrop, "#02061700", PANEL_TWEEN)
 	animateScale(self.ui.mainScale, 0.94, PANEL_TWEEN)
 	animateStroke(self.ui.mainStroke, "#ffffff08", PANEL_TWEEN)
@@ -2068,7 +2204,10 @@ function Controller:_mount()
 	})
 
 	if syn and syn.protect_gui then
-		pcall(syn.protect_gui, screenGui)
+		local ok, err = pcall(syn.protect_gui, screenGui)
+		if not ok then
+			warn("[Sigmatik] syn.protect_gui failed: " .. tostring(err))
+		end
 	end
 
 	local root = create("Frame", {
@@ -2523,9 +2662,9 @@ function Controller:_mount()
 	})
 	applyTextColor(telegramLabel, "#ffffffa6")
 
-	settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	table.insert(self.connections, settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		settingsScroll.CanvasSize = UDim2.fromOffset(0, settingsLayout.AbsoluteContentSize.Y + 28)
-	end)
+	end))
 
 	self.ui = {
 		screenGui = screenGui,
@@ -2571,43 +2710,42 @@ function Controller:_mount()
 		settingsTitle = settingsTitle,
 	}
 
-	searchInput.Focused:Connect(function()
+	table.insert(self.connections, searchInput.Focused:Connect(function()
 		self:_updateSearchVisual(true)
-	end)
-	searchInput.FocusLost:Connect(function()
+	end))
+	table.insert(self.connections, searchInput.FocusLost:Connect(function()
 		self:_updateSearchVisual(false)
-	end)
-	searchInput:GetPropertyChangedSignal("Text"):Connect(function()
+	end))
+	table.insert(self.connections, searchInput:GetPropertyChangedSignal("Text"):Connect(function()
 		self:_updateSearchPlaceholder(false)
 		searchIcon:setColor(searchInput.Text ~= "" and self.theme.AccentSoft or (self.searchFocused and self.theme.Accent or "#ffffffb3"), true)
 		self:_renderModuleRows(true)
-	end)
+	end))
 
 	local function handleClose()
 		self:_close()
 	end
 
-	closeButton.button.MouseButton1Click:Connect(handleClose)
-	if closeButton.button.Activated then
-		closeButton.button.Activated:Connect(handleClose)
-	end
-	settingsButton.button.MouseButton1Click:Connect(function()
+	table.insert(self.connections, closeButton.button.MouseButton1Click:Connect(handleClose))
+	table.insert(self.connections, settingsButton.button.MouseButton1Click:Connect(function()
 		self:_toggleAppSettings()
-	end)
-	bindButton.MouseButton1Click:Connect(function()
+	end))
+	table.insert(self.connections, bindButton.MouseButton1Click:Connect(function()
 		self.waitingForBind = true
 		self:_refreshBindVisual()
-	end)
+	end))
 
-	dragHandle.InputBegan:Connect(function(input)
+	table.insert(self.connections, dragHandle.InputBegan:Connect(function(input)
+		if self.closing then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			self.draggingWindow = true
 			self.dragStart = input.Position
 			self.startPosition = mainWindow.Position
 		end
-	end)
+	end))
 
-	UserInputService.InputChanged:Connect(function(input)
+	table.insert(self.connections, UserInputService.InputChanged:Connect(function(input)
+		if self.closing then return end
 		if self.draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - self.dragStart
 			mainWindow.Position = UDim2.new(
@@ -2623,14 +2761,18 @@ function Controller:_mount()
 		if self.draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
 			self.draggingSlider.update(input.Position.X)
 		end
-	end)
+	end))
 
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	table.insert(self.connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if self.closing then return end
 		if input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
 		end
 
 		if self.waitingForBind and input.KeyCode ~= Enum.KeyCode.Unknown then
+			if gameProcessed then
+				return
+			end
 			self.waitingForBind = false
 			self.uiToggleKey = input.KeyCode
 			self:_refreshBindVisual()
@@ -2645,9 +2787,10 @@ function Controller:_mount()
 		if input.KeyCode == self.uiToggleKey then
 			self:_setWindowHidden(not self.windowHidden)
 		end
-	end)
+	end))
 
-	UserInputService.InputEnded:Connect(function(input)
+	table.insert(self.connections, UserInputService.InputEnded:Connect(function(input)
+		if self.closing then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			if self.draggingSlider then
 				self.draggingSlider.finish()
@@ -2660,13 +2803,18 @@ function Controller:_mount()
 
 			self.draggingWindow = false
 		end
-	end)
+	end))
 
-	screenGui.AncestryChanged:Connect(function(_, parent)
+	table.insert(self.connections, UserInputService.WindowFocusReleased:Connect(function()
+		self.draggingWindow = false
+		self.draggingSlider = nil
+	end))
+
+	table.insert(self.connections, screenGui.AncestryChanged:Connect(function(_, parent)
 		if parent == nil and blur.Parent then
 			blur:Destroy()
 		end
-	end)
+	end))
 
 	for _, tab in ipairs(self.tabs) do
 		self:_createCategoryTab(tab)
@@ -2757,14 +2905,21 @@ function Library:Create(config)
 	controller.draggingWindow = false
 	controller.draggingSlider = nil
 	controller.sliderResetters = {}
+	controller.connections = {}
+	controller.transientConnections = {}
 	controller.lastActiveCount = -1
 	controller.closing = false
 	controller.waitingForBind = false
 	controller.windowHidden = false
-	controller.uiToggleKey = typeof(config.GuiToggleKey) == "EnumItem" and config.GuiToggleKey or Enum.KeyCode.RightShift
+	local toggleKeyValid = typeof(config.GuiToggleKey) == "EnumItem"
+		and tostring(config.GuiToggleKey.EnumType) == "Enum.KeyCode"
+	controller.uiToggleKey = toggleKeyValid and config.GuiToggleKey or Enum.KeyCode.RightShift
 
 	for _, tab in ipairs(config.Tabs or {}) do
 		local normalizedTab = normalizeTab(tab)
+		if controller.tabLookup[normalizedTab.Name] then
+			warn("[Sigmatik] duplicate tab name: " .. tostring(normalizedTab.Name))
+		end
 		table.insert(controller.tabs, normalizedTab)
 		controller.tabLookup[normalizedTab.Name] = normalizedTab
 	end
