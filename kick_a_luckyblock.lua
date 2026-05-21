@@ -5855,7 +5855,10 @@ UI = SigmatikLibrary:Create({
                                     Callback = cb("TgEnabled") },
                                 { Type = "input", Name = "Telegram Chat ID", Value = Cfg.TgChatId,
                                     Placeholder = "auto or paste id",
-                                    Format = function(v) return tostring(v) end,
+                                    Format = function(v)
+                                        if not v or v == 0 or v == "" then return "" end
+                                        return tostring(v)
+                                    end,
                                     Callback = cb("TgChatId") },
                                 momentaryBtn("Link Telegram", "Message your bot first, then press this", function()
                                     local id = tgResolveChatId()
