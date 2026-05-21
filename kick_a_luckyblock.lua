@@ -3816,6 +3816,7 @@ end)
 local KickEventEnded = Net:WaitForChild("rev_KickEventEnded")
 KickEventEnded.OnClientEvent:Connect(function()
     SuicideMode = false
+    ForceSaveZone = false
     _activeWaveRarity = nil
 end)
 
@@ -4175,48 +4176,6 @@ local function autoUpgradeLoop()
             task.wait(0.1)
         end
     end
-end
-
------------------------------------------------------------------ INSTANT KILL (suicide for non-target drops)
-local SuicideThread
-
-local function killBrainrotOnce()
-    local char, hum, root = getCharParts()
-    if not char then return end
-
-    -- 1. teleport into the wave if it exists already
-    local waves = workspace:FindFirstChild("Waves")
-    if waves and root then
-        for _, m in ipairs(waves:GetChildren()) do
-            local rp = m:FindFirstChild("RootPart") or m.PrimaryPart
-            if rp then
-                if root.Anchored then root.Anchored = false end
-                root.CFrame = rp.CFrame
-                break
-            end
-        end
-    end
-
-    -- 2. nuke humanoid health regardless of anchor state
-    if hum then
-        pcall(function() hum.Health = 0 end)
-        pcall(function() hum:TakeDamage(hum.MaxHealth or 1000) end)
-        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Dead) end)
-    end
-
-    -- 3. break joints as last resort
-    pcall(function() char:BreakJoints() end)
-end
-
-function startSuicide()
-    if SuicideThread and coroutine.status(SuicideThread) ~= "dead" then return end
-    SuicideThread = task.spawn(function()
-        while SuicideMode and State.AutoPlay do
-            killBrainrotOnce()
-            task.wait(0.1)
-        end
-        SuicideThread = nil
-    end)
 end
 
 ----------------------------------------------------------------- FAST PLAY (kick + wave boost)
