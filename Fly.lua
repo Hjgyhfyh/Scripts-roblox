@@ -1,4 +1,4 @@
-local Players = game:GetService("Players")
+﻿local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -21,7 +21,7 @@ local Window = Rayfield:CreateWindow({
 	KeySystem = false
 })
 
-local TabMovement = Window:CreateTab("🏃 Movement", 4483362458)
+local TabMovement = Window:CreateTab("рџЏѓ Movement", 4483362458)
 
 local player = Players.LocalPlayer
 local flyEnabled = false
@@ -147,4 +147,3 @@ player.CharacterAdded:Connect(function()
 		startFly()
 	end
 end)
--- autosync check 1531
