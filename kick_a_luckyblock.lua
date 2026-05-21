@@ -3658,6 +3658,30 @@ local function baseIncomeStrings()
     return { d = suf(daily), h = h and suf(h) or nil, m = m and suf(m) or nil }
 end
 
+-- the player's Roblox headshot as a public CDN url (resolved once, then cached)
+local _robloxAvatar = nil
+local function getRobloxAvatar()
+    if _robloxAvatar then return _robloxAvatar end
+    local uid = LocalPlayer.UserId
+    local url = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" .. uid .. "&size=150x150&format=Png&isCircular=false"
+    local body
+    if httpRequest then
+        local ok, res = pcall(httpRequest, { Url = url, Method = "GET" })
+        if ok and res then body = res.Body or res.body end
+    end
+    if not body then
+        local ok2, b = pcall(function() return game:HttpGetAsync(url) end)
+        if ok2 then body = b end
+    end
+    if body then
+        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+        if ok and data and data.data and data.data[1] and data.data[1].imageUrl then
+            _robloxAvatar = data.data[1].imageUrl
+        end
+    end
+    return _robloxAvatar
+end
+
 local function sendHeartbeat()
     if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
     local s = math.floor(Stats.seconds)
@@ -3668,6 +3692,9 @@ local function sendHeartbeat()
     local base = baseIncomeStrings()
     if base then body.baseDay = base.d; body.baseHour = base.h; body.baseMin = base.m end
     if LastCatch then body.lastName = LastCatch.name; body.lastValue = abbrevNum(LastCatch.value) end
+    body.robloxName = LocalPlayer.DisplayName or LocalPlayer.Name
+    local av = getRobloxAvatar()
+    if av then body.robloxAvatar = av end
     backendPost("/stat", body)
 end
 
