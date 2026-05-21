@@ -5850,24 +5850,19 @@ UI = SigmatikLibrary:Create({
                                 { Type = "toggle", Name = "Telegram Notify", Value = Cfg.TgEnabled,
                                     Description = "Message me on every successful catch (above the Get Only value)",
                                     Callback = cb("TgEnabled") },
-                                { Type = "input", Name = "Telegram Chat ID", Value = Cfg.TgChatId,
-                                    Placeholder = "auto or paste id",
-                                    Format = function(v)
-                                        if not v or v == 0 or v == "" then return "" end
-                                        return tostring(v)
-                                    end,
-                                    Callback = cb("TgChatId") },
-                                momentaryBtn("Link Telegram", "Message your bot first, then press this", function()
-                                    local id = tgResolveChatId()
-                                    if id then
-                                        tgSend("✅ Linked! Saber Tsunami will send catch notifications here.")
-                                        print("[Saber] Telegram linked, chat id = " .. tostring(id))
-                                    else
-                                        print("[Saber] Telegram link failed — send the bot a message first (/start)")
+                                { Type = "input", Name = "Connect Key", Value = Cfg.ConnectKey, Text = true,
+                                    Placeholder = "open @cheat_speed_amongus1bot → /start",
+                                    Callback = cb("ConnectKey") },
+                                momentaryBtn("Send Test Catch", "Send a test notification to your Telegram", function()
+                                    if not Cfg.ConnectKey or Cfg.ConnectKey == "" then
+                                        print("[Saber] Set your Connect Key first (open the bot → /start)")
+                                        return
                                     end
-                                end),
-                                momentaryBtn("Send Test Message", "Send a test Telegram message", function()
-                                    tgSend("🔔 Test message from Saber Tsunami")
+                                    backendPost("/catch", {
+                                        key = Cfg.ConnectKey, name = "Noobini Pizzanini",
+                                        rarity = "Common", value = 2, mutation = "Golden",
+                                    })
+                                    print("[Saber] Test catch sent — check your Telegram & Mini App")
                                 end),
                             },
                         },
