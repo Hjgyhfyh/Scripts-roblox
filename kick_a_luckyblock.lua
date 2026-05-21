@@ -3575,66 +3575,14 @@ local function scheduleSave()
     task.delay(0.3, function() pendingSave = false; saveConfig() end)
 end
 
------------------------------------------------------------------ TELEGRAM NOTIFY
--- resolve whatever HTTP function the executor exposes
+----------------------------------------------------------------- TELEGRAM NOTIFY (via backend)
+-- The bot token lives ONLY on the server (telepasta.ru) — never in this script.
+-- We POST catches/stats to the backend using your personal Connect Key (from the
+-- bot's /start). The backend formats and sends the Telegram message + Mini App data.
 local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
     or (fluxus and fluxus.request)
 
-local function tgApi(method)
-    return ("https://api.telegram.org/bot%s/%s"):format(Cfg.TgToken or "", method)
-end
-
-local function tgRaw(url, method, body)
-    if not httpRequest then return nil end
-    local req = { Url = url, Method = method or "GET" }
-    if body then
-        req.Headers = { ["Content-Type"] = "application/json" }
-        req.Body = body
-    end
-    local ok, res = pcall(httpRequest, req)
-    if ok then return res end
-    return nil
-end
-
--- ask Telegram who has messaged the bot and remember that chat id
-local function tgResolveChatId()
-    local res = tgRaw(tgApi("getUpdates"), "GET")
-    local bodyText = res and (res.Body or res.body)
-    if not bodyText then return nil end
-    local ok, data = pcall(function() return HttpService:JSONDecode(bodyText) end)
-    if not ok or type(data) ~= "table" or not data.ok or type(data.result) ~= "table" then
-        return nil
-    end
-    for i = #data.result, 1, -1 do
-        local upd = data.result[i]
-        local msg = upd.message or upd.edited_message or upd.channel_post
-        if msg and msg.chat and msg.chat.id then
-            Cfg.TgChatId = tostring(msg.chat.id)
-            scheduleSave()
-            return Cfg.TgChatId
-        end
-    end
-    return nil
-end
-
--- fire-and-forget message send (never blocks the caller)
-local function tgSend(text)
-    if not httpRequest then return false end
-    if not Cfg.TgToken or Cfg.TgToken == "" then return false end
-    task.spawn(function()
-        local chat = Cfg.TgChatId
-        if not chat or chat == "" or chat == 0 or chat == "0" then chat = tgResolveChatId() end
-        if not chat or chat == "" then return end
-        local body = HttpService:JSONEncode({
-            chat_id = chat,
-            text = text,
-            parse_mode = "HTML",
-            disable_web_page_preview = true,
-        })
-        tgRaw(tgApi("sendMessage"), "POST", body)
-    end)
-    return true
-end
+local BACKEND = "https://telepasta.ru/saber/api"
 
 local function abbrevNum(v)
     v = v or 0
@@ -3644,18 +3592,56 @@ local function abbrevNum(v)
     return tostring(math.floor(v))
 end
 
-local function htmlEscape(s)
-    return (tostring(s):gsub("[&<>]", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;" }))
+-- fire-and-forget JSON POST to the backend (never blocks the caller)
+local function backendPost(path, tbl)
+    if not httpRequest then return end
+    task.spawn(function()
+        pcall(httpRequest, {
+            Url = BACKEND .. path,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(tbl),
+        })
+    end)
 end
 
--- notify Telegram about a successful (kept) catch
+-- notify the backend about a successful (kept) catch → it sends the Telegram message
 local function tgNotifyCatch(name, mut, value)
     if not Cfg.TgEnabled then return end
-    local mutTxt = (mut and mut ~= "None") and (" <b>%s</b>"):format(htmlEscape(mut)) or ""
-    local text = ("🧠 <b>Caught:</b> %s%s\n💰 <b>Value:</b> %s/s"):format(
-        htmlEscape(name), mutTxt, abbrevNum(value))
-    tgSend(text)
+    if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
+    local d = EntitiesData.Brainrots and EntitiesData.Brainrots[name]
+    backendPost("/catch", {
+        key = Cfg.ConnectKey,
+        name = name,
+        rarity = d and d.Rarity or nil,
+        value = value,
+        mutation = (mut and mut ~= "None") and mut or nil,
+    })
 end
+
+-- ---- play stats: Time Play (seconds while Auto Play is on) + games played -----
+local Stats = { seconds = 0, games = 0 }
+
+local function flushStats()
+    if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
+    local s = math.floor(Stats.seconds)
+    local g = Stats.games
+    if s < 1 and g < 1 then return end
+    Stats.seconds = Stats.seconds - s
+    Stats.games = 0
+    backendPost("/stat", { key = Cfg.ConnectKey, addSeconds = s, addGames = g })
+end
+
+task.spawn(function()
+    local last = os.clock()
+    while true do
+        task.wait(30)
+        local now = os.clock()
+        if State.AutoPlay then Stats.seconds = Stats.seconds + (now - last) end
+        last = now
+        flushStats()
+    end
+end)
 
 ----------------------------------------------------------------- AUTO KICK
 local function isInSaveZone()
