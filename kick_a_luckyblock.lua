@@ -3454,6 +3454,9 @@ local Cfg = {
     GetOnlyEnabled = false,         -- only keep drops worth >= GetOnlyMin, dump the rest
     GetOnlyMin = 0,                 -- minimum brainrot CPS value to keep (0..48.9M)
     GetOnlyMode = 1,                -- where to dump low drops: 1=Tsunami (restart), 2=Safe Zone
+    TgEnabled = false,              -- send a Telegram message on every successful catch
+    TgToken = "8271909730:AAFKcjtdNmfYEsxanrVvNi0GSmhH8P96mww",
+    TgChatId = "",                  -- auto-filled from getUpdates, or set manually
 }
 
 local WaveData = require(ReplicatedStorage.Shared.Data.WaveData)
