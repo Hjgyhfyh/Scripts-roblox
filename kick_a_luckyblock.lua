@@ -3806,9 +3806,9 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
         -- default brainrot, no match — collect normally
         SuicideMode = false
     else
+        -- wrong mutated drop: let autoPlayLoop feed it to the wave (restart)
         SuicideMode = true
         print(("[Saber] Wrong mutated drop (%s+%s) — feeding to wave NOW"):format(brainrot.Name, effMut))
-        startSuicide()
     end
 end)
 
