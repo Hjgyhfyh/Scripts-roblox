@@ -3706,14 +3706,17 @@ local function fmtStrength(n)
     return (string.format("%.2f", scaled):gsub("%.?0+$", "")) .. (STR_ORDER[tier + 1] or "")
 end
 
--- read the HUD kick-power label, e.g. "3.9B Kick Power"
+-- read the HUD kick-power label, e.g. "3.9B Kick Power"; also detect the (MAX) flag
 local function readKickPower()
     local pg = LocalPlayer:FindFirstChild("PlayerGui"); if not pg then return nil end
     local hud = pg:FindFirstChild("HUD"); if not hud then return nil end
     local bl = hud:FindFirstChild("BottomLeft"); if not bl then return nil end
     local kl = bl:FindFirstChild("KickLevel"); if not kl then return nil end
     local lbl = kl:FindFirstChild("TextLabel"); if not lbl then return nil end
-    return lbl.Text
+    local maxed = false
+    local ap = kl:FindFirstChild("ActualPower")
+    if ap and ap:IsA("TextLabel") and tostring(ap.Text):upper():find("MAX") then maxed = true end
+    return lbl.Text, maxed
 end
 
 -- The HUD value is rounded (≈3 sig figs), so a 30s delta is usually 0. Instead we
