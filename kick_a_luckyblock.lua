@@ -3943,21 +3943,12 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
     LastCatch = { name = brainrot.Name, value = val }  -- for the presence heartbeat (Playing)
 
-    -- Get Only: any drop worth less than the threshold is dumped (to the wave or the safe zone)
+    -- Get Only: any drop worth less than the threshold is fed to the Tsunami (restart)
     if Cfg.GetOnlyEnabled and val < (Cfg.GetOnlyMin or 0) then
-        if (Cfg.GetOnlyMode or 1) == 2 then
-            -- Safe Zone: park the brainrot in safety (keeps it, no restart)
-            SuicideMode = false
-            ForceSaveZone = true
-            print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — sending to Safe Zone"):format(
-                brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-        else
-            -- Tsunami: feed it to the wave so Auto Play restarts
-            ForceSaveZone = false
-            SuicideMode = true
-            print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
-                brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-        end
+        ForceSaveZone = false
+        SuicideMode = true
+        print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
+            brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
         return  -- below threshold: NOT a successful catch, no Telegram
     end
 
