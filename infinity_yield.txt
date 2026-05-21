@@ -4890,6 +4890,8 @@ CMDs[#CMDs + 1] = {NAME = 'addplugin / plugin [name]', DESC = 'Add a plugin via 
 CMDs[#CMDs + 1] = {NAME = 'removeplugin / deleteplugin [name]', DESC = 'Remove a plugin via command'}
 CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
+CMDs[#CMDs + 1] = {NAME = 'panel / qc / quick', DESC = 'Open/close the Sigmatik quick-commands panel'}
+CMDs[#CMDs + 1] = {NAME = 'sigmatik / hub / sigma / scripthub', DESC = 'Open the Sigmatik script hub (loads scripts from the GitHub repo)'}
 -- wait()
 
 for i = 1, #CMDs do
@@ -13876,21 +13878,31 @@ task.spawn(function()
             end)
         end
 
-        addcmd('sigmatik', {'hub', 'sigma', 'scripthub'}, function(args)
-            local a = args[1] and string.lower(tostring(args[1]))
-            if a == "close" or a == "hide" or a == "off" then
-                HUB.Visible = false
+        hubLoad = loadList
+    end
+
+    addcmd('sigmatik', {'hub', 'sigma', 'scripthub'}, function(args)
+        if not hubBuilt then
+            local okb, errb = pcall(buildHub)
+            if not okb or not HUB then
+                pcall(notify, "Sigmatik", "Ошибка построения хаба: " .. tostring(errb))
+                if _G.IY_DEBUG then warn("Sigmatik build error:", errb) end
                 return
             end
-            if a == "open" or a == "show" or a == "on" then
-                HUB.Visible = true
-            else
-                HUB.Visible = not HUB.Visible
-            end
-            if HUB.Visible and not loaded then loadList() end
-        end)
-
-        notify("Sigmatik Hub", "Команда " .. prefix .. "sigmatik — открыть хаб скриптов")
+            hubBuilt = true
+        end
+        local a = args[1] and string.lower(tostring(args[1]))
+        if a == "close" or a == "hide" or a == "off" then
+            HUB.Visible = false
+            return
+        end
+        if a == "open" or a == "show" or a == "on" then
+            HUB.Visible = true
+        else
+            HUB.Visible = not HUB.Visible
+        end
+        if HUB.Visible and hubLoad then hubLoad() end
     end)
-    if not ok and _G.IY_DEBUG then warn("Sigmatik error:", err) end
+
+    notify("Sigmatik Hub", "Команда " .. prefix .. "sigmatik — открыть хаб скриптов")
 end)
