@@ -6163,7 +6163,7 @@ local function showConnectKeyPrompt()
     desc.TextXAlignment = Enum.TextXAlignment.Left
     desc.TextYAlignment = Enum.TextYAlignment.Top
     desc.TextColor3 = Color3.fromRGB(160, 170, 200)
-    desc.Text = "Введи свой ключ из Telegram, чтобы вести удалённую личную статистику пойманных брейнротов прямо в Telegram: уведомления о ловле, твоя коллекция, время игры и количество игр.\n\nКлюч у каждого игрока свой. Получить его: открой бота @cheat_speed_amongus1bot → кнопка меню ☰ → вкладка Profile.\n\nМожно пропустить и ввести позже в разделе Telegram."
+    desc.Text = "Введи свой ключ из Telegram, чтобы вести удалённую личную статистику пойманных брейнротов прямо в Telegram: уведомления о ловле, твоя коллекция, время игры и количество игр.\n\nКлюч у каждого игрока свой. Получить его: открой бота @cheat_speed_amongus1bot → нажми кнопку меню снизу → вкладка Profile.\n\nМожно пропустить и ввести позже в разделе Telegram."
     desc.Parent = card
 
     local boxBG = Instance.new("Frame")
