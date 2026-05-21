@@ -5773,14 +5773,6 @@ local function momentaryBtn(name, description, action)
     }
 end
 
-local function abbrevNum(v)
-    v = v or 0
-    if v >= 1e9 then return string.format("%.2fB", v / 1e9) end
-    if v >= 1e6 then return string.format("%.1fM", v / 1e6) end
-    if v >= 1e3 then return string.format("%.1fK", v / 1e3) end
-    return tostring(math.floor(v))
-end
-
 local cb = function(field, fn)
     return function(v)
         Cfg[field] = v
