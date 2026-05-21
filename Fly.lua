@@ -147,3 +147,4 @@ player.CharacterAdded:Connect(function()
 		startFly()
 	end
 end)
+-- autosync check 1531
