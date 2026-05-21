@@ -3628,27 +3628,59 @@ local function tgNotifyCatch(name, mut, value)
     })
 end
 
--- ---- play stats: Time Play (seconds while Auto Play is on) + games played -----
+-- ---- presence + play stats heartbeat -----
+-- Sent every 30s while the script runs → backend marks the player online and shows
+-- their current activity: playing (Auto Play), farming (Auto Farm Weight), or idle.
 local Stats = { seconds = 0, games = 0 }
+local LastCatch = nil  -- { name = "...", value = <number> } — set in the KickEvent handler
 
-local function flushStats()
+local function currentState()
+    if State.AutoPlay then return "playing" end
+    if State.AutoWeight then return "farming" end
+    return "idle"
+end
+
+-- base (placed brainrots) income as the game's own big-number suffix strings
+local function baseIncomeStrings()
+    local data = PlacedVisualizer and PlacedVisualizer.MyBrainrots
+    if type(data) ~= "table" then return nil end
+    local ok, daily = pcall(GetOfflineCash, data)
+    if not ok or not daily then return nil end
+    local function suf(v)
+        local o, s = pcall(function() return v:GetSuffix(true) end)
+        return (o and s) and tostring(s) or nil
+    end
+    local function div(a, b)
+        local o, r = pcall(function() return a / b end)
+        return o and r or nil
+    end
+    local h, m = div(daily, 24), div(daily, 1440)
+    return { d = suf(daily), h = h and suf(h) or nil, m = m and suf(m) or nil }
+end
+
+local function sendHeartbeat()
     if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
     local s = math.floor(Stats.seconds)
-    local g = Stats.games
-    if s < 1 and g < 1 then return end
     Stats.seconds = Stats.seconds - s
+    local g = Stats.games
     Stats.games = 0
-    backendPost("/stat", { key = Cfg.ConnectKey, addSeconds = s, addGames = g })
+    local body = { key = Cfg.ConnectKey, addSeconds = s, addGames = g, state = currentState() }
+    local base = baseIncomeStrings()
+    if base then body.baseDay = base.d; body.baseHour = base.h; body.baseMin = base.m end
+    if LastCatch then body.lastName = LastCatch.name; body.lastValue = abbrevNum(LastCatch.value) end
+    backendPost("/stat", body)
 end
 
 task.spawn(function()
+    task.wait(4)
+    sendHeartbeat()  -- appear online shortly after load
     local last = os.clock()
     while true do
         task.wait(30)
         local now = os.clock()
         if State.AutoPlay then Stats.seconds = Stats.seconds + (now - last) end
         last = now
-        flushStats()
+        sendHeartbeat()
     end
 end)
 
