@@ -594,15 +594,20 @@ local function normalizeControl(control)
 		normalized.Value = clampRound(rawValue, normalized.Min, normalized.Max, normalized.Increment)
 		normalized.CurrentValue = normalized.Value
 	elseif kind == "input" then
-		normalized.Min = type(control.Min) == "number" and control.Min or nil
-		normalized.Max = type(control.Max) == "number" and control.Max or nil
 		normalized.Placeholder = control.Placeholder
-		local rawValue = control.Value or control.CurrentValue or 0
-		if type(rawValue) ~= "number" then rawValue = parseNumberInput(rawValue) or 0 end
-		if normalized.Min then rawValue = math.max(normalized.Min, rawValue) end
-		if normalized.Max then rawValue = math.min(normalized.Max, rawValue) end
-		normalized.Value = rawValue
-		normalized.CurrentValue = rawValue
+		normalized.Text = control.Text and true or false  -- text mode (string) vs number
+		if normalized.Text then
+			normalized.Value = tostring(control.Value or control.CurrentValue or "")
+		else
+			normalized.Min = type(control.Min) == "number" and control.Min or nil
+			normalized.Max = type(control.Max) == "number" and control.Max or nil
+			local rawValue = control.Value or control.CurrentValue or 0
+			if type(rawValue) ~= "number" then rawValue = parseNumberInput(rawValue) or 0 end
+			if normalized.Min then rawValue = math.max(normalized.Min, rawValue) end
+			if normalized.Max then rawValue = math.min(normalized.Max, rawValue) end
+			normalized.Value = rawValue
+		end
+		normalized.CurrentValue = normalized.Value
 	elseif kind == "colorpicker" then
 		normalized.Palette = arrayCopy(control.Palette or DEFAULT_PALETTE)
 		local rawColor = control.Value or control.CurrentValue or normalized.Palette[1]
