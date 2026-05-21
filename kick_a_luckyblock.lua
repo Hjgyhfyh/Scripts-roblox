@@ -3636,6 +3636,23 @@ local function tgSend(text)
     return true
 end
 
+local function abbrevNum(v)
+    v = v or 0
+    if v >= 1e9 then return string.format("%.2fB", v / 1e9) end
+    if v >= 1e6 then return string.format("%.1fM", v / 1e6) end
+    if v >= 1e3 then return string.format("%.1fK", v / 1e3) end
+    return tostring(math.floor(v))
+end
+
+-- notify Telegram about a successful (kept) catch
+local function tgNotifyCatch(name, mut, value)
+    if not Cfg.TgEnabled then return end
+    local mutTxt = (mut and mut ~= "None") and (" <b>%s</b>"):format(mut) or ""
+    local text = ("🧠 <b>Caught:</b> %s%s\n💰 <b>Value:</b> %s/s"):format(
+        tostring(name), mutTxt, abbrevNum(value))
+    tgSend(text)
+end
+
 ----------------------------------------------------------------- AUTO KICK
 local function isInSaveZone()
     local _, _, root = getCharParts()
