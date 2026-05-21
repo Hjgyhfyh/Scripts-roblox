@@ -3688,6 +3688,9 @@ local function autoPlayLoop(epoch)
                 task.wait(0.1)
             end
             if not alive() then break end
+            -- settle: let the KickEvent drop handler classify this wave first
+            -- (sets SuicideMode / ForceSaveZone) before we pick the phase
+            task.wait(0.2)
             if SuicideMode then
                 while alive() and GameHandler.InGame do
                     feedToWaveOnce()
