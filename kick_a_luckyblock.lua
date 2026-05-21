@@ -3600,6 +3600,7 @@ local function autoPlayLoop(epoch)
 end
 
 local SuicideMode = false
+local startSuicide  -- forward declaration (real body defined later)
 
 -- normalize legacy string entries to mutation-set tables
 local function normalizeStopList()
@@ -3639,10 +3640,26 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     end
 
     if not State.AutoPlay then return end
-    if not hasStopTargets() then return end
     if type(brainrot) ~= "table" or not brainrot.Name then return end
 
     local effMut = mutation or "None"
+
+    -- Get Only: feed any drop worth less than the threshold straight back into the wave
+    if Cfg.GetOnlyEnabled then
+        local mutArg = (effMut ~= "None") and effMut or nil
+        local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
+        if val < (Cfg.GetOnlyMin or 0) then
+            SuicideMode = true
+            print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to wave"):format(
+                brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
+            startSuicide()
+            return
+        end
+        SuicideMode = false
+    end
+
+    if not hasStopTargets() then return end
+
     if isStopMatch(brainrot.Name, effMut) then
         -- target hit: collect normally, KEEP Auto Play running
         SuicideMode = false
@@ -4053,7 +4070,7 @@ local function killBrainrotOnce()
     pcall(function() char:BreakJoints() end)
 end
 
-local function startSuicide()
+function startSuicide()
     if SuicideThread and coroutine.status(SuicideThread) ~= "dead" then return end
     SuicideThread = task.spawn(function()
         while SuicideMode and State.AutoPlay do
