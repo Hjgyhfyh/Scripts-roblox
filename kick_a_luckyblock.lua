@@ -3600,8 +3600,9 @@ end
 -- ask Telegram who has messaged the bot and remember that chat id
 local function tgResolveChatId()
     local res = tgRaw(tgApi("getUpdates"), "GET")
-    if not res or not res.Body then return nil end
-    local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+    local bodyText = res and (res.Body or res.body)
+    if not bodyText then return nil end
+    local ok, data = pcall(function() return HttpService:JSONDecode(bodyText) end)
     if not ok or type(data) ~= "table" or not data.ok or type(data.result) ~= "table" then
         return nil
     end
@@ -3623,7 +3624,7 @@ local function tgSend(text)
     if not Cfg.TgToken or Cfg.TgToken == "" then return false end
     task.spawn(function()
         local chat = Cfg.TgChatId
-        if not chat or chat == "" then chat = tgResolveChatId() end
+        if not chat or chat == "" or chat == 0 or chat == "0" then chat = tgResolveChatId() end
         if not chat or chat == "" then return end
         local body = HttpService:JSONEncode({
             chat_id = chat,
