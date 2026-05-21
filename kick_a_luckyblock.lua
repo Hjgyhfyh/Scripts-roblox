@@ -3683,6 +3683,58 @@ local function getRobloxAvatar()
     return _robloxAvatar
 end
 
+-- ---- strength (Kick Power) reading + gain rate ----
+local STR_SUFFIX = { K=1e3, M=1e6, B=1e9, T=1e12, QA=1e15, QN=1e18, SX=1e21, SP=1e24, OC=1e27, NO=1e30, DC=1e33 }
+local STR_ORDER  = { "", "K", "M", "B", "T", "Qa", "Qn", "Sx", "Sp", "Oc", "No", "Dc" }
+
+local function parseStrength(text)
+    if type(text) ~= "string" then return nil, nil end
+    local num, suf = text:match("([%d%.,]+)%s*([A-Za-z]*)")
+    if not num then return nil, nil end
+    local n = tonumber((num:gsub(",", "")))
+    if not n then return nil, nil end
+    local mult = (suf ~= "" and STR_SUFFIX[suf:upper()]) or 1
+    return n * mult, (num .. (suf or ""))
+end
+
+local function fmtStrength(n)
+    n = math.abs(n or 0)
+    if n < 1 then return "0" end
+    local tier = math.floor(math.log(n, 10) / 3)
+    if tier < 0 then tier = 0 elseif tier > #STR_ORDER - 1 then tier = #STR_ORDER - 1 end
+    local scaled = n / (10 ^ (tier * 3))
+    return (string.format("%.2f", scaled):gsub("%.?0+$", "")) .. (STR_ORDER[tier + 1] or "")
+end
+
+-- read the HUD kick-power label, e.g. "3.9B Kick Power"
+local function readKickPower()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui"); if not pg then return nil end
+    local hud = pg:FindFirstChild("HUD"); if not hud then return nil end
+    local bl = hud:FindFirstChild("BottomLeft"); if not bl then return nil end
+    local kl = bl:FindFirstChild("KickLevel"); if not kl then return nil end
+    local lbl = kl:FindFirstChild("TextLabel"); if not lbl then return nil end
+    return lbl.Text
+end
+
+local _kp = { value = nil, t = nil }
+local function strengthFields()
+    local txt = readKickPower()
+    if not txt then return nil end
+    local abs, disp = parseStrength(txt)
+    if not abs then return nil end
+    local out = { now = disp }
+    local now = os.clock()
+    if _kp.value and _kp.t and now > _kp.t + 0.5 then
+        local dps = (abs - _kp.value) / (now - _kp.t)  -- per second
+        if dps < 0 then dps = 0 end                    -- ignore rebirth resets
+        out.min = fmtStrength(dps * 60)
+        out.hour = fmtStrength(dps * 3600)
+        out.day = fmtStrength(dps * 86400)
+    end
+    _kp.value, _kp.t = abs, now
+    return out
+end
+
 local function sendHeartbeat()
     if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
     local s = math.floor(Stats.seconds)
