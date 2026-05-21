@@ -3879,44 +3879,48 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     if type(brainrot) ~= "table" or not brainrot.Name then return end
 
     local effMut = mutation or "None"
+    local mutArg = (effMut ~= "None") and effMut or nil
+    local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
 
     -- Get Only: any drop worth less than the threshold is dumped (to the wave or the safe zone)
-    if Cfg.GetOnlyEnabled then
-        local mutArg = (effMut ~= "None") and effMut or nil
-        local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
-        if val < (Cfg.GetOnlyMin or 0) then
-            if (Cfg.GetOnlyMode or 1) == 2 then
-                -- Safe Zone: park the brainrot in safety (keeps it, no restart)
-                SuicideMode = false
-                ForceSaveZone = true
-                print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — sending to Safe Zone"):format(
-                    brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-            else
-                -- Tsunami: feed it to the wave so Auto Play restarts
-                ForceSaveZone = false
-                SuicideMode = true
-                print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
-                    brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-            end
-            return
+    if Cfg.GetOnlyEnabled and val < (Cfg.GetOnlyMin or 0) then
+        if (Cfg.GetOnlyMode or 1) == 2 then
+            -- Safe Zone: park the brainrot in safety (keeps it, no restart)
+            SuicideMode = false
+            ForceSaveZone = true
+            print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — sending to Safe Zone"):format(
+                brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
+        else
+            -- Tsunami: feed it to the wave so Auto Play restarts
+            ForceSaveZone = false
+            SuicideMode = true
+            print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
+                brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
         end
-        SuicideMode = false
-        ForceSaveZone = false
+        return  -- below threshold: NOT a successful catch, no Telegram
     end
 
-    if not hasStopTargets() then return end
+    -- past the value gate: decide keep vs dump via the stop-on-hit list
+    SuicideMode = false
+    ForceSaveZone = false
 
-    if isStopMatch(brainrot.Name, effMut) then
-        -- target hit: collect normally, KEEP Auto Play running
-        SuicideMode = false
-        print(("[Saber] Caught %s (mut=%s) — collecting"):format(brainrot.Name, effMut))
-    elseif effMut == "None" then
-        -- default brainrot, no match — collect normally
-        SuicideMode = false
-    else
-        -- wrong mutated drop: let autoPlayLoop feed it to the wave (restart)
-        SuicideMode = true
-        print(("[Saber] Wrong mutated drop (%s+%s) — feeding to wave NOW"):format(brainrot.Name, effMut))
+    local kept = true
+    if hasStopTargets() then
+        if isStopMatch(brainrot.Name, effMut) then
+            print(("[Saber] Caught %s (mut=%s) — collecting"):format(brainrot.Name, effMut))
+        elseif effMut == "None" then
+            -- default brainrot, no match — collect normally
+        else
+            -- wrong mutated drop: let autoPlayLoop feed it to the wave (restart)
+            SuicideMode = true
+            kept = false
+            print(("[Saber] Wrong mutated drop (%s+%s) — feeding to wave NOW"):format(brainrot.Name, effMut))
+        end
+    end
+
+    -- successful catch (kept and at/above the Get Only threshold) → Telegram ping
+    if kept then
+        tgNotifyCatch(brainrot.Name, effMut, val)
     end
 end)
 
