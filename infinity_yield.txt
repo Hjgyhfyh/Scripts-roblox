@@ -13343,7 +13343,8 @@ end)
 -- ============================================================
 --  Quick Command Panel — кастомное дополнение к Infinite Yield
 --  Группирует вариации команд (fly / vfly / cfly ...) в кнопки.
---  Открыть/скрыть:  ;panel   (алиасы: qc, quick, quickcmds)
+--  Это команда:  ;panel  — открыть/скрыть.  ;panel close — скрыть.
+--  Алиасы: qc, quick, quickcmds.
 -- ============================================================
 task.spawn(function()
     local ok, err = pcall(function()
@@ -13397,6 +13398,17 @@ task.spawn(function()
                 {t = "Spin",       on = "spin",      off = "unspin"},
                 {t = "Orbit",      on = "orbit",     off = "unorbit"},
                 {t = "Hat Spin",   on = "hatspin",   off = "unhatspin"},
+            }},
+            {name = "Интерфейс", items = {
+                {t = "Chat",        on = "enable chat",       off = "disable chat",       defaultOn = true},
+                {t = "Backpack",    on = "enable backpack",   off = "disable backpack",   defaultOn = true},
+                {t = "Leaderboard", on = "enable playerlist", off = "disable playerlist", defaultOn = true},
+                {t = "Health",      on = "enable health",     off = "disable health",     defaultOn = true},
+                {t = "Emotes",      on = "enable emotesmenu", off = "disable emotesmenu", defaultOn = true},
+                {t = "Reset Btn",   on = "enable reset",      off = "disable reset",      defaultOn = true},
+                {t = "All UI",      on = "enable all",        off = "disable all",        defaultOn = true},
+                {t = "Show GUIs",   on = "showguis",          off = "unshowguis"},
+                {t = "Hide GUIs",   on = "hideguis",          off = "unhideguis"},
             }},
             {name = "Прочее", items = {
                 {t = "God",        on = "god"},
@@ -13555,6 +13567,8 @@ task.spawn(function()
                     table.insert(buttonsByOff[it.off], b)
                 end
 
+                if it.defaultOn then setActive(b, true) end   -- включено по умолчанию
+
                 b.MouseEnter:Connect(function()
                     if not toggleState[b] then b.BackgroundColor3 = BTNH end
                 end)
@@ -13619,17 +13633,23 @@ task.spawn(function()
             QP.Visible = false
         end)
 
-        -- команда-переключатель видимости
-        addcmd('panel', {'quickcmds', 'qc', 'quick'}, function()
-            QP.Visible = not QP.Visible
+        -- команда: ;panel (переключить) | ;panel close | ;panel open
+        addcmd('panel', {'quickcmds', 'qc', 'quick'}, function(args)
+            local a = args[1] and string.lower(tostring(args[1]))
+            if a == "close" or a == "hide" or a == "off" then
+                QP.Visible = false
+            elseif a == "open" or a == "show" or a == "on" then
+                QP.Visible = true
+            else
+                QP.Visible = not QP.Visible
+            end
+            if QP.Visible then
+                task.wait()
+                Body.CanvasPosition = Vector2.new(0, 0)   -- открывать с первой группы
+            end
         end)
 
-        -- показать после интро
-        task.wait(2.5)
-        QP.Visible = true
-        task.wait()
-        Body.CanvasPosition = Vector2.new(0, 0)   -- всегда открывать с первой группы
-        notify("Quick Panel", "Панель быстрых команд готова. Открыть/скрыть: " .. prefix .. "panel")
+        notify("Quick Panel", "Команда " .. prefix .. "panel — открыть/скрыть панель быстрых команд")
     end)
     if not ok and _G.IY_DEBUG then warn("QuickPanel error:", err) end
 end)
