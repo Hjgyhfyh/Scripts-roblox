@@ -6052,7 +6052,7 @@ UI = SigmatikLibrary:Create({
             Name = "Misc", Icon = "settings",
             Modules = {
                 {
-                    Name = "Anti AFK", Enabled = true, Callback = setAntiAFK,
+                    Name = "Anti AFK", Enabled = false, Callback = setAntiAFK,
                     Sections = { { Name = "Settings", Controls = {} } },
                 },
                 {
