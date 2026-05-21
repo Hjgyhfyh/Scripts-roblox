@@ -5613,6 +5613,13 @@ UI = SigmatikLibrary:Create({
                                     Callback = cb("FastPlaySafeMargin") },
                                 { Type = "toggle", Name = "Fast Play V2 (match wave speed)", Value = Cfg.FastPlayV2,
                                     Callback = setFastPlayV2 },
+                                { Type = "toggle", Name = "Get Only", Value = Cfg.GetOnlyEnabled,
+                                    Description = "Feed drops worth less than the value below back into the wave",
+                                    Callback = cb("GetOnlyEnabled") },
+                                { Type = "slider", Name = "Get Only min value", Min = 0, Max = 48900000, Increment = 100000,
+                                    Value = Cfg.GetOnlyMin,
+                                    Format = function(v) return abbrevNum(v) end,
+                                    Callback = cb("GetOnlyMin") },
                             },
                         },
                         {
