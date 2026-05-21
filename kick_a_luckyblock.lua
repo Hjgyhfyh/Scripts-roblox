@@ -3440,8 +3440,9 @@ local Cfg = {
     FastPlayV2 = false,
     FastPlayKickMult = 1,           -- 1 = off (server timing-checks anything > 1)
     FastPlaySafeMargin = 0.5,       -- extra seconds wait after server-expected wave time
-    GetOnlyEnabled = false,         -- only keep drops worth >= GetOnlyMin, feed the rest to the wave
+    GetOnlyEnabled = false,         -- only keep drops worth >= GetOnlyMin, dump the rest
     GetOnlyMin = 0,                 -- minimum brainrot CPS value to keep (0..48.9M)
+    GetOnlyMode = 1,                -- where to dump low drops: 1=Tsunami (restart), 2=Safe Zone
 }
 
 local WaveData = require(ReplicatedStorage.Shared.Data.WaveData)
