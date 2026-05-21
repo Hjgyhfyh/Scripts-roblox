@@ -3614,9 +3614,9 @@ local function backendPost(path, tbl)
     end)
 end
 
--- notify the backend about a successful (kept) catch → it sends the Telegram message
-local function tgNotifyCatch(name, mut, value)
-    if not Cfg.TgEnabled then return end
+-- record EVERY drop in the backend (so it shows in "Последние уловы" / collection).
+-- `notify` = send a Telegram message too (only for successful kept catches + TgEnabled).
+local function recordCatch(name, mut, value, notify)
     if not Cfg.ConnectKey or Cfg.ConnectKey == "" then return end
     local d = EntitiesData.Brainrots and EntitiesData.Brainrots[name]
     backendPost("/catch", {
@@ -3625,6 +3625,7 @@ local function tgNotifyCatch(name, mut, value)
         rarity = d and d.Rarity or nil,
         value = value,
         mutation = (mut and mut ~= "None") and mut or nil,
+        notify = (notify and Cfg.TgEnabled) and true or false,
     })
 end
 
