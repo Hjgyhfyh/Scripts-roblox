@@ -3759,12 +3759,19 @@ local function sendHeartbeat()
     backendPost("/stat", body)
 end
 
+-- epoch guard: re-executing the script bumps the epoch so any heartbeat loop from a
+-- previous run stops (executors don't kill old threads) — prevents duplicate heartbeats.
+local _hbEpoch = ((getgenv and getgenv().__kalbHB) or 0) + 1
+if getgenv then getgenv().__kalbHB = _hbEpoch end
+local function hbAlive() return (not getgenv) or getgenv().__kalbHB == _hbEpoch end
+
 task.spawn(function()
     task.wait(4)
-    sendHeartbeat()  -- appear online shortly after load
+    if hbAlive() then sendHeartbeat() end  -- appear online shortly after load
     local last = os.clock()
-    while true do
+    while hbAlive() do
         task.wait(30)
+        if not hbAlive() then break end
         local now = os.clock()
         if State.AutoPlay then Stats.seconds = Stats.seconds + (now - last) end
         last = now
