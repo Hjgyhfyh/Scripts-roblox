@@ -14005,3 +14005,201 @@ task.spawn(function()
     end)
     if not ok and _G.IY_DEBUG then warn("AntiGravity error:", err) end
 end)
+
+-- ============================================================
+--  Локализация IY (RU/EN) — движок + переключатель в настройках.
+--  Перевод наполняется таблицами IY_UI_TR (интерфейс) и
+--  IY_DESC_TR (описания команд). Имена команд НЕ переводятся.
+--  Язык сохраняется в infiniteyield/IY_language.txt.
+-- ============================================================
+task.spawn(function()
+    local ok, err = pcall(function()
+        local LANG_FILE = "infiniteyield/IY_language.txt"
+
+        local function loadLang()
+            local okf, has = pcall(function() return isfile and isfile(LANG_FILE) end)
+            if okf and has then
+                local okr, d = pcall(readfile, LANG_FILE)
+                if okr and type(d) == "string" then
+                    d = d:gsub("%s+", "")
+                    if d == "ru" or d == "en" then return d end
+                end
+            end
+            return "en"
+        end
+        IYLang = loadLang()
+
+        -- ===== Интерфейс (EN -> RU) =====
+        local UI = {
+            ["Prefix"] = "Префикс",
+            ["Keep Menu Open"] = "Не закрывать меню",
+            ["Notification Text"] = "Текст уведомления",
+            ["Notification Title"] = "Заголовок уведомления",
+            ["Trigger:"] = "Триггер:",
+            ["Click to bind"] = "Нажми для привязки",
+            ["Add"] = "Добавить",
+            ["Clear"] = "Очистить",
+            ["Close"] = "Закрыть",
+            ["Delete"] = "Удалить",
+            ["Create Toggle"] = "Создать переключатель",
+            ["Click the button below and press a key/mouse button. Then select what you want to bind it to."] = "Нажми кнопку ниже и нажми клавишу/кнопку мыши, затем выбери действие для привязки.",
+            ["    Click Delete (Hold Key & Click)"] = "    Удаление кликом (зажми клавишу + клик)",
+            ["    Click TP (Hold Key & Click)"] = "    Телепорт кликом (зажми клавишу + клик)",
+        }
+
+        -- ===== Описания команд (EN -> RU), партия 1/8 =====
+        local DESC = {
+            ["Invite to the Infinite Yield discord server."] = "Приглашение на Discord-сервер Infinite Yield.",
+            ["Changes the size of the gui. [number] accepts both decimals and whole numbers. Min is 0.4 and Max is 2"] = "Меняет размер интерфейса. [число] — дробное или целое. Мин. 0.4, макс. 2",
+            ["Loads Roblox console"] = "Открывает консоль Roblox",
+            ["Loads old Roblox console"] = "Открывает старую консоль Roblox",
+            ["Opens DEX by Moon"] = "Открывает DEX от Moon",
+            ["Opens Old DEX by Moon"] = "Открывает старый DEX от Moon",
+            ["Opens Simple Spy V3"] = "Открывает Simple Spy V3",
+            ["Opens Edges audio logger"] = "Открывает аудио-логгер Edge",
+            ["Gives you info about the server"] = "Показывает информацию о сервере",
+            ["Scans strings for server references and reconstructs them"] = "Сканирует строки на ссылки сервера и восстанавливает их",
+            ["Copies the games JobId to your clipboard"] = "Копирует JobId игры в буфер обмена",
+            ["Notifies you the games JobId"] = "Показывает JobId игры",
+            ["Makes you rejoin the game"] = "Перезаходит в игру",
+            ["Automatically rejoins the server if you get kicked/disconnected"] = "Автоматически перезаходит при кике/отключении",
+            ["Teleports you to a different server"] = "Телепортирует на другой сервер",
+            ["Joins a game by ID"] = "Заходит в игру по ID",
+            ["Prevents the game from kicking you for being idle/afk"] = "Не даёт игре кикнуть за бездействие (AFK)",
+            ["Set outgoing KBPS limit"] = "Задаёт лимит исходящего KBPS",
+            ["Set IncomingReplicationLag"] = "Задаёт IncomingReplicationLag",
+            ["Notifies you the creators ID"] = "Показывает ID создателя",
+            ["Copies the creators ID to your clipboard"] = "Копирует ID создателя в буфер обмена",
+            ["Sets your userid to the creators ID"] = "Ставит ваш userid равным ID создателя",
+            ["Prevents the game from showing you purchase/premium prompts"] = "Блокирует окна покупок/премиума в игре",
+            ["Allows the game to show purchase/premium prompts again"] = "Снова разрешает окна покупок/премиума",
+            ["Toggles visibility of coregui items"] = "Переключает видимость элементов CoreGui",
+            ["Shows any invisible GUIs"] = "Показывает все скрытые GUI",
+            ["Undoes showguis"] = "Отменяет showguis",
+            ["Hides any GUIs in PlayerGui"] = "Скрывает все GUI в PlayerGui",
+            ["Undoes hideguis"] = "Отменяет hideguis",
+            ["Enables backspace to delete GUI"] = "Включает удаление GUI по Backspace",
+            ["Disables guidelete"] = "Отключает guidelete",
+            ["Hides the main IY GUI"] = "Скрывает основной интерфейс IY",
+            ["Shows IY again"] = "Снова показывает IY",
+            ["Auto execute IY when you teleport through servers"] = "Авто-запуск IY при телепортах между серверами",
+            ["Disable keepiy"] = "Отключает keepiy",
+            ["Toggles keepiy"] = "Переключает keepiy",
+            ["Automatically removes ad billboards"] = "Автоматически убирает рекламные билборды",
+            ["Uses saveinstance to save the game"] = "Сохраняет игру через saveinstance",
+            ["Clears the annoying box and blur when a game kicks you"] = "Убирает окно и размытие при кике из игры",
+            ["Clears the annoying box shown when a game is loading assets due to network lag"] = "Убирает окно при подгрузке ассетов из-за сетевой задержки",
+            ["Disables antigameplaypaused"] = "Отключает antigameplaypaused",
+            ["Prevents localscripts from kicking you"] = "Не даёт локальным скриптам кикать вас",
+            ["Prevents localscripts from teleporting you"] = "Не даёт локальным скриптам телепортировать вас",
+            ["Changes if antiteleport allows you to rejoin or not"] = "Меняет, разрешает ли antiteleport перезаход",
+            ["Cancels teleports in progress"] = "Отменяет текущие телепорты",
+            ["Adjusts your game volume on a scale of 0 to 10"] = "Регулирует громкость игры (0–10)",
+            ["Lowers game quality to boost FPS"] = "Понижает качество графики для роста FPS",
+            ["Starts Roblox recorder"] = "Запускает запись Roblox",
+            ["Takes a screenshot"] = "Делает скриншот",
+            ["Toggles fullscreen"] = "Переключает полноэкранный режим",
+            ["Sends you a notification with the provided text"] = "Отправляет уведомление с заданным текстом",
+            ["Executes the previous command used"] = "Выполняет предыдущую команду",
+            ["Notify yourself your ping"] = "Показывает ваш пинг",
+            ["Disable 3d Rendering to decrease the amount of CPU the client uses"] = "Отключает 3D-рендер для снижения нагрузки на CPU",
+            ["Enable 3d Rendering"] = "Включает 3D-рендер",
+            ["Enables 2022 material textures"] = "Включает текстуры материалов 2022",
+            ["Disables 2022 material textures"] = "Отключает текстуры материалов 2022",
+            ["Enables the left and right alignment keys (comma and period)"] = "Включает клавиши выравнивания влево/вправо (запятая и точка)",
+            ["Disables the alignment keys"] = "Отключает клавиши выравнивания",
+        }
+
+        getgenv().IY_UI_TR = UI
+        getgenv().IY_DESC_TR = DESC
+
+        local function translateObj(obj)
+            if not (obj:IsA("TextLabel") or obj:IsA("TextButton")) then return end
+            local orig = obj:GetAttribute("IYOrig")
+            if orig == nil then
+                if UI[obj.Text] then orig = obj.Text; obj:SetAttribute("IYOrig", orig) else return end
+            end
+            obj.Text = (IYLang == "ru" and UI[orig]) or orig
+        end
+
+        local function applyDesc()
+            if not CMDsF then return end
+            for _, c in ipairs(CMDsF:GetChildren()) do
+                local hasDesc = (c:GetAttribute("Desc") ~= nil) or (c:GetAttribute("IYOrigDesc") ~= nil)
+                if hasDesc then
+                    local od = c:GetAttribute("IYOrigDesc")
+                    if od == nil then od = c:GetAttribute("Desc"); c:SetAttribute("IYOrigDesc", od) end
+                    if od and DESC[od] then c:SetAttribute("Desc", (IYLang == "ru" and DESC[od]) or od) end
+                end
+            end
+        end
+
+        local function applyAll()
+            pcall(function()
+                for _, obj in ipairs(PARENT:GetDescendants()) do pcall(translateObj, obj) end
+            end)
+            pcall(applyDesc)
+        end
+
+        local function setLang(l)
+            IYLang = l
+            pcall(writefile, LANG_FILE, l)
+            applyAll()
+        end
+        getgenv().IY_setLanguage = setLang
+
+        -- строка-переключатель в Настройках
+        pcall(function()
+            local maxY = 0
+            for _, c in ipairs(SettingsHolder:GetChildren()) do
+                if c:IsA("GuiObject") then
+                    local y = c.Position.Y.Offset + c.Size.Y.Offset
+                    if y > maxY then maxY = y end
+                end
+            end
+            local row = Instance.new("TextLabel")
+            row.Name = "IYLanguage"
+            row.Parent = SettingsHolder
+            row.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+            row.BackgroundTransparency = 1
+            row.BorderSizePixel = 0
+            row.Position = UDim2.new(0, 5, 0, maxY + 5)
+            row.Size = UDim2.new(1, -10, 0, 20)
+            row.Font = Enum.Font.SourceSans
+            row.TextSize = 14
+            row.TextColor3 = currentText1
+            row.TextXAlignment = Enum.TextXAlignment.Left
+            row.ZIndex = 10
+            row.Text = (IYLang == "ru") and "Язык" or "Language"
+            local btn = Instance.new("TextButton")
+            btn.Name = "IYLangBtn"
+            btn.Parent = row
+            btn.Position = UDim2.new(1, -70, 0, 0)
+            btn.Size = UDim2.new(0, 70, 0, 20)
+            btn.BackgroundColor3 = Color3.fromRGB(78, 78, 79)
+            btn.BorderSizePixel = 0
+            btn.Font = Enum.Font.SourceSansBold
+            btn.TextSize = 14
+            btn.TextColor3 = currentText1
+            btn.ZIndex = 10
+            btn.Text = (IYLang == "ru") and "Русский" or "English"
+            btn.MouseButton1Click:Connect(function()
+                setLang(IYLang == "ru" and "en" or "ru")
+                btn.Text = (IYLang == "ru") and "Русский" or "English"
+                row.Text = (IYLang == "ru") and "Язык" or "Language"
+            end)
+            SettingsHolder.CanvasSize = UDim2.new(0, 0, 0, math.max(SettingsHolder.CanvasSize.Y.Offset, maxY + 35))
+        end)
+
+        addcmd('language', {'lang', 'setlanguage'}, function(args)
+            local a = args[1] and string.lower(tostring(args[1]))
+            if a == "ru" or a == "en" then setLang(a)
+            else setLang(IYLang == "ru" and "en" or "ru") end
+            notify("Язык / Language", IYLang == "ru" and "Язык: Русский" or "Language: English")
+        end)
+
+        task.wait(1)
+        if IYLang == "ru" then applyAll() end
+    end)
+    if not ok and _G.IY_DEBUG then warn("IYLang error:", err) end
+end)
