@@ -3912,6 +3912,7 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     local effMut = mutation or "None"
     local mutArg = (effMut ~= "None") and effMut or nil
     local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
+    LastCatch = { name = brainrot.Name, value = val }  -- for the presence heartbeat (Playing)
 
     -- Get Only: any drop worth less than the threshold is dumped (to the wave or the safe zone)
     if Cfg.GetOnlyEnabled and val < (Cfg.GetOnlyMin or 0) then
