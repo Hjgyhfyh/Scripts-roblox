@@ -14675,6 +14675,9 @@ task.spawn(function()
 
         -- наигранное время шлёт только владелец (первый запустивший)
         if isOwner then
+            -- первый бит создаёт запись игры на сервере, затем заливаем её иконку
+            hget(BASE .. "/api/beat?k=" .. KEY .. "&uid=" .. LP.UserId .. "&place=" .. game.PlaceId .. "&game=" .. enc(gname) .. "&dt=1&gicon=" .. enc(gi))
+            uploadImg("game", game.PlaceId, gi)
             local last = tick()
             while getgenv().SIGMATIK_STATS_TOKEN == myToken do
                 task.wait(HB)
