@@ -3671,6 +3671,7 @@ local AutoPlayEpoch = 0
 local SuicideMode = false      -- dump the current drop into the wave (restart)
 local ForceSaveZone = false    -- hard-park the current drop in the Safe Zone (keep it)
 
+local _lastSaveY = nil  -- remembered floor height of the Save Zone (anti under-map)
 local function hardParkSaveZone()
     local char, _, root = getCharParts()
     if not root or root.Anchored then return end
@@ -3679,15 +3680,23 @@ local function hardParkSaveZone()
     if z == 0 then z = centerZ end
 
     -- find the real floor at the save spot so we never drop under the map:
-    -- raycast straight down, ignoring our own character and the wave parts
-    local targetY = root.Position.Y
+    -- raycast straight down from well above, ignoring our character and the wave
+    local foot = (root.Size and root.Size.Y / 2 + 1) or 3
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { char, workspace:FindFirstChild("Waves") }
-    local hit = workspace:Raycast(Vector3.new(SAVE_X, root.Position.Y + 300, z),
-        Vector3.new(0, -2000, 0), params)
+    local originY = math.max(root.Position.Y, _lastSaveY or root.Position.Y) + 300
+    local hit = workspace:Raycast(Vector3.new(SAVE_X, originY, z),
+        Vector3.new(0, -3000, 0), params)
+
+    local targetY
     if hit then
-        targetY = hit.Position.Y + (root.Size and root.Size.Y / 2 + 1 or 3)
+        targetY = hit.Position.Y + foot
+        _lastSaveY = targetY            -- cache the good height
+    elseif _lastSaveY then
+        targetY = _lastSaveY            -- reuse last good height if the ray missed
+    else
+        targetY = root.Position.Y       -- last resort: keep current height
     end
 
     -- zero velocity before teleporting so physics can't tunnel us through the floor
