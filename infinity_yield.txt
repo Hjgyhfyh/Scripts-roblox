@@ -13906,3 +13906,100 @@ task.spawn(function()
 
     notify("Sigmatik Hub", "Команда " .. prefix .. "sigmatik — открыть хаб скриптов")
 end)
+
+-- ============================================================
+--  Anti-Gravity — порт логики ZeroGravity.lua без его GUI.
+--  ;antigravity  — включить нулевую гравитацию (WASD/Space/Shift)
+--  ;unantigravity — выключить и вернуть обычную гравитацию.
+-- ============================================================
+task.spawn(function()
+    local ok, err = pcall(function()
+        local Players = game:GetService("Players")
+        local UIS = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+        local CONTROL_FORCE = 25
+
+        local agActive = false
+        local agNormalGravity = workspace.Gravity
+        local agConns = {}
+        local keys = {W = false, A = false, S = false, D = false, Space = false, LeftShift = false}
+        local keyMap = {
+            [Enum.KeyCode.W] = "W", [Enum.KeyCode.A] = "A", [Enum.KeyCode.S] = "S",
+            [Enum.KeyCode.D] = "D", [Enum.KeyCode.Space] = "Space", [Enum.KeyCode.LeftShift] = "LeftShift",
+        }
+
+        local function clearConns()
+            for _, c in ipairs(agConns) do pcall(function() c:Disconnect() end) end
+            agConns = {}
+            for k in pairs(keys) do keys[k] = false end
+        end
+
+        local function disableAG()
+            if not agActive then return end
+            agActive = false
+            workspace.Gravity = agNormalGravity
+            local char = Players.LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildWhichIsA("Humanoid")
+                if hum then hum.PlatformStand = false end
+            end
+            clearConns()
+        end
+
+        local function enableAG()
+            if agActive then return end
+            local char = Players.LocalPlayer.Character
+            local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+            local root = hum and hum.RootPart
+            if not root then
+                notify("Anti-Gravity", "Персонаж не найден — попробуй после респавна")
+                return
+            end
+
+            agNormalGravity = workspace.Gravity
+            workspace.Gravity = 0
+            agActive = true
+            hum.PlatformStand = true
+
+            table.insert(agConns, UIS.InputBegan:Connect(function(input, gp)
+                if gp then return end
+                local k = keyMap[input.KeyCode]; if k then keys[k] = true end
+            end))
+            table.insert(agConns, UIS.InputEnded:Connect(function(input)
+                local k = keyMap[input.KeyCode]; if k then keys[k] = false end
+            end))
+            table.insert(agConns, RunService.Heartbeat:Connect(function(dt)
+                if not agActive then return end
+                local char = Players.LocalPlayer.Character
+                local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+                local root = hum and hum.RootPart
+                if not root then return end
+                local cf = workspace.CurrentCamera.CFrame
+                local dir = Vector3.new(0, 0, 0)
+                if keys.W then dir = dir + cf.LookVector end
+                if keys.S then dir = dir - cf.LookVector end
+                if keys.A then dir = dir - cf.RightVector end
+                if keys.D then dir = dir + cf.RightVector end
+                if keys.Space then dir = dir + Vector3.new(0, 1, 0) end
+                if keys.LeftShift then dir = dir - Vector3.new(0, 1, 0) end
+                if dir.Magnitude > 0 then
+                    dir = dir.Unit * CONTROL_FORCE
+                    root:ApplyImpulse(dir * root.AssemblyMass * dt)
+                end
+            end))
+            table.insert(agConns, Players.LocalPlayer.CharacterAdded:Connect(function()
+                if agActive then disableAG() end
+            end))
+
+            notify("Anti-Gravity", "Включено. Управление: WASD + Space/Shift. Выкл: " .. prefix .. "unantigravity")
+        end
+
+        addcmd('antigravity', {'zerogravity', 'zerog', 'nogravity'}, function()
+            enableAG()
+        end)
+        addcmd('unantigravity', {'unzerogravity', 'unzerog', 'ungravity'}, function()
+            disableAG()
+        end)
+    end)
+    if not ok and _G.IY_DEBUG then warn("AntiGravity error:", err) end
+end)
