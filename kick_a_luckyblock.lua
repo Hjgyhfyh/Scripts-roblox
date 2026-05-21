@@ -3672,12 +3672,28 @@ local SuicideMode = false      -- dump the current drop into the wave (restart)
 local ForceSaveZone = false    -- hard-park the current drop in the Safe Zone (keep it)
 
 local function hardParkSaveZone()
-    local _, _, root = getCharParts()
+    local char, _, root = getCharParts()
     if not root or root.Anchored then return end
     local centerZ = (SAVE_Z_MIN + SAVE_Z_MAX) / 2
     local z = math.clamp(root.Position.Z, SAVE_Z_MIN, SAVE_Z_MAX)
     if z == 0 then z = centerZ end
-    root.CFrame = CFrame.new(SAVE_X, root.Position.Y, z)
+
+    -- find the real floor at the save spot so we never drop under the map:
+    -- raycast straight down, ignoring our own character and the wave parts
+    local targetY = root.Position.Y
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { char, workspace:FindFirstChild("Waves") }
+    local hit = workspace:Raycast(Vector3.new(SAVE_X, root.Position.Y + 300, z),
+        Vector3.new(0, -2000, 0), params)
+    if hit then
+        targetY = hit.Position.Y + (root.Size and root.Size.Y / 2 + 1 or 3)
+    end
+
+    -- zero velocity before teleporting so physics can't tunnel us through the floor
+    pcall(function() root.AssemblyLinearVelocity = Vector3.zero end)
+    pcall(function() root.AssemblyAngularVelocity = Vector3.zero end)
+    root.CFrame = CFrame.new(SAVE_X, targetY, z)
 end
 
 local function autoPlayLoop(epoch)
