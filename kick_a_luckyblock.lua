@@ -593,6 +593,16 @@ local function normalizeControl(control)
 		if type(rawValue) ~= "number" then rawValue = normalized.Min end
 		normalized.Value = clampRound(rawValue, normalized.Min, normalized.Max, normalized.Increment)
 		normalized.CurrentValue = normalized.Value
+	elseif kind == "input" then
+		normalized.Min = type(control.Min) == "number" and control.Min or nil
+		normalized.Max = type(control.Max) == "number" and control.Max or nil
+		normalized.Placeholder = control.Placeholder
+		local rawValue = control.Value or control.CurrentValue or 0
+		if type(rawValue) ~= "number" then rawValue = parseNumberInput(rawValue) or 0 end
+		if normalized.Min then rawValue = math.max(normalized.Min, rawValue) end
+		if normalized.Max then rawValue = math.min(normalized.Max, rawValue) end
+		normalized.Value = rawValue
+		normalized.CurrentValue = rawValue
 	elseif kind == "colorpicker" then
 		normalized.Palette = arrayCopy(control.Palette or DEFAULT_PALETTE)
 		local rawColor = control.Value or control.CurrentValue or normalized.Palette[1]
@@ -3656,6 +3666,19 @@ local function bestSavePhase()
 end
 
 local AutoPlayEpoch = 0
+-- declared before autoPlayLoop so the loop, the KickEvent handler and the
+-- Get Only logic all share the SAME locals (not split global/local copies)
+local SuicideMode = false      -- dump the current drop into the wave (restart)
+local ForceSaveZone = false    -- hard-park the current drop in the Safe Zone (keep it)
+
+local function hardParkSaveZone()
+    local _, _, root = getCharParts()
+    if not root or root.Anchored then return end
+    local centerZ = (SAVE_Z_MIN + SAVE_Z_MAX) / 2
+    local z = math.clamp(root.Position.Z, SAVE_Z_MIN, SAVE_Z_MAX)
+    if z == 0 then z = centerZ end
+    root.CFrame = CFrame.new(SAVE_X, root.Position.Y, z)
+end
 
 local function autoPlayLoop(epoch)
     local function alive() return State.AutoPlay and AutoPlayEpoch == epoch end
@@ -3670,6 +3693,13 @@ local function autoPlayLoop(epoch)
                     feedToWaveOnce()
                     task.wait(0.2)
                 end
+            elseif ForceSaveZone then
+                -- Get Only "Safe Zone": teleport to safety and hold there so the
+                -- low-value brainrot survives the wave (no slow walking)
+                while alive() and GameHandler.InGame do
+                    hardParkSaveZone()
+                    task.wait(0.15)
+                end
             elseif Cfg.BestSave or Cfg.FastPlay then
                 bestSavePhase()
             else
@@ -3679,6 +3709,7 @@ local function autoPlayLoop(epoch)
                 end
             end
             SuicideMode = false
+            ForceSaveZone = false
             task.wait(0.4)
         else
             if not alive() then break end
