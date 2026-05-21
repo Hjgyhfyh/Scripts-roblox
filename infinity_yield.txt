@@ -13661,7 +13661,8 @@ end)
 --  список тянется динамически, клик по строке запускает скрипт.
 -- ============================================================
 task.spawn(function()
-    local ok, err = pcall(function()
+    local hubBuilt, HUB, hubLoad = false
+    local function buildHub()
         local REPO_API = "https://api.github.com/repos/Hjgyhfyh/Scripts-roblox/contents/"
         local ACCENT = Color3.fromRGB(120, 90, 200)
         local BTN    = currentShade2
@@ -13688,7 +13689,7 @@ task.spawn(function()
         end
 
         -- ОКНО
-        local HUB = Instance.new("Frame")
+        HUB = Instance.new("Frame")
         HUB.Name = "IY_SigmatikHub"
         HUB.Size = UDim2.new(0, 320, 0, 430)
         HUB.Position = UDim2.new(0.5, -160, 0.5, -215)
@@ -13818,7 +13819,7 @@ task.spawn(function()
         end
 
         local function loadList()
-            if loading then return end
+            if loaded or loading then return end
             loading = true
             Status.Text = "Загрузка списка с GitHub..."
             clearList()
