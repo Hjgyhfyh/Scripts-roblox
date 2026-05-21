@@ -3920,6 +3920,8 @@ KickEventEnded.OnClientEvent:Connect(function()
     SuicideMode = false
     ForceSaveZone = false
     _activeWaveRarity = nil
+    -- count a game the script played (for Time Play / games stats)
+    if State.AutoPlay then Stats.games = Stats.games + 1 end
 end)
 
 ----------------------------------------------------------------- AUTO SQUAT (weight bonus auto-clicker)
