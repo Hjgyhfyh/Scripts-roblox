@@ -3944,13 +3944,14 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
     LastCatch = { name = brainrot.Name, value = val }  -- for the presence heartbeat (Playing)
 
-    -- Get Only: any drop worth less than the threshold is fed to the Tsunami (restart)
+    -- Get Only: below threshold → feed to Tsunami, but STILL record it (no Telegram)
     if Cfg.GetOnlyEnabled and val < (Cfg.GetOnlyMin or 0) then
         ForceSaveZone = false
         SuicideMode = true
         print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
             brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-        return  -- below threshold: NOT a successful catch, no Telegram
+        recordCatch(brainrot.Name, effMut, val, false)
+        return
     end
 
     -- past the value gate: decide keep vs dump via the stop-on-hit list
@@ -3971,10 +3972,8 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
         end
     end
 
-    -- successful catch (kept and at/above the Get Only threshold) → Telegram ping
-    if kept then
-        tgNotifyCatch(brainrot.Name, effMut, val)
-    end
+    -- record every drop (recent feed + collection); Telegram ping only for kept catches
+    recordCatch(brainrot.Name, effMut, val, kept)
 end)
 
 -- reset suicide flag and wave rarity when game ends
