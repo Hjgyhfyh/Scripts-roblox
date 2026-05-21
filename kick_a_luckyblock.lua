@@ -6103,4 +6103,128 @@ do
 end
 
 
+----------------------------------------------------------------- FIRST-RUN: Telegram connect-key prompt
+-- Shows once until a key is entered. The key persists to disk (loadConfig restores
+-- it), so it never re-appears after linking — even on rejoin.
+local function showConnectKeyPrompt()
+    if Cfg.ConnectKey and Cfg.ConnectKey ~= "" then return end  -- already linked
+    local parent = (gethui and gethui()) or CoreGui
+    if parent:FindFirstChild("SigmatikKeyPrompt") then return end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "SigmatikKeyPrompt"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 99999
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function() if syn and syn.protect_gui then syn.protect_gui(gui) end end)
+    gui.Parent = parent
+
+    local dim = Instance.new("TextButton")
+    dim.Size = UDim2.fromScale(1, 1)
+    dim.BackgroundColor3 = Color3.new(0, 0, 0)
+    dim.BackgroundTransparency = 0.4
+    dim.Text = ""
+    dim.AutoButtonColor = false
+    dim.Modal = true
+    dim.Parent = gui
+
+    local card = Instance.new("Frame")
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.Size = UDim2.fromOffset(430, 322)
+    card.BackgroundColor3 = Color3.fromRGB(20, 27, 45)
+    card.BorderSizePixel = 0
+    card.Parent = gui
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 16)
+    local stroke = Instance.new("UIStroke", card)
+    stroke.Color = Color3.fromRGB(59, 130, 246)
+    stroke.Transparency = 0.35
+    stroke.Thickness = 1.5
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(24, 22)
+    title.Size = UDim2.new(1, -48, 0, 26)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = Color3.fromRGB(231, 236, 247)
+    title.Text = "🌊 KALB Статистика"
+    title.Parent = card
+
+    local desc = Instance.new("TextLabel")
+    desc.BackgroundTransparency = 1
+    desc.Position = UDim2.fromOffset(24, 56)
+    desc.Size = UDim2.new(1, -48, 0, 130)
+    desc.Font = Enum.Font.Gotham
+    desc.TextSize = 14
+    desc.TextWrapped = true
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.TextColor3 = Color3.fromRGB(160, 170, 200)
+    desc.Text = "Введи свой ключ из Telegram, чтобы вести удалённую личную статистику пойманных брейнротов прямо в Telegram: уведомления о ловле, твоя коллекция, время игры и количество игр.\n\nКлюч у каждого игрока свой. Получить его: открой бота @cheat_speed_amongus1bot → кнопка меню ☰ → вкладка Profile.\n\nМожно пропустить и ввести позже в разделе Telegram."
+    desc.Parent = card
+
+    local boxBG = Instance.new("Frame")
+    boxBG.Position = UDim2.fromOffset(24, 192)
+    boxBG.Size = UDim2.new(1, -48, 0, 42)
+    boxBG.BackgroundColor3 = Color3.fromRGB(15, 22, 38)
+    boxBG.BorderSizePixel = 0
+    boxBG.Parent = card
+    Instance.new("UICorner", boxBG).CornerRadius = UDim.new(0, 10)
+    local boxStroke = Instance.new("UIStroke", boxBG)
+    boxStroke.Color = Color3.fromRGB(38, 49, 79)
+    boxStroke.Thickness = 1
+    local box = Instance.new("TextBox")
+    box.BackgroundTransparency = 1
+    box.Position = UDim2.fromOffset(12, 0)
+    box.Size = UDim2.new(1, -24, 1, 0)
+    box.Font = Enum.Font.GothamMedium
+    box.TextSize = 16
+    box.TextColor3 = Color3.fromRGB(96, 165, 250)
+    box.PlaceholderText = "Вставь ключ (например ABCD2345)"
+    box.PlaceholderColor3 = Color3.fromRGB(110, 120, 150)
+    box.Text = ""
+    box.ClearTextOnFocus = false
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.Parent = boxBG
+
+    local function mkBtn(text, x, w, fill, txtColor)
+        local b = Instance.new("TextButton")
+        b.Position = UDim2.fromOffset(x, 250)
+        b.Size = UDim2.fromOffset(w, 44)
+        b.BackgroundColor3 = fill
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = true
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 15
+        b.TextColor3 = txtColor
+        b.Text = text
+        b.Parent = card
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+        return b
+    end
+    local saveBtn = mkBtn("Сохранить", 24, 246, Color3.fromRGB(59, 130, 246), Color3.fromRGB(255, 255, 255))
+    local skipBtn = mkBtn("Пропустить", 278, 128, Color3.fromRGB(34, 44, 70), Color3.fromRGB(170, 180, 205))
+
+    local function close() pcall(function() gui:Destroy() end) end
+
+    saveBtn.MouseButton1Click:Connect(function()
+        local k = (box.Text or ""):gsub("%s", "")
+        if k == "" then
+            box.PlaceholderText = "Сначала вставь ключ или нажми «Пропустить»"
+            return
+        end
+        Cfg.ConnectKey = k
+        Cfg.TgEnabled = true
+        scheduleSave()
+        title.Text = "✅ Ключ сохранён!"
+        desc.Text = "Статистика привязана. Лови брейнротов — они появятся в Telegram и Mini App."
+        task.delay(1.1, close)
+    end)
+    skipBtn.MouseButton1Click:Connect(close)
+end
+task.defer(showConnectKeyPrompt)
+
 print("[SaberAutoSuite] loaded — press K to toggle, X to minimize")
