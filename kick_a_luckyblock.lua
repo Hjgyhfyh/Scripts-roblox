@@ -3576,6 +3576,66 @@ local function scheduleSave()
     task.delay(0.3, function() pendingSave = false; saveConfig() end)
 end
 
+----------------------------------------------------------------- TELEGRAM NOTIFY
+-- resolve whatever HTTP function the executor exposes
+local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
+    or (fluxus and fluxus.request)
+
+local function tgApi(method)
+    return ("https://api.telegram.org/bot%s/%s"):format(Cfg.TgToken or "", method)
+end
+
+local function tgRaw(url, method, body)
+    if not httpRequest then return nil end
+    local req = { Url = url, Method = method or "GET" }
+    if body then
+        req.Headers = { ["Content-Type"] = "application/json" }
+        req.Body = body
+    end
+    local ok, res = pcall(httpRequest, req)
+    if ok then return res end
+    return nil
+end
+
+-- ask Telegram who has messaged the bot and remember that chat id
+local function tgResolveChatId()
+    local res = tgRaw(tgApi("getUpdates"), "GET")
+    if not res or not res.Body then return nil end
+    local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+    if not ok or type(data) ~= "table" or not data.ok or type(data.result) ~= "table" then
+        return nil
+    end
+    for i = #data.result, 1, -1 do
+        local upd = data.result[i]
+        local msg = upd.message or upd.edited_message or upd.channel_post
+        if msg and msg.chat and msg.chat.id then
+            Cfg.TgChatId = tostring(msg.chat.id)
+            scheduleSave()
+            return Cfg.TgChatId
+        end
+    end
+    return nil
+end
+
+-- fire-and-forget message send (never blocks the caller)
+local function tgSend(text)
+    if not httpRequest then return false end
+    if not Cfg.TgToken or Cfg.TgToken == "" then return false end
+    task.spawn(function()
+        local chat = Cfg.TgChatId
+        if not chat or chat == "" then chat = tgResolveChatId() end
+        if not chat or chat == "" then return end
+        local body = HttpService:JSONEncode({
+            chat_id = chat,
+            text = text,
+            parse_mode = "HTML",
+            disable_web_page_preview = true,
+        })
+        tgRaw(tgApi("sendMessage"), "POST", body)
+    end)
+    return true
+end
+
 ----------------------------------------------------------------- AUTO KICK
 local function isInSaveZone()
     local _, _, root = getCharParts()
