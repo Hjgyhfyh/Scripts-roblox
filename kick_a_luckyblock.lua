@@ -3714,7 +3714,7 @@ local function readKickPower()
     local kl = bl:FindFirstChild("KickLevel"); if not kl then return nil end
     local lbl = kl:FindFirstChild("TextLabel"); if not lbl then return nil end
     local maxed = false
-    local ap = kl:FindFirstChild("ActualPower")
+    local ap = kl:FindFirstChild("ActualPower", true)
     if ap and ap:IsA("TextLabel") and tostring(ap.Text):upper():find("MAX") then maxed = true end
     return lbl.Text, maxed
 end
