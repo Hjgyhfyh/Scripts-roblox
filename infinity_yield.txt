@@ -4892,6 +4892,8 @@ CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 CMDs[#CMDs + 1] = {NAME = 'panel / qc / quick', DESC = 'Open/close the Sigmatik quick-commands panel'}
 CMDs[#CMDs + 1] = {NAME = 'sigmatik / hub / sigma / scripthub', DESC = 'Open the Sigmatik script hub (loads scripts from the GitHub repo)'}
+CMDs[#CMDs + 1] = {NAME = 'antigravity / zerogravity / zerog', DESC = 'Zero gravity, fly with WASD + Space/Shift (no GUI)'}
+CMDs[#CMDs + 1] = {NAME = 'unantigravity / unzerog / ungravity', DESC = 'Disable anti-gravity and restore normal gravity'}
 -- wait()
 
 for i = 1, #CMDs do
