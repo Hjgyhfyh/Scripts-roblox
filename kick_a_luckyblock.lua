@@ -3644,12 +3644,16 @@ local function abbrevNum(v)
     return tostring(math.floor(v))
 end
 
+local function htmlEscape(s)
+    return (tostring(s):gsub("[&<>]", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;" }))
+end
+
 -- notify Telegram about a successful (kept) catch
 local function tgNotifyCatch(name, mut, value)
     if not Cfg.TgEnabled then return end
-    local mutTxt = (mut and mut ~= "None") and (" <b>%s</b>"):format(mut) or ""
+    local mutTxt = (mut and mut ~= "None") and (" <b>%s</b>"):format(htmlEscape(mut)) or ""
     local text = ("🧠 <b>Caught:</b> %s%s\n💰 <b>Value:</b> %s/s"):format(
-        tostring(name), mutTxt, abbrevNum(value))
+        htmlEscape(name), mutTxt, abbrevNum(value))
     tgSend(text)
 end
 
