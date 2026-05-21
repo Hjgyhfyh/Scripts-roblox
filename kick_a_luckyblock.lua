@@ -3716,22 +3716,25 @@ local function readKickPower()
     return lbl.Text
 end
 
-local _kp = { value = nil, t = nil }
+-- The HUD value is rounded (≈3 sig figs), so a 30s delta is usually 0. Instead we
+-- track the AVERAGE gain since the first reading this session — smooth and meaningful,
+-- and reset the baseline on a rebirth (value drops).
+local _kp = { first = nil, firstT = nil }
 local function strengthFields()
     local txt = readKickPower()
     if not txt then return nil end
     local abs, disp = parseStrength(txt)
     if not abs then return nil end
-    local out = { now = disp }
     local now = os.clock()
-    if _kp.value and _kp.t and now > _kp.t + 0.5 then
-        local dps = (abs - _kp.value) / (now - _kp.t)  -- per second
-        if dps < 0 then dps = 0 end                    -- ignore rebirth resets
+    if not _kp.first or abs < _kp.first then _kp.first, _kp.firstT = abs, now end  -- init / rebirth reset
+    local out = { now = disp, min = "0", hour = "0", day = "0" }
+    local dt = now - (_kp.firstT or now)
+    if dt >= 20 and abs > _kp.first then
+        local dps = (abs - _kp.first) / dt  -- average strength gained per second
         out.min = fmtStrength(dps * 60)
         out.hour = fmtStrength(dps * 3600)
         out.day = fmtStrength(dps * 86400)
     end
-    _kp.value, _kp.t = abs, now
     return out
 end
 
