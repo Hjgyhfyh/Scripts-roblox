@@ -6080,6 +6080,30 @@ UI = SigmatikLibrary:Create({
                     Name = "Show Earnings", Enabled = false, Callback = setShowEarnings,
                     Sections = { { Name = "Settings", Controls = {} } },
                 },
+                {
+                    Name = "Telegram", Enabled = Cfg.TgEnabled, Callback = cb("TgEnabled"),
+                    Sections = {
+                        {
+                            Name = "Settings",
+                            Controls = {
+                                { Type = "input", Name = "Connect Key", Value = Cfg.ConnectKey, Text = true,
+                                    Placeholder = "key from bot (Mini App -> Profile)",
+                                    Callback = cb("ConnectKey") },
+                                momentaryBtn("Send Test Catch", "Send a test notification to your Telegram", function()
+                                    if not Cfg.ConnectKey or Cfg.ConnectKey == "" then
+                                        print("[Saber] Set your Connect Key first")
+                                        return
+                                    end
+                                    backendPost("/catch", {
+                                        key = Cfg.ConnectKey, name = "Noobini Pizzanini",
+                                        rarity = "Common", value = 2, mutation = "Golden",
+                                    })
+                                    print("[Saber] Test catch sent — check your Telegram & Mini App")
+                                end),
+                            },
+                        },
+                    },
+                },
             },
         },
     },
