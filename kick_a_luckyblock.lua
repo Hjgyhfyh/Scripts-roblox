@@ -1921,6 +1921,80 @@ function Controller:_createSliderCard(parent, control)
 	table.insert(self.sliderResetters, resetScales)
 end
 
+function Controller:_createInputCard(parent, control)
+	local row = create("Frame", {
+		Name = control.Name .. "Row",
+		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(308, 34),
+		ZIndex = 4,
+		Parent = parent,
+	})
+	applyFill(row, "#ffffff08")
+	addCorner(row, 10)
+	addGradient(row, 90, { "#ffffff10", "#0f172a20" })
+	addStroke(row, 1, "#ffffff10")
+
+	local label = create("TextLabel", {
+		Name = "Label",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(10, 0),
+		Size = UDim2.fromOffset(170, 34),
+		Font = fontForWeight(500),
+		Text = control.Name,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		ZIndex = 5,
+		Parent = row,
+	})
+	applyTextColor(label, "#ffffffcc")
+
+	local boxBG = create("Frame", {
+		Name = "Box",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Size = UDim2.fromOffset(108, 24),
+		BorderSizePixel = 0,
+		ZIndex = 5,
+		Parent = row,
+	})
+	applyFill(boxBG, "#11182780")
+	addCorner(boxBG, 6)
+	addStroke(boxBG, 1, "#ffffff14")
+
+	local box = create("TextBox", {
+		Name = "Input",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(6, 0),
+		Size = UDim2.new(1, -12, 1, 0),
+		Font = fontForWeight(600),
+		Text = "",
+		PlaceholderText = control.Placeholder or "",
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		ClearTextOnFocus = false,
+		ZIndex = 6,
+		Parent = boxBG,
+	})
+	applyTextColor(box, self.theme.Accent)
+
+	control._refresh = function()
+		if type(control.Format) == "function" then
+			local ok, formatted = pcall(control.Format, control.Value)
+			box.Text = ok and tostring(formatted) or tostring(control.Value)
+		else
+			box.Text = tostring(control.Value)
+		end
+	end
+	control._refresh(true)
+
+	table.insert(self.settingsPanelConnections, box.FocusLost:Connect(function()
+		self:_setControlValue(control, box.Text, false)
+		control._refresh(true)
+	end))
+end
+
 function Controller:_createColorPickerRow(parent, control)
 	local row = create("Frame", {
 		Name = control.Name .. "Row",
