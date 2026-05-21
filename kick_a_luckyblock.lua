@@ -3724,13 +3724,13 @@ end
 -- and reset the baseline on a rebirth (value drops).
 local _kp = { first = nil, firstT = nil }
 local function strengthFields()
-    local txt = readKickPower()
+    local txt, maxed = readKickPower()
     if not txt then return nil end
     local abs, disp = parseStrength(txt)
     if not abs then return nil end
     local now = os.clock()
     if not _kp.first or abs < _kp.first then _kp.first, _kp.firstT = abs, now end  -- init / rebirth reset
-    local out = { now = disp, min = "0", hour = "0", day = "0" }
+    local out = { now = maxed and (disp .. " (MAX)") or disp, min = "0", hour = "0", day = "0" }
     local dt = now - (_kp.firstT or now)
     if dt >= 20 and abs > _kp.first then
         local dps = (abs - _kp.first) / dt  -- average strength gained per second
