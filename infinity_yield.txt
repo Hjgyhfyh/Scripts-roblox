@@ -4894,6 +4894,7 @@ CMDs[#CMDs + 1] = {NAME = 'panel / qc / quick', DESC = 'Open/close the Sigmatik 
 CMDs[#CMDs + 1] = {NAME = 'sigmatik / hub / sigma / scripthub', DESC = 'Open the Sigmatik script hub (loads scripts from the GitHub repo)'}
 CMDs[#CMDs + 1] = {NAME = 'antigravity / zerogravity / zerog', DESC = 'Zero gravity, fly with WASD + Space/Shift (no GUI)'}
 CMDs[#CMDs + 1] = {NAME = 'unantigravity / unzerog / ungravity', DESC = 'Disable anti-gravity and restore normal gravity'}
+CMDs[#CMDs + 1] = {NAME = 'language / lang [ru/en]', DESC = 'Switch IY interface language (Russian/English)'}
 -- wait()
 
 for i = 1, #CMDs do
