@@ -3730,9 +3730,6 @@ local function autoPlayLoop(epoch)
     if r and r.Anchored then r.Anchored = false end
 end
 
-local SuicideMode = false
-local startSuicide  -- forward declaration (real body defined later)
-
 -- normalize legacy string entries to mutation-set tables
 local function normalizeStopList()
     for k, v in pairs(StopOnHitWhitelist) do
@@ -3781,21 +3778,22 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
         local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
         if val < (Cfg.GetOnlyMin or 0) then
             if (Cfg.GetOnlyMode or 1) == 2 then
-                -- Safe Zone: teleport the brainrot to safety (keeps it, no restart)
+                -- Safe Zone: park the brainrot in safety (keeps it, no restart)
                 SuicideMode = false
+                ForceSaveZone = true
                 print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — sending to Safe Zone"):format(
                     brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-                teleportToSaveZone()
             else
                 -- Tsunami: feed it to the wave so Auto Play restarts
+                ForceSaveZone = false
                 SuicideMode = true
                 print(("[Saber] Get Only: %s (%s) value %.0f < %.0f — feeding to Tsunami"):format(
                     brainrot.Name, effMut, val, Cfg.GetOnlyMin or 0))
-                startSuicide()
             end
             return
         end
         SuicideMode = false
+        ForceSaveZone = false
     end
 
     if not hasStopTargets() then return end
