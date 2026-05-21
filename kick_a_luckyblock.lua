@@ -1,4 +1,4 @@
--- Saber Tsunami Auto Suite (sigmatik library + autoplay)
+-- Kick a Lucky Block Auto Suite (sigmatik library + autoplay)
 local SigmatikLibrary = (function()
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
@@ -3284,7 +3284,7 @@ return Library
 end)()
 
 -- ============================================================================
--- Saber Tsunami :: Auto Suite (uses sigmatik_ui_library, persists to disk)
+-- Kick a Lucky Block :: Auto Suite (uses sigmatik_ui_library, persists to disk)
 -- ============================================================================
 local Players              = game:GetService("Players")
 local ReplicatedStorage    = game:GetService("ReplicatedStorage")
@@ -5840,7 +5840,7 @@ local cb = function(field, fn)
 end
 
 UI = SigmatikLibrary:Create({
-    Title = "Saber Tsunami",
+    Title = "Kick a Lucky Block",
     ConfigName = "Saved",
     SearchPlaceholder = "Search features...",
     WindowWidth = 960,
