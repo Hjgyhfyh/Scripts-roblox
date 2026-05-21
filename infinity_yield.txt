@@ -14667,6 +14667,8 @@ task.spawn(function()
             task.wait(2)
         end
 
+        uploadImg("av", LP.UserId, av)   -- аватар грузим после регистрации (юзер уже есть на сервере)
+
         -- единственный активный репортёр в этом VM (токен гасит дубли при перезагрузках)
         local myToken = tick()
         getgenv().SIGMATIK_STATS_TOKEN = myToken
