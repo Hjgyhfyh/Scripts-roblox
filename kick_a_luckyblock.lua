@@ -3748,6 +3748,8 @@ local function sendHeartbeat()
     body.robloxName = LocalPlayer.DisplayName or LocalPlayer.Name
     local av = getRobloxAvatar()
     if av then body.robloxAvatar = av end
+    local str = strengthFields()
+    if str then body.strNow = str.now; body.strMin = str.min; body.strHour = str.hour; body.strDay = str.day end
     backendPost("/stat", body)
 end
 
