@@ -5853,6 +5853,10 @@ UI = SigmatikLibrary:Create({
                                 { Type = "toggle", Name = "Telegram Notify", Value = Cfg.TgEnabled,
                                     Description = "Message me on every successful catch (above the Get Only value)",
                                     Callback = cb("TgEnabled") },
+                                { Type = "input", Name = "Telegram Chat ID", Value = Cfg.TgChatId,
+                                    Placeholder = "auto or paste id",
+                                    Format = function(v) return tostring(v) end,
+                                    Callback = cb("TgChatId") },
                                 momentaryBtn("Link Telegram", "Message your bot first, then press this", function()
                                     local id = tgResolveChatId()
                                     if id then
