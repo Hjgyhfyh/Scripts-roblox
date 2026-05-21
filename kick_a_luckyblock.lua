@@ -166,6 +166,22 @@ local function clampRound(value, minimum, maximum, increment)
 	return math.clamp(rounded, minimum, maximum)
 end
 
+local function parseNumberInput(text)
+	if type(text) == "number" then return text end
+	if type(text) ~= "string" then return nil end
+	local s = text:gsub(",", "."):gsub("%s+", "")
+	local num, suffix = s:match("^(-?%d*%.?%d+)([kKmMbBтТмМкК]?)")
+	if not num then return nil end
+	local n = tonumber(num)
+	if not n then return nil end
+	suffix = suffix:lower()
+	if suffix == "k" or suffix == "к" then n = n * 1e3
+	elseif suffix == "m" or suffix == "м" then n = n * 1e6
+	elseif suffix == "b" then n = n * 1e9
+	elseif suffix == "т" then n = n * 1e9 end
+	return n
+end
+
 local function formatSliderValue(value, increment)
 	local step = increment or 1
 	if step == math.floor(step) then
@@ -5566,6 +5582,14 @@ local function momentaryBtn(name, description, action)
             end)
         end,
     }
+end
+
+local function abbrevNum(v)
+    v = v or 0
+    if v >= 1e9 then return string.format("%.2fB", v / 1e9) end
+    if v >= 1e6 then return string.format("%.1fM", v / 1e6) end
+    if v >= 1e3 then return string.format("%.1fK", v / 1e3) end
+    return tostring(math.floor(v))
 end
 
 local cb = function(field, fn)
