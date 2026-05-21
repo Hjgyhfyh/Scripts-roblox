@@ -13653,3 +13653,243 @@ task.spawn(function()
     end)
     if not ok and _G.IY_DEBUG then warn("QuickPanel error:", err) end
 end)
+
+-- ============================================================
+--  Sigmatik Hub — кастомное дополнение к Infinite Yield
+--  Команда:  ;sigmatik  (алиасы: hub, sigma, scripthub)
+--  Окно со списком скриптов из GitHub Hjgyhfyh/Scripts-roblox;
+--  список тянется динамически, клик по строке запускает скрипт.
+-- ============================================================
+task.spawn(function()
+    local ok, err = pcall(function()
+        local REPO_API = "https://api.github.com/repos/Hjgyhfyh/Scripts-roblox/contents/"
+        local ACCENT = Color3.fromRGB(120, 90, 200)
+        local BTN    = currentShade2
+        local BTNH   = Color3.fromRGB(58, 58, 60)
+        local HttpService = game:GetService("HttpService")
+
+        local function corner(obj, r)
+            local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r); c.Parent = obj
+        end
+
+        -- надёжный HTTP GET (с User-Agent для GitHub API)
+        local function httpGet(url, withUA)
+            if withUA and httprequest then
+                local okr, res = pcall(httprequest, {Url = url, Method = "GET", Headers = {["User-Agent"] = "Roblox-Sigmatik"}})
+                if okr and res and res.Body and (not res.StatusCode or res.StatusCode == 200) then return res.Body end
+            end
+            local okg, body = pcall(function() return game:HttpGet(url) end)
+            if okg and body then return body end
+            if httprequest then
+                local okr, res = pcall(httprequest, {Url = url, Method = "GET", Headers = {["User-Agent"] = "Roblox-Sigmatik"}})
+                if okr and res and res.Body then return res.Body end
+            end
+            error("HTTP GET failed: " .. tostring(url))
+        end
+
+        -- ОКНО
+        local HUB = Instance.new("Frame")
+        HUB.Name = "IY_SigmatikHub"
+        HUB.Size = UDim2.new(0, 320, 0, 430)
+        HUB.Position = UDim2.new(0.5, -160, 0.5, -215)
+        HUB.BackgroundColor3 = currentShade1
+        HUB.BorderSizePixel = 0
+        HUB.Active = true
+        HUB.Visible = false
+        HUB.ZIndex = 10
+        HUB.Parent = PARENT
+        corner(HUB, 6)
+
+        local Top = Instance.new("Frame")
+        Top.Size = UDim2.new(1, 0, 0, 30)
+        Top.BackgroundColor3 = currentShade2
+        Top.BorderSizePixel = 0
+        Top.ZIndex = 11
+        Top.Parent = HUB
+        corner(Top, 6)
+        local mask = Instance.new("Frame")
+        mask.Size = UDim2.new(1, 0, 0, 8); mask.Position = UDim2.new(0, 0, 1, -8)
+        mask.BackgroundColor3 = currentShade2; mask.BorderSizePixel = 0; mask.ZIndex = 11; mask.Parent = Top
+
+        local Title = Instance.new("TextLabel")
+        Title.BackgroundTransparency = 1
+        Title.Position = UDim2.new(0, 10, 0, 0); Title.Size = UDim2.new(1, -70, 1, 0)
+        Title.Font = Enum.Font.SourceSansSemibold; Title.TextSize = 16
+        Title.TextColor3 = currentText1; Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.Text = "Sigmatik Hub"; Title.ZIndex = 12; Title.Parent = Top
+
+        local RefreshBtn = Instance.new("TextButton")
+        RefreshBtn.BackgroundTransparency = 1
+        RefreshBtn.Size = UDim2.new(0, 28, 1, 0); RefreshBtn.Position = UDim2.new(1, -56, 0, 0)
+        RefreshBtn.Font = Enum.Font.SourceSansBold; RefreshBtn.TextSize = 18
+        RefreshBtn.TextColor3 = currentText1; RefreshBtn.Text = "\u{27F3}"; RefreshBtn.ZIndex = 12; RefreshBtn.Parent = Top
+
+        local CloseBtn = Instance.new("TextButton")
+        CloseBtn.BackgroundTransparency = 1
+        CloseBtn.Size = UDim2.new(0, 28, 1, 0); CloseBtn.Position = UDim2.new(1, -28, 0, 0)
+        CloseBtn.Font = Enum.Font.SourceSansBold; CloseBtn.TextSize = 20
+        CloseBtn.TextColor3 = currentText1; CloseBtn.Text = "\u{00D7}"; CloseBtn.ZIndex = 12; CloseBtn.Parent = Top
+
+        local Search = Instance.new("TextBox")
+        Search.Position = UDim2.new(0, 6, 0, 36); Search.Size = UDim2.new(1, -12, 0, 26)
+        Search.BackgroundColor3 = currentShade2; Search.BorderSizePixel = 0
+        Search.Font = Enum.Font.SourceSans; Search.TextSize = 14
+        Search.TextColor3 = currentText1; Search.PlaceholderText = "Поиск скрипта..."
+        Search.PlaceholderColor3 = Color3.fromRGB(150, 150, 155)
+        Search.Text = ""; Search.ClearTextOnFocus = false
+        Search.TextXAlignment = Enum.TextXAlignment.Left; Search.ZIndex = 11; Search.Parent = HUB
+        local sPad = Instance.new("UIPadding"); sPad.PaddingLeft = UDim.new(0, 8); sPad.Parent = Search
+        corner(Search, 4)
+
+        local Status = Instance.new("TextLabel")
+        Status.Position = UDim2.new(0, 6, 0, 66); Status.Size = UDim2.new(1, -12, 0, 16)
+        Status.BackgroundTransparency = 1; Status.Font = Enum.Font.SourceSans; Status.TextSize = 12
+        Status.TextColor3 = Color3.fromRGB(150, 150, 155); Status.TextXAlignment = Enum.TextXAlignment.Left
+        Status.Text = ""; Status.ZIndex = 11; Status.Parent = HUB
+
+        local List = Instance.new("ScrollingFrame")
+        List.Position = UDim2.new(0, 0, 0, 84); List.Size = UDim2.new(1, 0, 1, -88)
+        List.BackgroundTransparency = 1; List.BorderSizePixel = 0
+        List.ScrollBarThickness = 4; List.ScrollBarImageColor3 = currentShade2
+        List.CanvasSize = UDim2.new(0, 0, 0, 0); List.ZIndex = 10; List.Parent = HUB
+        local lPad = Instance.new("UIPadding")
+        lPad.PaddingLeft = UDim.new(0, 6); lPad.PaddingRight = UDim.new(0, 6)
+        lPad.PaddingTop = UDim.new(0, 2); lPad.PaddingBottom = UDim.new(0, 6); lPad.Parent = List
+        local lList = Instance.new("UIListLayout")
+        lList.SortOrder = Enum.SortOrder.LayoutOrder; lList.Padding = UDim.new(0, 4); lList.Parent = List
+        lList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            List.CanvasSize = UDim2.new(0, 0, 0, lList.AbsoluteContentSize.Y + 8)
+        end)
+
+        local allButtons = {}
+        local loaded = false
+        local loading = false
+
+        local function clearList()
+            for _, c in ipairs(List:GetChildren()) do
+                if c:IsA("TextButton") then c:Destroy() end
+            end
+            allButtons = {}
+        end
+
+        local function runScript(item)
+            Status.Text = "Запуск: " .. item.label .. " ..."
+            task.spawn(function()
+                local okr, errr = pcall(function()
+                    local src = httpGet(item.download_url, false)
+                    local fn, lerr = loadstring(src)
+                    if not fn then error(lerr or "loadstring failed") end
+                    fn()
+                end)
+                if okr then
+                    Status.Text = "\u{2713} Запущен: " .. item.label
+                    notify("Sigmatik", "Запущен скрипт: " .. item.label)
+                else
+                    Status.Text = "\u{2717} Ошибка: " .. item.label
+                    notify("Sigmatik", "Ошибка запуска " .. item.label .. ": " .. tostring(errr))
+                end
+            end)
+        end
+
+        local function addButton(item)
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 26)
+            b.BackgroundColor3 = BTN; b.BorderSizePixel = 0; b.AutoButtonColor = false
+            b.Font = Enum.Font.SourceSans; b.TextSize = 14; b.TextColor3 = currentText1
+            b.TextXAlignment = Enum.TextXAlignment.Left; b.TextTruncate = Enum.TextTruncate.AtEnd
+            b.Text = "  " .. item.label
+            b.ZIndex = 10; b.Parent = List
+            corner(b, 4)
+            b.MouseEnter:Connect(function() b.BackgroundColor3 = BTNH end)
+            b.MouseLeave:Connect(function() b.BackgroundColor3 = BTN end)
+            b.MouseButton1Click:Connect(function() runScript(item) end)
+            table.insert(allButtons, {btn = b, name = string.lower(item.label)})
+        end
+
+        local function applyFilter()
+            local q = string.lower(Search.Text)
+            local shown = 0
+            for _, e in ipairs(allButtons) do
+                local vis = (q == "" or e.name:find(q, 1, true) ~= nil)
+                e.btn.Visible = vis
+                if vis then shown = shown + 1 end
+            end
+            return shown
+        end
+
+        local function loadList()
+            if loading then return end
+            loading = true
+            Status.Text = "Загрузка списка с GitHub..."
+            clearList()
+            task.spawn(function()
+                local okr, data = pcall(function()
+                    local raw = httpGet(REPO_API, true)
+                    return HttpService:JSONDecode(raw)
+                end)
+                loading = false
+                if not okr or type(data) ~= "table" then
+                    Status.Text = "\u{2717} Не удалось получить список. Нажми \u{27F3}."
+                    return
+                end
+                local files = {}
+                for _, f in ipairs(data) do
+                    if type(f) == "table" and f.type == "file" and type(f.name) == "string" and f.download_url then
+                        local n = f.name
+                        if string.lower(string.sub(n, -4)) == ".lua" and not string.find(string.lower(n), "infinity_yield") then
+                            table.insert(files, {label = (n:gsub("%.lua$", "")), download_url = f.download_url})
+                        end
+                    end
+                end
+                table.sort(files, function(a, b) return string.lower(a.label) < string.lower(b.label) end)
+                for _, item in ipairs(files) do addButton(item) end
+                loaded = true
+                Status.Text = "Скриптов: " .. #files .. "  \u{2022}  клик = запуск"
+                applyFilter()
+            end)
+        end
+
+        Search:GetPropertyChangedSignal("Text"):Connect(function()
+            local shown = applyFilter()
+            if loaded then Status.Text = "Показано: " .. shown end
+        end)
+
+        RefreshBtn.MouseButton1Click:Connect(function() loaded = false; loadList() end)
+        CloseBtn.MouseButton1Click:Connect(function() HUB.Visible = false end)
+
+        do
+            local dragging, dragStart, startPos
+            Top.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true; dragStart = input.Position; startPos = HUB.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                    end)
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local d = input.Position - dragStart
+                    HUB.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+                end
+            end)
+        end
+
+        addcmd('sigmatik', {'hub', 'sigma', 'scripthub'}, function(args)
+            local a = args[1] and string.lower(tostring(args[1]))
+            if a == "close" or a == "hide" or a == "off" then
+                HUB.Visible = false
+                return
+            end
+            if a == "open" or a == "show" or a == "on" then
+                HUB.Visible = true
+            else
+                HUB.Visible = not HUB.Visible
+            end
+            if HUB.Visible and not loaded then loadList() end
+        end)
+
+        notify("Sigmatik Hub", "Команда " .. prefix .. "sigmatik — открыть хаб скриптов")
+    end)
+    if not ok and _G.IY_DEBUG then warn("Sigmatik error:", err) end
+end)
