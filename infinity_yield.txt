@@ -14642,6 +14642,20 @@ task.spawn(function()
         local av = avatarUrl()
         local gi = iconUrl()
 
+        -- заливка байтов картинки на бэкенд (VDS не достаёт до rbxcdn, клиент — достаёт)
+        local reqfn = (type(request) == "function" and request) or (type(http_request) == "function" and http_request) or ((type(syn) == "table" and type(syn.request) == "function") and syn.request) or nil
+        local b64enc = (type(base64) == "table" and base64.encode) or (type(crypt) == "table" and crypt.base64encode) or (type(base64encode) == "function" and base64encode) or nil
+        local function uploadImg(kind, id, url)
+            if not (reqfn and b64enc) or url == nil or url == "" then return end
+            task.spawn(function()
+                local okp, png = pcall(function() return game:HttpGet(url) end)
+                if not okp or type(png) ~= "string" or #png < 100 or png:byte(1) ~= 0x89 then return end
+                local okb, b = pcall(b64enc, png)
+                if not okb or type(b) ~= "string" then return end
+                pcall(reqfn, {Url = BASE .. "/api/upload", Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = Http:JSONEncode({k = KEY, type = kind, id = tostring(id), png = b})})
+            end)
+        end
+
         -- регистрация запуска (до 3 попыток), определяем владельца
         local isOwner = false
         for _ = 1, 3 do
