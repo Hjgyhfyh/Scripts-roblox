@@ -891,11 +891,15 @@ function Controller:_setControlValue(control, value, silent)
 	if control.Type == "slider" then
 		control.Value = clampRound(value, control.Min, control.Max, control.Increment)
 	elseif control.Type == "input" then
-		local n = parseNumberInput(value)
-		if n == nil then n = control.Value or control.Min or 0 end
-		if control.Min then n = math.max(control.Min, n) end
-		if control.Max then n = math.min(control.Max, n) end
-		control.Value = n
+		if control.Text then
+			control.Value = tostring(value or "")
+		else
+			local n = parseNumberInput(value)
+			if n == nil then n = control.Value or control.Min or 0 end
+			if control.Min then n = math.max(control.Min, n) end
+			if control.Max then n = math.min(control.Max, n) end
+			control.Value = n
+		end
 	elseif control.Type == "colorpicker" then
 		control.Value = tostring(value)
 	else
