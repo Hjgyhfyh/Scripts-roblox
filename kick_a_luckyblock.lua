@@ -3909,7 +3909,9 @@ KickEvent.OnClientEvent:Connect(function(distance, brainrot, mutation)
     if not State.AutoPlay then return end
     if type(brainrot) ~= "table" or not brainrot.Name then return end
 
-    local effMut = mutation or "None"
+    -- the mutation lives in brainrot.Mutation (the 3rd arg is always nil); the old
+    -- code read the nil arg, so mutated drops were valued without their multiplier.
+    local effMut = (brainrot.Mutation and brainrot.Mutation ~= "" and brainrot.Mutation) or mutation or "None"
     local mutArg = (effMut ~= "None") and effMut or nil
     local val = effectiveCPS(brainrot.Name, mutArg, brainrot.Level)
     LastCatch = { name = brainrot.Name, value = val }  -- for the presence heartbeat (Playing)
