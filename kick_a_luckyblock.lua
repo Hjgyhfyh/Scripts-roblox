@@ -5843,6 +5843,26 @@ UI = SigmatikLibrary:Create({
                                 end),
                             },
                         },
+                        {
+                            Name = "Telegram Notify",
+                            Controls = {
+                                { Type = "toggle", Name = "Telegram Notify", Value = Cfg.TgEnabled,
+                                    Description = "Message me on every successful catch (above the Get Only value)",
+                                    Callback = cb("TgEnabled") },
+                                momentaryBtn("Link Telegram", "Message your bot first, then press this", function()
+                                    local id = tgResolveChatId()
+                                    if id then
+                                        tgSend("✅ Linked! Saber Tsunami will send catch notifications here.")
+                                        print("[Saber] Telegram linked, chat id = " .. tostring(id))
+                                    else
+                                        print("[Saber] Telegram link failed — send the bot a message first (/start)")
+                                    end
+                                end),
+                                momentaryBtn("Send Test Message", "Send a test Telegram message", function()
+                                    tgSend("🔔 Test message from Saber Tsunami")
+                                end),
+                            },
+                        },
                     },
                 },
                 {
