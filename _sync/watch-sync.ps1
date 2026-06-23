@@ -1,7 +1,7 @@
-# Авто-синхронизация папки "Скрипты" -> GitHub (Hjgyhfyh/Scripts-roblox)
+﻿# Авто-синхронизация папки "Скрипты" -> GitHub (Hjgyhfyh/Scripts-roblox)
 # Синхронный watcher: ждёт изменение, дебаунсит, делает commit+push.
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $Source = 'D:\Нужное\Скрипты роблокс\Делаем скрипты тут\Скрипты'
 $Mirror = 'D:\Нужное\Скрипты роблокс\_github_sync'
 $LogFile = Join-Path $Mirror '_sync\sync.log'
@@ -21,8 +21,9 @@ function Invoke-Sync {
         if ([string]::IsNullOrWhiteSpace($changes)) { Pop-Location; return }
         git commit -m "auto-sync: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" 2>&1 | Out-Null
         git push origin main 2>&1 | Out-Null
+        $code = $LASTEXITCODE
         Pop-Location
-        Write-Log "pushed changes"
+        if ($code -eq 0) { Write-Log "pushed changes" } else { Write-Log "push failed (exit $code)" }
     } catch {
         Write-Log "ERROR: $_"
         while ((Get-Location).Path -eq $Mirror) { Pop-Location }
