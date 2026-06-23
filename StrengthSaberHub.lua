@@ -193,8 +193,51 @@ local function fireCombine()
     fire(UIAction, "CombineAllPets")
 end
 
+local EGG_NAME = "GM Egg"
+local eggLastFire = 0
+local eggEnsureAt = 0
+
+local function eggCooldown()
+    if StatsCalculator and cdm and cdm.Data then
+        local ok, cd = pcall(function()
+            return StatsCalculator:GetHatchCooldown(LocalPlayer, cdm.Data)
+        end)
+        if ok and type(cd) == "number" and cd > 0.05 then
+            return cd
+        end
+    end
+    return 1.8
+end
+
+local function ensureSetting(name, pass)
+    if not (UIAction and cdm and cdm.Data and cdm.Data.Settings) then return end
+    if pass then
+        local passes = cdm.Data.Passes
+        if not (passes and table.find(passes, pass)) then return end
+    end
+    if cdm.Data.Settings[name] ~= true then
+        fire(UIAction, "ChangeSetting", name)
+    end
+end
+
 local function fireBuyEgg()
-    fire(UIAction, "BuyEgg", "GM Egg")
+    local now = os.clock()
+    if now - eggEnsureAt > 3 then
+        eggEnsureAt = now
+        ensureSetting("FastHatch", "FastHatch")
+        ensureSetting("MultiHatch", "TripleHatch")
+    end
+    if now - eggLastFire < eggCooldown() * 0.92 then
+        return
+    end
+    eggLastFire = now
+    fire(UIAction, "BuyEgg", EGG_NAME)
+end
+
+if EggHatchResult then
+    track(EggHatchResult.OnClientEvent:Connect(function()
+        eggLastFire = 0
+    end))
 end
 
 local GLOBAL_LIMIT = 400
