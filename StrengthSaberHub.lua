@@ -80,6 +80,8 @@ local MainClient = LocalPlayer:FindFirstChild("PlayerScripts")
 local cdm = safeRequire(MainClient and MainClient:FindFirstChild("ClientDataManager"))
 local ItemInfo = safeRequire(ReplicatedStorage:FindFirstChild("Modules")
     and ReplicatedStorage.Modules:FindFirstChild("ItemInfo"))
+local StatsCalculator = safeRequire(ReplicatedStorage:FindFirstChild("Modules")
+    and ReplicatedStorage.Modules:FindFirstChild("StatsCalculator"))
 local HitDetection = safeRequire(MainClient and MainClient:FindFirstChild("ClientTool")
     and MainClient.ClientTool:FindFirstChild("HitDetection"))
 
