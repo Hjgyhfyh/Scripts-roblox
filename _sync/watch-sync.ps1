@@ -7,6 +7,9 @@ $Mirror = 'D:\Нужное\Скрипты роблокс\_github_sync'
 $LogFile = Join-Path $Mirror '_sync\sync.log'
 $DebounceMs = 2500
 
+$singleton = New-Object System.Threading.Mutex($false, 'RobloxScriptsAutoSyncWatcher')
+if (-not $singleton.WaitOne(0)) { exit }
+
 function Write-Log($msg) {
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $msg"
     Add-Content -Path $LogFile -Value $line -Encoding utf8

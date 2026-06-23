@@ -591,6 +591,7 @@ buildCard(5, "class", "Авто-покупка класса", "BuyClass → сл
 buildCard(6, "dna", "Авто-покупка DNA", "BuyAllDNAs", 10, fireBuyDNA, "проверок/сек", 20)
 buildCard(7, "saber", "Авто-покупка сейбера", "BuyAllWeapons", 10, fireBuyWeapon, "проверок/сек", 20)
 buildCard(8, "combine", "Авто-крафт питомцев", "CombineAllPets", 10, fireCombine, "проверок/сек", 20)
+buildCard(9, "egg", "Авто-открытие яиц (GM Egg, 250 ракушек)", "BuyEgg → GM Egg", 5, fireBuyEgg, "яиц/сек", 20)
 
 configReady = true
 
