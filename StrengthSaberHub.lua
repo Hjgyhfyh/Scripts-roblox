@@ -194,20 +194,7 @@ local function fireCombine()
 end
 
 local EGG_NAME = "GM Egg"
-local eggLastFire = 0
 local eggEnsureAt = 0
-
-local function eggCooldown()
-    if StatsCalculator and cdm and cdm.Data then
-        local ok, cd = pcall(function()
-            return StatsCalculator:GetHatchCooldown(LocalPlayer, cdm.Data)
-        end)
-        if ok and type(cd) == "number" and cd > 0.05 then
-            return cd
-        end
-    end
-    return 1.8
-end
 
 local function ensureSetting(name, pass)
     if not (UIAction and cdm and cdm.Data and cdm.Data.Settings) then return end
@@ -227,17 +214,7 @@ local function fireBuyEgg()
         ensureSetting("FastHatch", "FastHatch")
         ensureSetting("MultiHatch", "TripleHatch")
     end
-    if now - eggLastFire < eggCooldown() * 0.92 then
-        return
-    end
-    eggLastFire = now
     fire(UIAction, "BuyEgg", EGG_NAME)
-end
-
-if EggHatchResult then
-    track(EggHatchResult.OnClientEvent:Connect(function()
-        eggLastFire = 0
-    end))
 end
 
 local GLOBAL_LIMIT = 400
