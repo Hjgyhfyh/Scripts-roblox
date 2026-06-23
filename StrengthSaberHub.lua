@@ -190,6 +190,10 @@ local function fireCombine()
     fire(UIAction, "CombineAllPets")
 end
 
+local function fireBuyEgg()
+    fire(UIAction, "BuyEgg", "GM Egg")
+end
+
 local GLOBAL_LIMIT = 400
 local tokens = GLOBAL_LIMIT
 track(RunService.Heartbeat:Connect(function(dt)
@@ -586,6 +590,7 @@ buildCard(4, "collect", "Авто-сбор ракушек", "CollectCurrencyPick
 buildCard(5, "class", "Авто-покупка класса", "BuyClass → следующий · СБРОС прогресса!", 10, fireBuyClass, "проверок/сек", 20)
 buildCard(6, "dna", "Авто-покупка DNA", "BuyAllDNAs", 10, fireBuyDNA, "проверок/сек", 20)
 buildCard(7, "saber", "Авто-покупка сейбера", "BuyAllWeapons", 10, fireBuyWeapon, "проверок/сек", 20)
+buildCard(8, "combine", "Авто-крафт питомцев", "CombineAllPets", 10, fireCombine, "проверок/сек", 20)
 
 configReady = true
 
