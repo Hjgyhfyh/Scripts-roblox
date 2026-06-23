@@ -186,6 +186,10 @@ local function fireBuyWeapon()
     fire(UIAction, "BuyAllWeapons")
 end
 
+local function fireCombine()
+    fire(UIAction, "CombineAllPets")
+end
+
 local GLOBAL_LIMIT = 400
 local tokens = GLOBAL_LIMIT
 track(RunService.Heartbeat:Connect(function(dt)
