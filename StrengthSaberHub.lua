@@ -66,13 +66,12 @@ local function safeRequire(inst)
 end
 
 local Events = ReplicatedStorage:WaitForChild("Events", 10)
-local SwingSaber, SellStrength, CollectCurrencyPickup, UIAction, EggHatchResult
+local SwingSaber, SellStrength, CollectCurrencyPickup, UIAction
 if Events then
     SwingSaber = Events:WaitForChild("SwingSaber", 10)
     SellStrength = Events:WaitForChild("SellStrength", 10)
     CollectCurrencyPickup = Events:WaitForChild("CollectCurrencyPickup", 10)
     UIAction = Events:WaitForChild("UIAction", 10)
-    EggHatchResult = Events:FindFirstChild("EggHatchResult")
 end
 
 local MainClient = LocalPlayer:FindFirstChild("PlayerScripts")
@@ -80,8 +79,6 @@ local MainClient = LocalPlayer:FindFirstChild("PlayerScripts")
 local cdm = safeRequire(MainClient and MainClient:FindFirstChild("ClientDataManager"))
 local ItemInfo = safeRequire(ReplicatedStorage:FindFirstChild("Modules")
     and ReplicatedStorage.Modules:FindFirstChild("ItemInfo"))
-local StatsCalculator = safeRequire(ReplicatedStorage:FindFirstChild("Modules")
-    and ReplicatedStorage.Modules:FindFirstChild("StatsCalculator"))
 local HitDetection = safeRequire(MainClient and MainClient:FindFirstChild("ClientTool")
     and MainClient.ClientTool:FindFirstChild("HitDetection"))
 
