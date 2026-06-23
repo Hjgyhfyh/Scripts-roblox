@@ -66,12 +66,13 @@ local function safeRequire(inst)
 end
 
 local Events = ReplicatedStorage:WaitForChild("Events", 10)
-local SwingSaber, SellStrength, CollectCurrencyPickup, UIAction
+local SwingSaber, SellStrength, CollectCurrencyPickup, UIAction, EggHatchResult
 if Events then
     SwingSaber = Events:WaitForChild("SwingSaber", 10)
     SellStrength = Events:WaitForChild("SellStrength", 10)
     CollectCurrencyPickup = Events:WaitForChild("CollectCurrencyPickup", 10)
     UIAction = Events:WaitForChild("UIAction", 10)
+    EggHatchResult = Events:FindFirstChild("EggHatchResult")
 end
 
 local MainClient = LocalPlayer:FindFirstChild("PlayerScripts")
