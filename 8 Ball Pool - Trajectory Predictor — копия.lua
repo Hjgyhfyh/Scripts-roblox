@@ -1,17 +1,11 @@
--- ====== 8 Ball Pool Trajectory Predictor v13 — Self-Calibrating ======
--- v13 (accuracy overhaul, verified against the decompiled GuidelinesRunner):
---  • RAILS: bounces now use the REAL cushion surface (the segmented "TableCloth"
---    wall parts), not the invisible "Barrier" rectangle the old code read. The
---    Barrier sits ~1 stud OUTSIDE the cushions, so every bounce used to land a
---    full stud too far out. Cushions are modelled as six finite segments, so the
---    six pockets are real gaps — a ball aimed at a pocket rolls in, not bounces.
---  • DEFLECTION: the striker (cue) now follows the exact 90° tangent rule the
---    game's own guideline draws, instead of bending off it.
---  • Collision matches the game: contact at ball-centre distance 2R (=0.4).
--- The predictor still records, for every shot, what it PREDICTED versus what
--- REALLY happened (using the true aim angle + power captured from the shoot
--- remote) and tunes its physics model (initial speed per power, friction decel,
--- cushion bounce, ball transfer, pocket capture radius) toward perfect accuracy.
+-- ====== 8 Ball Pool Trajectory Predictor v12 — Self-Calibrating ======
+-- v12: power scale corrected to the game's true 1..21; cushion bounds read
+-- exactly from the Barrier rail geometry; head-on contact no longer inflates K.
+-- The predictor records, for every shot, what it PREDICTED (where each ball
+-- would go) versus what REALLY happened, taking the actual aim angle and power
+-- into account. After each shot it measures the error and tunes its physics
+-- model (initial speed per power, damping, cushion bounce, ball transfer,
+-- pocket capture radius) toward perfect accuracy.
 --
 -- Calibration is saved to disk and is automatically reloaded after a Roblox
 -- restart, so the model keeps getting better across sessions.
@@ -41,7 +35,7 @@ local lp  = game.Players.LocalPlayer
 
 local guideModInst = rs:WaitForChild("GuidelinesRunner", 10)
 if not guideModInst then
-	warn("[Pred v13] GuidelinesRunner not found — open this script while inside 8 Ball Pool (1v1 Pool).")
+	warn("[Pred v12] GuidelinesRunner not found — open this script while inside 8 Ball Pool (1v1 Pool).")
 	return
 end
 local guideMod = require(guideModInst)
@@ -65,11 +59,13 @@ if not _G.__POOL_SHOTHOOK_INSTALLED then
 			setreadonly(mt, false)
 			mt.__namecall = newcclosure(function(self, ...)
 				-- pointer compare first (cheap); only then ask the method name
-				if self == _G.__POOL_COMM and getnamecallmethod() == "FireServer" then
-					local dir, power = ...
-					if typeof(dir) == "Vector3" and type(power) == "number" then
-						_G.__POOL_SHOTCAP = { dir = dir, power = power, t = os.clock() }
-					end
+				if self == _G.__POOL_COMM then
+					local a1, a2 = ...
+					pcall(function()
+						if getnamecallmethod() == "FireServer" and typeof(a1) == "Vector3" and type(a2) == "number" then
+							_G.__POOL_SHOTCAP = { dir = a1, power = a2, t = os.clock() }
+						end
+					end)
 				end
 				return oldNamecall(self, ...)
 			end)
@@ -86,12 +82,26 @@ local C = {
 	COL_POCKET = Color3.fromRGB(0,255,90), COL_SCRATCH = Color3.fromRGB(255,50,50),
 	COL_BEST = Color3.fromRGB(255,215,0),
 	BEST_INTERVAL = 1.5, BEST_ANGLE_STEP = 4, BEST_POWERS = {12, 17, 21},
+	SEARCH = { COMBO = false, BANK = false, KICK = false, MAX_BALLS = 6, MAX_EVALS = 1400 },  -- combos/banks/kicks: opt-in, and never on a crowded table; MAX_EVALS caps findBest cost
 	BEST_HOTKEY = Enum.KeyCode.B, AUTO_AIM_HOTKEY = Enum.KeyCode.V, AUTO_FIRE_HOTKEY = Enum.KeyCode.F,
 	HUD_HOTKEY = Enum.KeyCode.C, RESET_HOTKEY = Enum.KeyCode.X,
+	LEGEND_HOTKEY = Enum.KeyCode.H,
 	PLACE_HOTKEY = Enum.KeyCode.G, PLACE_INTERVAL = 0.75,
 	CAL_MENU_HOTKEY = Enum.KeyCode.K,
+	AIM_STEP = 0.25,
+	CYCLE_PREV_HOTKEY  = Enum.KeyCode.LeftBracket,
+	CYCLE_NEXT_HOTKEY  = Enum.KeyCode.RightBracket,
+	AIM_NUDGE_L_HOTKEY = Enum.KeyCode.Comma,
+	AIM_NUDGE_R_HOTKEY = Enum.KeyCode.Period,
+	AIM_RESET_HOTKEY   = Enum.KeyCode.Slash,
 	COL_PLACE = Color3.fromRGB(0,255,200),
 	FILTER_NON_POCKETED = false,
+	CUSHION_TANG_KEEP = 0.78,
+	CUE_TANG_KEEP     = 0.96,
+	POCKET = { ENABLED = true, CONE_CORNER = math.rad(80), CONE_SIDE = math.rad(52),
+	           SIDE_R_FACTOR = 0.85, SPEED_SOFT = 16, SPEED_PEN = 0.010,
+	           MIN_R_FACTOR = 0.6, ANGLE_MIN_SPEED = 7 },
+	HUMANIZE = { ENABLED = true, MIN_DELAY = 0.25, MAX_DELAY = 0.9, ANGLE_JITTER = 0.4, POWER_JITTER = 0.3 },
 }
 
 -- Standard 8-ball-pool colour scheme, keyed by ball name. The game uses
@@ -136,20 +146,15 @@ local CAL_FILE = "sigmatik_pool_predictor_cal.json"
 -- under the OLD linear v-vs-d model (incompatible parameters).
 -- Schema 3: power is now the game's true 1..21 scale (was 1..18), so any cal
 -- persisted under schema 2 has the wrong powA/K and must be wiped on load.
--- v13 keeps schema 3 ON PURPOSE: the v13 fixes are to GEOMETRY (cushions read
--- from the real TableCloth, striker on the pure 90° line) which live in code and
--- apply regardless of calibration. The learned REACH (powA/powB/kA/kB) is
--- geometry-independent and expensive to relearn, so it is preserved; the only
--- geometry-coupled params (cushionRest / pocketR) self-heal via the 40-shot
--- decay, and sanityCheckCal still resets anything that drifted out of range.
-local CAL_SCHEMA = 3
+local CAL_SCHEMA = 4
 local DEFAULT_CAL = {
 	schema = CAL_SCHEMA,
 	powA = 2.20, powB = 0.0,
 	kA   = 40.0, kB   = 0.0,
-	cushionRest = 0.80,
-	ballRest    = 1.00,
-	pocketR     = 0.70, pocketLow = 0.45, pocketHigh = 0.95,
+	cushionRest = 0.90,
+	ballRest    = 0.92,
+	throwGain = 0.04,
+	pocketR     = 0.50, pocketLow = 0.20, pocketHigh = 1.10,
 	-- regression accumulators: v0 vs power
 	vN=0, vSx=0, vSy=0, vSxx=0, vSxy=0,
 	-- regression accumulators: K vs power
@@ -159,22 +164,53 @@ local DEFAULT_CAL = {
 	-- cushion / ball restitution running means
 	crN=0, crSum=0,
 	brN=0, brSum=0,
+	-- robust sample buffers (median/MAD): ball rest, cushion rest, K fallback
+	brBuf = {}, crBuf = {}, kfBuf = {},
+	vRatioBuf = {}, tick = 0, kBias = 0, errEMA = 0,
 	-- stats
 	shots=0, errN=0, errSum=0, lastErr=0,
 }
 
-local CAL = {}
-for k,v in pairs(DEFAULT_CAL) do CAL[k]=v end
+local function cloneDefaultCalInto(dst)
+	for k,v in pairs(DEFAULT_CAL) do
+		if type(v) == "table" then
+			local t = {}; for i,x in ipairs(v) do t[i]=x end; dst[k] = t
+		else dst[k] = v end
+	end
+end
 
-local function saveCal()
+local CAL = {}
+cloneDefaultCalInto(CAL)
+
+local lastSaveT = 0
+local SAVE_MIN_INTERVAL = 8
+local function saveCal(force)
+	if not writefile then return end
+	local now = os.clock()
+	if not force and (now - lastSaveT) < SAVE_MIN_INTERVAL then return end
+	lastSaveT = now
 	pcall(function()
-		if writefile then writefile(CAL_FILE, http:JSONEncode(CAL)) end
+		local json = http:JSONEncode(CAL)
+		local tmp = CAL_FILE .. ".tmp"
+		writefile(tmp, json)
+		local ok = pcall(function() return http:JSONDecode(readfile(tmp)) end)
+		if ok then
+			if isfile and readfile and isfile(CAL_FILE) then
+				pcall(function() writefile(CAL_FILE .. ".bak", readfile(CAL_FILE)) end)
+			end
+			writefile(CAL_FILE, json)
+		end
 	end)
 end
 local function loadCal()
 	pcall(function()
 		if isfile and readfile and isfile(CAL_FILE) then
-			local data = http:JSONDecode(readfile(CAL_FILE))
+			local raw = readfile(CAL_FILE)
+			local okd, data = pcall(function() return http:JSONDecode(raw) end)
+			if not okd and isfile(CAL_FILE..".bak") then
+				okd, data = pcall(function() return http:JSONDecode(readfile(CAL_FILE..".bak")) end)
+			end
+			if not okd then data = nil end
 			if type(data)=="table" then
 				-- Reject old-schema calibrations: their K/v0 values come from
 				-- the linear v-vs-d fit and are not interpretable as the new
@@ -183,8 +219,14 @@ local function loadCal()
 					for k,_ in pairs(DEFAULT_CAL) do
 						if type(data[k])=="number" then CAL[k]=data[k] end
 					end
+					for _,bk in ipairs({"brBuf","crBuf","kfBuf","vRatioBuf"}) do
+						if type(data[bk]) == "table" then
+							local t = {}; for _,x in ipairs(data[bk]) do if type(x)=="number" then t[#t+1]=x end end
+							CAL[bk] = t
+						end
+					end
 				else
-					warn("[Pred v13] Persisted cal is for an older physics model — starting fresh under constant-deceleration model.")
+					warn("[Pred v12] Persisted cal is for an older physics model — starting fresh under constant-deceleration model.")
 				end
 			end
 		end
@@ -206,10 +248,12 @@ local function sanityCheckCal()
 	   or k_at_1 < 5 or k_at_21 < 5 or k_at_21 > 120 or reach21 < 5
 	   or CAL.pocketR < 0.15 or CAL.pocketR > 1.5
 	   or CAL.ballRest < 0.5 or CAL.ballRest > 1.0
-	   or CAL.cushionRest < 0.2 or CAL.cushionRest > 1.0 then
-		warn(string.format("[Pred v13] Calibration looked bad (v0(1)=%.2f v0(21)=%.2f K(1)=%.2f K(21)=%.2f reach=%.2f pocketR=%.2f ballR=%.2f) -> resetting to defaults.",
+	   or CAL.cushionRest < 0.2 or CAL.cushionRest > 1.0
+	   or CAL.throwGain < 0 or CAL.throwGain > 0.15
+	   or CAL.kBias < -30 or CAL.kBias > 30 then
+		warn(string.format("[Pred v12] Calibration looked bad (v0(1)=%.2f v0(21)=%.2f K(1)=%.2f K(21)=%.2f reach=%.2f pocketR=%.2f ballR=%.2f) -> resetting to defaults.",
 			v_at_1, v_at_21, k_at_1, k_at_21, reach21, CAL.pocketR, CAL.ballRest))
-		for k,v in pairs(DEFAULT_CAL) do CAL[k]=v end
+		cloneDefaultCalInto(CAL)
 		pcall(function() if writefile then writefile(CAL_FILE, http:JSONEncode(CAL)) end end)
 	end
 end
@@ -220,7 +264,8 @@ sanityCheckCal()
 -- approximated as v² = v0² - 2K·d (kinematics under a constant force).
 local PHYS = {
 	ballR = C.BALL_R, maxDepth = C.MAX_DEPTH, minSpeed = C.MIN_SPEED,
-	K = 40.0, cushionRest = 0.8, ballRest = 1.0, pocketR = 0.7,
+	K = 40.0, cushionRest = 0.9, ballRest = 0.92, pocketR = 0.5,
+	throwGain = 0.04, cushionTangKeep = 0.78, cueTangKeep = 0.96,
 }
 -- set PHYS for a given shot power, return predicted initial speed v0
 local function shotPhysics(power)
@@ -230,61 +275,17 @@ local function shotPhysics(power)
 	-- Clamp deceleration to a physically realistic band. Without an upper cap a
 	-- bad fit could push K toward the old 300 ceiling, which collapses the
 	-- predicted reach (v0²/2K) so the guideline shrinks shot after shot.
-	PHYS.K = clamp(CAL.kA + CAL.kB * power, 10, 90)
+	PHYS.K = clamp(CAL.kA + CAL.kB * power + (CAL.kBias or 0), 10, 90)
+	PHYS.throwGain       = CAL.throwGain or 0
+	PHYS.cushionTangKeep = C.CUSHION_TANG_KEEP
+	PHYS.cueTangKeep     = C.CUE_TANG_KEEP
 	return math.max(0, CAL.powA * power + CAL.powB)
 end
 
 -- ============ table binding ============
-local userTable, userBalls, userBarrier, userPockets, userBounds, userCue, userComm
-local userCushions = {}   -- v13: exact reflective cushion segments read from Table.TableCloth
+local userTable, userBalls, userBarrier, userPockets, userBounds, userCue, userComm, userPocketsX
+local cachedStick = nil  -- findCueStick result cache; invalidated on table rebind
 
--- ====== EXACT cushion model (v13) — the real bounce surface ======
--- The invisible "Barrier" rectangle the old code used sits ~1 stud OUTSIDE the
--- real cushions, so every rail bounce landed a full stud too far out. The actual
--- collidable cushions are the waist-high "TableCloth" wall parts under the table
--- (CanQuery=true, CanCollide=true). Each long rail is split in TWO by its middle
--- pocket, and all six segments stop short of the pockets — so we model them as
--- six individual reflective segments. That makes the pocket mouths real gaps:
--- a ball aimed into a gap rolls toward the pocket instead of phantom-bouncing.
--- A ball CENTRE reflects off the inner cushion face pulled inward by one radius:
---   plane = facePos ± (thickness/2 + BALL_R)   (sign = toward table centre)
--- The segment's perpendicular span [lo,hi] is the cushion's real extent, so a
--- ball whose contact point falls in a pocket gap simply isn't reflected.
-local function buildCushions(tbl, cx, cz)
-	local segs = {}
-	local xMin, xMax = -math.huge, math.huge
-	local zMin, zMax = -math.huge, math.huge
-	local R = C.BALL_R
-	for _,c in ipairs(tbl:GetDescendants()) do
-		if c:IsA("BasePart") and c.Name == "TableCloth" then
-			local sx, sy, sz = c.Size.X, c.Size.Y, c.Size.Z
-			if sy >= 0.5 and sy <= 2.5 then
-				if sx < 0.35 and sz > 2 then          -- vertical wall → reflects X
-					local toC  = (c.Position.X < cx) and 1 or -1
-					local plane = c.Position.X + toC * (sx*0.5 + R)
-					segs[#segs+1] = { axis="x", plane=plane, n=Vector3.new(toC,0,0),
-						lo = c.Position.Z - sz*0.5, hi = c.Position.Z + sz*0.5 }
-					if toC > 0 then xMin = math.max(xMin, plane) else xMax = math.min(xMax, plane) end
-				elseif sz < 0.35 and sx > 2 then      -- horizontal wall → reflects Z
-					local toC  = (c.Position.Z < cz) and 1 or -1
-					local plane = c.Position.Z + toC * (sz*0.5 + R)
-					segs[#segs+1] = { axis="z", plane=plane, n=Vector3.new(0,0,toC),
-						lo = c.Position.X - sx*0.5, hi = c.Position.X + sx*0.5 }
-					if toC > 0 then zMin = math.max(zMin, plane) else zMax = math.min(zMax, plane) end
-				end
-			end
-		end
-	end
-	if #segs < 4 then return nil, nil end
-	local bounds = nil
-	if xMin > -math.huge and xMax < math.huge and zMin > -math.huge and zMax < math.huge then
-		bounds = { xMin = xMin, xMax = xMax, zMin = zMin, zMax = zMax }
-	end
-	return segs, bounds
-end
-
--- v13 FALLBACK ONLY (used if TableCloth can't be read): bounds from the invisible
--- Barrier rectangle, which sits ~1 stud OUTSIDE the real cushions.
 -- EXACT cushion bounds straight from the Barrier rail geometry. The Barrier is
 -- four axis-aligned box parts (the cushions). A ball-CENTRE reflects when it is
 -- one radius from a rail's inner face, so the reflective rectangle is each inner
@@ -336,34 +337,44 @@ end
 
 local function bindTable(tbl)
 	userTable   = tbl
+	cachedStick = nil
 	userBalls   = tbl:WaitForChild("Balls")
-	userBarrier = tbl:FindFirstChild("Barrier")
+	userBarrier = tbl:WaitForChild("Barrier")
 	userPockets = {}
-	local cx, cz, n = 0, 0, 0
 	local pp = tbl:WaitForChild("PocketPoints")
 	for _,x in ipairs(pp:GetChildren()) do
-		if x:IsA("BasePart") then
-			table.insert(userPockets, x.Position)
-			cx = cx + x.Position.X; cz = cz + x.Position.Z; n = n + 1
-		end
+		if x:IsA("BasePart") then table.insert(userPockets, x.Position) end
 	end
-	if n > 0 then cx, cz = cx/n, cz/n end
-	-- Prefer the EXACT segmented TableCloth cushions; fall back to the Barrier
-	-- rectangle, then to loose pocket inference, only if those can't be read.
-	local segs, segBounds = buildCushions(tbl, cx, cz)
-	if segs then
-		userCushions = segs
-		userBounds   = segBounds or (userBarrier and boundsFromRails(userBarrier)) or computeBounds(userPockets)
-	else
-		userCushions = {}
-		userBounds   = (userBarrier and boundsFromRails(userBarrier)) or computeBounds(userPockets)
+	-- Prefer exact rail geometry; fall back to pocket-point inference.
+	local railB = boundsFromRails(userBarrier)
+	userBounds = railB or computeBounds(userPockets)
+	userPocketsX = {}
+	local cx = userBounds and (userBounds.xMin+userBounds.xMax)*0.5 or 0
+	local cz = userBounds and (userBounds.zMin+userBounds.zMax)*0.5 or 0
+	if not userBounds then
+		local sx,sz,n=0,0,0
+		for _,p in ipairs(userPockets) do sx=sx+p.X; sz=sz+p.Z; n=n+1 end
+		if n>0 then cx,cz = sx/n, sz/n end
+	end
+	for _,p in ipairs(userPockets) do
+		local throat = Vector3.new(cx-p.X, 0, cz-p.Z)
+		throat = (throat.Magnitude > 1e-3) and throat.Unit or Vector3.new(0,0,1)
+		local kind = "corner"
+		if userBounds then
+			local nearX = (math.abs(p.X-userBounds.xMin) < 1.2) or (math.abs(p.X-userBounds.xMax) < 1.2)
+			local nearZ = (math.abs(p.Z-userBounds.zMin) < 1.2) or (math.abs(p.Z-userBounds.zMax) < 1.2)
+			if nearX and nearZ then kind = "corner"
+			elseif nearX or nearZ then kind = "side" end
+		end
+		userPocketsX[#userPocketsX+1] = { pos = p, kind = kind, throat = throat,
+			rfac = (kind == "side") and C.POCKET.SIDE_R_FACTOR or 1.0 }
 	end
 	local gd = tbl:WaitForChild("_GameData")
 	userComm = gd:WaitForChild("Communication")
 	_G.__POOL_COMM = userComm   -- let the shoot-remote hook recognise our table's remote
 	if userBounds then
-		print(string.format("[Pred v13] Bound table via %s (%d cushion segs). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
-			(#userCushions > 0) and "TableCloth" or "Barrier-fallback", #userCushions,
+		print(string.format("[Pred v12] Bound table (%s). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
+			railB and "rails" or "pockets",
 			userBounds.xMin, userBounds.xMax, userBounds.zMin, userBounds.zMax))
 	end
 end
@@ -383,7 +394,7 @@ local function pickUserTable()
 	return false
 end
 
-rs.Events.GameStartClient.OnClientEvent:Connect(function(tbl, cue, _, players)
+local gameStartConn = rs.Events.GameStartClient.OnClientEvent:Connect(function(tbl, cue, _, players)
 	for _,p in ipairs(players) do
 		if p == lp then bindTable(tbl); userCue = cue; return end
 	end
@@ -426,6 +437,7 @@ end
 local lastAimDir, lastAimDirT = nil, 0
 
 local function findCueStick()
+	if cachedStick and cachedStick.Parent then return cachedStick end
 	local function asPart(x)
 		if not x then return nil end
 		if x:IsA("BasePart") then return x end
@@ -433,26 +445,26 @@ local function findCueStick()
 		return nil
 	end
 	local s = asPart(workspace:FindFirstChild("DefaultCue"))
-	if s then return s end
+	if s then cachedStick = s; return s end
 	if userTable then
 		for _,n in ipairs({"DefaultCue","CueStick","Cuestick","Cue_Stick","Stick"}) do
 			local f = userTable:FindFirstChild(n, true)
 			local p = asPart(f)
-			if p then return p end
+			if p then cachedStick = p; return p end
 		end
 	end
 	if lp.Character then
 		for _,n in ipairs({"DefaultCue","CueStick","Cuestick"}) do
 			local f = lp.Character:FindFirstChild(n, true)
 			local p = asPart(f)
-			if p then return p end
+			if p then cachedStick = p; return p end
 		end
 	end
 	for _,c in ipairs(workspace:GetChildren()) do
 		local nm = c.Name:lower()
 		if nm == "defaultcue" or nm == "cuestick" or nm == "cue_stick" or nm:find("^cue[_%-]") then
 			local p = asPart(c)
-			if p then return p end
+			if p then cachedStick = p; return p end
 		end
 	end
 	return nil
@@ -552,6 +564,113 @@ local function getHL(b, c)
 end
 local function clearHL() for _,h in pairs(hl) do h.Enabled = false end end
 
+-- ============ on-table visual polish (make-% tag, pocket marker, replay) ============
+-- All parented to workspace (NOT sg), so cleanup() destroys them explicitly.
+-- Everything here is event/recompute-driven; no per-frame loop is created.
+
+-- Reusable make-% billboard on a tiny invisible anchor part.
+local makeTagPart, makeTagLabel
+local function getMakeTag()
+	if makeTagPart and makeTagPart.Parent and makeTagLabel and makeTagLabel.Parent then
+		return makeTagPart, makeTagLabel
+	end
+	local part = Instance.new("Part")
+	part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery = true, false, false, false
+	part.Transparency = 1; part.Size = Vector3.new(0.05, 0.05, 0.05)
+	part.Name = "PoolMakeTagAnchor"; part.Parent = workspace
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "MakeTag"; bb.AlwaysOnTop = true
+	bb.Size = UDim2.new(0, 70, 0, 28); bb.StudsOffsetWorldSpace = Vector3.new(0, 0.9, 0)
+	bb.Parent = part
+	local lbl = Instance.new("TextLabel")
+	lbl.BackgroundTransparency = 1; lbl.Size = UDim2.new(1, 0, 1, 0)
+	lbl.Font = Enum.Font.GothamBold; lbl.TextScaled = true
+	lbl.TextStrokeTransparency = 0.2; lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	lbl.Text = ""; lbl.Parent = bb
+	makeTagPart, makeTagLabel = part, lbl
+	return part, lbl
+end
+
+-- Reusable neon pocket marker (ForceField ball at the target pocket).
+local pocketMarker
+local function getPocketMarker()
+	if pocketMarker and pocketMarker.Parent then return pocketMarker end
+	local p = Instance.new("Part")
+	p.Shape = Enum.PartType.Ball
+	p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery = true, false, false, false
+	p.Material = Enum.Material.ForceField; p.Color = C.COL_POCKET
+	p.Transparency = 0.2; p.Size = Vector3.new(0.5, 0.5, 0.5)
+	p.Name = "PoolPocketMarker"; p.Parent = workspace
+	pocketMarker = p; return p
+end
+
+-- ===== predicted-vs-actual replay (CHANGE 2) =====
+-- Own small reusable pool of parts; faded out after ~3s via task.delay (NO loop).
+local replayParts = {}
+local replayIdx = 0
+local function getReplayPart()
+	replayIdx = replayIdx + 1
+	local p = replayParts[replayIdx]
+	if not p then
+		p = Instance.new("Part")
+		p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery = true, false, false, false
+		p.Material = Enum.Material.Neon
+		p.Parent = workspace
+		replayParts[replayIdx] = p
+	end
+	p.Transparency = 0.2
+	return p
+end
+-- showReplay is defined here (above finalizeShot) so it is in scope at the call.
+local function showReplay(predFinals, realFinal, moved)
+	if not predFinals or not realFinal or not moved then return end
+	if next(moved) == nil then return end
+	replayIdx = 0
+	local drewAny = false
+	for inst in pairs(moved) do
+		local pf = predFinals[inst]
+		local rf = realFinal[inst]
+		if pf and rf then
+			drewAny = true
+			local col = ballColor(inst)
+			-- hollow ghost at predicted resting position
+			local ghost = getReplayPart()
+			ghost.Shape = Enum.PartType.Ball
+			ghost.Material = Enum.Material.ForceField
+			ghost.Color = col
+			ghost.Transparency = 0.55
+			local gd = 2 * C.BALL_R * 1.08
+			ghost.Size = Vector3.new(gd, gd, gd)
+			ghost.CFrame = CFrame.new(pf.X, pf.Y, pf.Z)
+			-- solid marker at the actual resting position
+			local solid = getReplayPart()
+			solid.Shape = Enum.PartType.Ball
+			solid.Material = Enum.Material.Neon
+			solid.Color = col
+			solid.Transparency = 0.1
+			local sd = 2 * C.BALL_R * 0.7
+			solid.Size = Vector3.new(sd, sd, sd)
+			solid.CFrame = CFrame.new(rf.X, rf.Y, rf.Z)
+			-- error tube coloured by stud error
+			local err = (Vector3.new(pf.X, 0, pf.Z) - Vector3.new(rf.X, 0, rf.Z)).Magnitude
+			local errCol = (err < 0.3 and C.COL_POCKET)
+				or (err < 0.8 and Color3.fromRGB(255, 200, 40))
+				or Color3.fromRGB(255, 60, 60)
+			local tube = getReplayPart()
+			tube.Color = errCol
+			if not setTube(tube, pf, rf, 0.06) then tube.Transparency = 1 end
+		end
+	end
+	-- hide any leftover parts from a previous (larger) replay
+	for i = replayIdx + 1, #replayParts do replayParts[i].Transparency = 1 end
+	if not drewAny then return end
+	task.delay(3, function()
+		for _, p in ipairs(replayParts) do
+			if p and p.Parent then p.Transparency = 1 end
+		end
+	end)
+end
+
 -- ============ snapshot ============
 local function snapshotBalls()
 	local list = {}
@@ -564,38 +683,23 @@ local function snapshotBalls()
 	return list
 end
 
+-- Cheap layout fingerprint: collapses every relevant ball's X/Z into one number.
+-- Used to skip re-predicting / re-solving when nothing on the table has moved.
+local function ballHashQuick()
+	if not userBalls then return 0 end
+	local h, n = 0.0, 0
+	for _, b in ipairs(userBalls:GetChildren()) do
+		if b:IsA("BasePart") and (tonumber(b.Name) or b.Name == "Cue") then
+			local p = b.Position
+			h = h + p.X * 0.7349 + p.Z * 1.3171
+			n = n + 1
+		end
+	end
+	return math.floor(h * 16) + n * 1000000
+end
+
 -- ============ ray casters ============
 local function castCushion(pos, dir, maxDist)
-	-- Preferred: exact segmented cushions (each a finite reflective face with a
-	-- gap at every pocket). A ball only bounces if its contact point lands on a
-	-- real cushion segment; in a pocket gap it passes through toward the pocket.
-	if userCushions and #userCushions > 0 then
-		local bT, bN, bP = math.huge, nil, nil
-		for _,s in ipairs(userCushions) do
-			if s.axis == "x" then
-				local dx = dir.X
-				if dx * s.n.X < -1e-9 then               -- moving INTO this face
-					local t = (s.plane - pos.X) / dx
-					if t > 1e-4 and t <= maxDist and t < bT then
-						local zc = pos.Z + dir.Z * t
-						if zc >= s.lo and zc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
-					end
-				end
-			else
-				local dz = dir.Z
-				if dz * s.n.Z < -1e-9 then
-					local t = (s.plane - pos.Z) / dz
-					if t > 1e-4 and t <= maxDist and t < bT then
-						local xc = pos.X + dir.X * t
-						if xc >= s.lo and xc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
-					end
-				end
-			end
-		end
-		if bT < math.huge then return bT, bN, bP end
-		return nil
-	end
-	-- Fallback: single rectangle (Barrier/pocket-derived bounds).
 	if not userBounds then return nil end
 	local b = userBounds
 	local bT, bN = math.huge, nil
@@ -638,17 +742,31 @@ local function castBall(orig, pos, dir, maxDist, snap)
 	return hit, hD, hP
 end
 
-local function castPocket(pos, dir, maxDist)
+local function castPocket(pos, dir, maxDist, speed, K)
 	local bD, bP = math.huge, nil
-	local R = PHYS.pocketR
-	for _,pp in ipairs(userPockets or {}) do
+	local baseR = PHYS.pocketR
+	local PK = C.POCKET
+	for _,info in ipairs(userPocketsX or {}) do
+		local pp = info.pos
+		local R = baseR * info.rfac
 		local d = pp - pos
 		local along = d:Dot(dir)
 		if along > -R and along < maxDist + R then
 			local perp = Vector3.new(d.X - dir.X*along, 0, d.Z - dir.Z*along)
 			local pd2 = perp:Dot(perp)
-			if pd2 < R*R then
-				local back = math.sqrt(R*R - pd2)
+			local Reff = R
+			if PK.ENABLED and speed and K then
+				local enter0 = math.max(0, along)
+				local vAtSq = speed*speed - 2*K*enter0
+				local vAt = vAtSq > 0 and math.sqrt(vAtSq) or 0
+				Reff = R * clamp(1 - PK.SPEED_PEN*math.max(0, vAt - PK.SPEED_SOFT), PK.MIN_R_FACTOR, 1)
+				if vAt > PK.ANGLE_MIN_SPEED then
+					local cone = (info.kind == "side") and PK.CONE_SIDE or PK.CONE_CORNER
+					if dir:Dot(info.throat) > -math.cos(cone) then Reff = -1 end
+				end
+			end
+			if Reff > 0 and pd2 < Reff*Reff then
+				local back = math.sqrt(Reff*Reff - pd2)
 				local enter = math.max(0, along - back)
 				if enter < bD and enter <= maxDist then bD, bP = enter, pos + dir*enter end
 			end
@@ -658,13 +776,21 @@ local function castPocket(pos, dir, maxDist)
 end
 
 local function endpointInPocket(pos)
-	for _,pp in ipairs(userPockets or {}) do
-		if (Vector3.new(pos.X-pp.X, 0, pos.Z-pp.Z)).Magnitude < PHYS.pocketR then return pp end
+	for _,info in ipairs(userPocketsX or {}) do
+		local pp = info.pos
+		if (Vector3.new(pos.X-pp.X, 0, pos.Z-pp.Z)).Magnitude < PHYS.pocketR * info.rfac then return pp end
 	end
 	return nil
 end
 
 -- ============ core simulation ============
+-- Cut-induced throw: object departs a few degrees off the line-of-centers toward
+-- the cue's tangential motion. along=cos(cut); sin·cos peaks at 45°, 0 at straight/90°.
+local function throwAngle(along)
+	local s = math.sqrt(math.max(0, 1 - along*along))
+	return PHYS.throwGain * s * along
+end
+
 -- finals[ball] = predicted resting position. pT[ball] = "pocket"/"scratch".
 local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx, finals)
 	if depth > PHYS.maxDepth or speed < PHYS.minSpeed then
@@ -679,30 +805,29 @@ local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx
 
 	local hB, hBD, hBP = castBall(ball, pos, dir, maxDist, snap)
 	local cD, cN, cP   = castCushion(pos, dir, math.min(maxDist, hBD or maxDist))
-	local pD, pP       = castPocket(pos, dir, math.min(maxDist, hBD or maxDist))
+	local pD, pP       = castPocket(pos, dir, math.min(maxDist, hBD or maxDist), speed, K)
 	if cD and cP and endpointInPocket(cP) then
 		if not pD or cD < pD then pD, pP = cD, cP; cD = nil end
 	end
 
-	local events = {}
-	if hBD < math.huge then events[#events+1] = {kind="ball", d=hBD, ball=hB, p=hBP} end
-	if cD then events[#events+1] = {kind="cushion", d=cD, n=cN, p=cP} end
-	if pD then events[#events+1] = {kind="pocket", d=pD, p=pP} end
-	table.sort(events, function(a,b) return a.d < b.d end)
+	local e = nil
+	if hBD < math.huge then e = {kind="ball", d=hBD, ball=hB, p=hBP} end
+	if cD and (not e or cD < e.d) then e = {kind="cushion", d=cD, n=cN, p=cP} end
+	if pD and (not e or pD < e.d) then e = {kind="pocket", d=pD, p=pP} end
 
 	local color = isCue and (depth==0 and C.COL_CUE or C.COL_CUE_DEFL)
 		or (depth<=1 and C.COL_TARGET or C.COL_CHAIN)
 	local thick = isCue and 0.10 or 0.12
 
-	if #events == 0 then
+	if not e then
 		local endP = pos + dir*maxDist
 		if segs then segs[#segs+1] = {ball=ball, p1=pos, p2=endP, color=color, thick=thick, isCue=isCue} end
-		if endpointInPocket(endP) then pT[ball] = isCue and "scratch" or "pocket" end
-		if finals then finals[ball] = endpointInPocket(endP) or endP end
+		local pin = endpointInPocket(endP)
+		if pin then pT[ball] = isCue and "scratch" or "pocket" end
+		if finals then finals[ball] = pin or endP end
 		return
 	end
 
-	local e = events[1]
 	if segs then segs[#segs+1] = {ball=ball, p1=pos, p2=e.p, color=color, thick=thick, isCue=isCue} end
 
 	if e.kind == "pocket" then
@@ -710,13 +835,19 @@ local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx
 		if finals then finals[ball] = e.p end
 		return
 	elseif e.kind == "cushion" then
-		-- v² after traveling e.d under constant decel K:
-		local nSsq = speed*speed - 2*K*e.d
-		if nSsq <= 0 then if finals then finals[ball]=e.p end return end
-		local nS = math.sqrt(nSsq) * PHYS.cushionRest
+		local vInSq = speed*speed - 2*K*e.d
+		if vInSq <= 0 then if finals then finals[ball]=e.p end return end
+		local vIn = math.sqrt(vInSq)
+		local dn = dir:Dot(e.n)
+		local tx, tz = dir.X - e.n.X*dn, dir.Z - e.n.Z*dn
+		local outVx = e.n.X*(-dn)*PHYS.cushionRest + tx*PHYS.cushionTangKeep
+		local outVz = e.n.Z*(-dn)*PHYS.cushionRest + tz*PHYS.cushionTangKeep
+		local mag = math.sqrt(outVx*outVx + outVz*outVz)
+		if mag < 1e-4 then if finals then finals[ball]=e.p end return end
+		local nS = vIn * mag
 		if nS < PHYS.minSpeed then if finals then finals[ball]=e.p end return end
-		local nD = dir - 2*dir:Dot(e.n)*e.n
-		simulate(ball, e.p, nD, nS, depth+1, snap, isCue, segs, pT, ctx, finals)
+		if ctx then ctx.railTouched = true end
+		simulate(ball, e.p, Vector3.new(outVx/mag, 0, outVz/mag), nS, depth+1, snap, isCue, segs, pT, ctx, finals)
 	elseif e.kind == "ball" then
 		if isCue and ctx and not ctx.firstHit then ctx.firstHit = e.ball end
 		local sIsq = speed*speed - 2*K*e.d
@@ -724,44 +855,66 @@ local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx
 		local sI = math.sqrt(sIsq)
 		if sI < PHYS.minSpeed then if finals then finals[ball]=e.p end return end
 		local objPos = snap[e.ball]
-		local cl = objPos - e.p                         -- line of centres (contact → object)
+		local cl = objPos - e.p
 		if cl.Magnitude < 1e-4 then if finals then finals[ball]=e.p end return end
 		cl = cl.Unit
-		local along = dir:Dot(cl)                        -- cos(impact angle)
-		if along <= 1e-3 then if finals then finals[ball]=e.p end return end
-		-- Equal-mass elastic transfer = the game's own guideline EXACTLY (verified
-		-- against the decompiled GuidelinesRunner): the object ball leaves straight
-		-- along the line of centres at sI*cosθ, and the striker deflects along the
-		-- PURE TANGENT (the 90° rule) at sI*sinθ. The old model bent the striker
-		-- off the 90° line by folding a line-of-centres term in (because ballRest<1),
-		-- which is the single biggest reason the white's path looked wrong.
-		local vObj  = sI * along * PHYS.ballRest         -- ballRest≈1 (tiny inelastic loss only)
-		local vTang = sI * math.sqrt(math.max(0, 1 - along*along))
-		local nSnap = {}; for k,v in pairs(snap) do nSnap[k]=v end
-		nSnap[e.ball] = objPos + cl*0.05                 -- nudge so the striker can't re-hit it
-		if vObj > PHYS.minSpeed then
-			simulate(e.ball, objPos, cl, vObj, depth+1, nSnap, false, segs, pT, ctx, finals)
+		local along = dir:Dot(cl)
+		if along < 0 then if finals then finals[ball]=e.p end return end
+		local restE = PHYS.ballRest
+		local va_along = sI * along
+		local va_after = (1 - restE) / 2 * va_along
+		local vb_after = (1 + restE) / 2 * va_along
+		local va_tang  = sI * math.sqrt(math.max(0, 1 - along*along)) * PHYS.cueTangKeep
+		local rawTang = dir - cl*along
+		local tangDir = (rawTang.Magnitude > 1e-4) and rawTang.Unit or Vector3.zero
+		local objDir = cl
+		local th = throwAngle(along)
+		if th > 1e-4 and tangDir.Magnitude > 0.5 then
+			local rot = cl*math.cos(th) + tangDir*math.sin(th)
+			if rot.Magnitude > 1e-4 then objDir = rot.Unit end
+		end
+		local savedBall = snap[e.ball]
+		snap[e.ball] = objPos + cl*0.02
+		if vb_after > PHYS.minSpeed then
+			simulate(e.ball, objPos, objDir, vb_after, depth+1, snap, false, segs, pT, ctx, finals)
 		elseif finals then finals[e.ball] = objPos end
-		if vTang > PHYS.minSpeed then
-			local rawTang = dir - cl*along                -- component of travel ⟂ to line of centres
-			if rawTang.Magnitude > 1e-4 then
-				simulate(ball, e.p, rawTang.Unit, vTang, depth+1, nSnap, isCue, segs, pT, ctx, finals)
+		local cueNewSp = math.sqrt(va_after*va_after + va_tang*va_tang)
+		if cueNewSp > PHYS.minSpeed then
+			local cueNewDir = cl*va_after + tangDir*va_tang
+			if cueNewDir.Magnitude > 1e-4 then
+				simulate(ball, e.p, cueNewDir.Unit, cueNewSp, depth+1, snap, isCue, segs, pT, ctx, finals)
 			elseif finals then finals[ball] = e.p end
 		elseif finals then finals[ball] = e.p end
+		snap[e.ball] = savedBall
 	end
 end
 
 -- ============ live prediction render ============
+local __lastWarnT = 0
+local function poolWarn(e)
+	local t = os.clock()
+	if t - __lastWarnT > 1 then __lastWarnT = t; warn("[Pred v12] loop error: " .. tostring(e)) end
+end
+local lastDir, lastPower, lastPredHash = nil, -1, nil
 local predConn = rsv.RenderStepped:Connect(function()
-	resetPool(); clearHL()
-	if not pickUserTable() then return end
-	if not (userBalls and userBalls.Parent) then return end
+	local __ok, __e = pcall(function()
+	if not pickUserTable() then resetPool(); clearHL(); return end
+	if not (userBalls and userBalls.Parent) then resetPool(); clearHL(); return end
 	local cb = userBalls:FindFirstChild("Cue")
-	if not cb then return end
+	if not cb then resetPool(); clearHL(); return end
 	local dir = getAimDir(cb)
-	if not dir or dir.Magnitude < 0.5 then return end
+	if not dir or dir.Magnitude < 0.5 then resetPool(); clearHL(); return end
 	dir = dir.Unit
 	local power = readPower()
+	-- Dirty-state gate: when the aim, power and table layout are all unchanged the
+	-- last frame's drawing is still valid, so skip the whole simulate+redraw (and
+	-- crucially do NOT clear the pool, leaving the existing guideline on screen).
+	local h = ballHashQuick()
+	if lastDir and h == lastPredHash and math.abs(power - lastPower) < 0.05 and dir:Dot(lastDir) > 0.99995 then
+		return
+	end
+	lastDir, lastPower, lastPredHash = dir, power, h
+	resetPool(); clearHL()
 	local v0 = shotPhysics(power)
 	-- Ensure we always have enough speed to draw at least the first segment,
 	-- even when the player is still at minimum power.
@@ -792,6 +945,8 @@ local predConn = rsv.RenderStepped:Connect(function()
 	for ball, k in pairs(pocket) do
 		getHL(ball, k == "scratch" and C.COL_SCRATCH or C.COL_POCKET)
 	end
+	end)
+	if not __ok then poolWarn(__e) end
 end)
 
 -- ============ best-shot evaluation ============
@@ -872,7 +1027,7 @@ end
 -- Position ("leave") quality after a shot: reward a cue resting spot that has a
 -- clean look at my remaining balls (each with a clear line to a pocket); penalise
 -- ending buried on a rail. Cheap heuristic used only on the final candidates.
-local function leaveScore(cueFinal, snap, sunkSet, rule)
+local function leaveScore(cueFinal, snap, sunkSet, rule, forceEight)
 	if not cueFinal then return 0 end
 	local railPen = 0
 	if userBounds then
@@ -882,7 +1037,7 @@ local function leaveScore(cueFinal, snap, sunkSet, rule)
 			railPen = -1.5
 		end
 	end
-	local onEight = (rule ~= "" and myBallsLeft(snap, rule) == 0)
+	local onEight = forceEight or (rule ~= "" and myBallsLeft(snap, rule) == 0)
 	local makeable = 0
 	for ball, bp in pairs(snap) do
 		local isTarget = (onEight and ball.Name == "8") or (not onEight and isMy(ball.Name, rule))
@@ -898,8 +1053,16 @@ end
 -- Best/placement info is shown in the side HUD panel (assigned where the HUD is
 -- built, below) — never as floating text on the table.
 local setHudInfo
+local refreshShotList
+local toggleLegend
+-- Aim fine-tune offset (degrees) applied on top of the chosen shot's direction
+-- in applyAutoAim. Declared here so both recompute() (which resets it) and
+-- applyAutoAim() (far below, in the auto-aim section) share the same upvalue.
+local aimOffsetDeg = 0
 
-local bestState = {enabled=true, parts={}, lastCompute=0, current=nil}
+local bestState = {enabled=true, parts={}, lastCompute=0, current=nil, list={}, selIdx=1, safetyEnabled=true}
+local lastBestHash = nil   -- layout fingerprint at last recompute() (best-shot solver)
+local lastPlaceHash = nil  -- layout fingerprint at last recomputePlacement()
 local function getBP(idx, c)
 	if not bestState.parts[idx] then
 		local p = Instance.new("Part")
@@ -918,6 +1081,118 @@ local function clearBP() for _,p in ipairs(bestState.parts) do p.Transparency = 
 --   2) Brute-force angle grid — catches combos, banked, and clearance shots
 --      the geometric step doesn't consider.
 --   3) Refine the top candidate with progressively finer angle/power grids.
+local function aimToSend(cuePos, ballPos, targetDir)
+	if targetDir.Magnitude < 1e-4 then return nil end
+	targetDir = targetDir.Unit
+	local R2 = 2 * C.BALL_R
+	local ghost = ballPos - targetDir * R2
+	local toGhost = Vector3.new(ghost.X - cuePos.X, 0, ghost.Z - cuePos.Z)
+	if toGhost.Magnitude < 0.5 then return nil end
+	local dir = toGhost.Unit
+	local along = dir:Dot(targetDir)
+	if along > 0.05 then
+		local th = throwAngle(along)
+		if th > 1e-4 then
+			local rawTang = dir - targetDir*along
+			if rawTang.Magnitude > 1e-4 then
+				local tang = rawTang.Unit
+				local cl2 = targetDir*math.cos(th) - tang*math.sin(th)
+				if cl2.Magnitude > 1e-4 then
+					cl2 = cl2.Unit
+					local ghost2 = ballPos - cl2*R2
+					local tg2 = Vector3.new(ghost2.X - cuePos.X, 0, ghost2.Z - cuePos.Z)
+					if tg2.Magnitude > 0.5 then dir = tg2.Unit end
+				end
+			end
+		end
+	end
+	return dir
+end
+local function detectBreak(snap)
+	local n, minx, maxx, minz, maxz = 0, math.huge, -math.huge, math.huge, -math.huge
+	for ball, bp in pairs(snap) do
+		if ball.Name ~= "Cue" and tonumber(ball.Name) then
+			n = n + 1
+			minx = math.min(minx, bp.X); maxx = math.max(maxx, bp.X)
+			minz = math.min(minz, bp.Z); maxz = math.max(maxz, bp.Z)
+		end
+	end
+	if n < 14 then return false end
+	return math.max(maxx - minx, maxz - minz) < 6
+end
+local function breakShot(cb, cp, snap)
+	local cx, cz, n = 0, 0, 0
+	for ball, bp in pairs(snap) do
+		if ball.Name ~= "Cue" and tonumber(ball.Name) then cx = cx + bp.X; cz = cz + bp.Z; n = n + 1 end
+	end
+	if n == 0 then return nil end
+	cx, cz = cx / n, cz / n
+	local base = Vector3.new(cx - cp.X, 0, cz - cp.Z)
+	if base.Magnitude < 0.5 then return nil end
+	base = base.Unit
+	for _, off in ipairs({0, -3, 3, -6, 6}) do
+		local r = math.rad(off)
+		local d = Vector3.new(base.X*math.cos(r) - base.Z*math.sin(r), 0, base.X*math.sin(r) + base.Z*math.cos(r))
+		local pocket = {}
+		simulate(cb, cp, d, shotPhysics(21), 0, snap, true, nil, pocket, {}, {})
+		if pocket[cb] ~= "scratch" then
+			return { dir = d, power = 21, sunk = 0, score = 1, ["break"] = true,
+			         angle = math.deg(math.atan2(d.Z, d.X)) }
+		end
+	end
+	return nil
+end
+local function safetyScore(cueFinal, snap, rule)
+	local reach, nearestOpp = 0, math.huge
+	for ball, bp in pairs(snap) do
+		if ball.Name ~= "Cue" and isOpp(ball.Name, rule) then
+			local dist = (Vector3.new(cueFinal.X - bp.X, 0, cueFinal.Z - bp.Z)).Magnitude
+			if dist < nearestOpp then nearestOpp = dist end
+			if pathClear(cueFinal, bp, snap, nil, ball) then reach = reach + 1 end
+		end
+	end
+	local railBonus = 0
+	if userBounds then
+		local m = 0.5
+		if (cueFinal.X - userBounds.xMin) < m or (userBounds.xMax - cueFinal.X) < m
+		   or (cueFinal.Z - userBounds.zMin) < m or (userBounds.zMax - cueFinal.Z) < m then railBonus = 1.0 end
+	end
+	if nearestOpp == math.huge then nearestOpp = 0 end
+	return -reach * 3 + math.min(nearestOpp, 20) * 0.1 + railBonus
+end
+local function findSafety()
+	if not pickUserTable() then return nil end
+	local cb = userBalls:FindFirstChild("Cue"); if not cb then return nil end
+	local cp = cb.Position
+	local snap = snapshotBalls()
+	local rule = guideMod.Rule or ""
+	local onEight = (rule ~= "" and myBallsLeft(snap, rule) == 0)
+	local best = { score = -math.huge }
+	for ang = 0, 359, 6 do
+		local r = math.rad(ang)
+		local d = Vector3.new(math.cos(r), 0, math.sin(r))
+		for _, p in ipairs({4, 7, 10}) do
+			local pocket, ctx, finals = {}, { firstHit = nil }, {}
+			simulate(cb, cp, d, shotPhysics(p), 0, snap, true, nil, pocket, ctx, finals)
+			local legal = false
+			if ctx.firstHit then
+				local fh = ctx.firstHit.Name
+				if onEight then legal = (fh == "8") else legal = not (isOpp(fh, rule) or fh == "8") end
+			end
+			local scratched = pocket[cb] == "scratch"
+			if legal and not scratched and (ctx.railTouched or next(pocket) ~= nil) then
+				local cueFinal = finals[cb] or cp
+				local sc = safetyScore(cueFinal, snap, rule)
+				if sc > best.score then
+					best = { score = sc, dir = d, power = p, cueFinal = cueFinal, safety = true, sunk = 0,
+					         angle = math.deg(math.atan2(d.Z, d.X)) }
+				end
+			end
+		end
+	end
+	if best.score == -math.huge then return nil end
+	return best
+end
 local function findBest(ultraPrecise)
 	if not pickUserTable() then return nil end
 	local cb = userBalls:FindFirstChild("Cue"); if not cb then return nil end
@@ -925,13 +1200,23 @@ local function findBest(ultraPrecise)
 	local snap = snapshotBalls()
 	local rule = guideMod.Rule or ""
 	local best = {score = -math.huge}
+	bestState.list = {}
+	if detectBreak(snap) then
+		local bs = breakShot(cb, cp, snap)
+		if bs then bestState.list = { bs }; bestState.selIdx = 1; return bs end
+	end
 
 	-- helper to evaluate and track best. Every shot that pots at least one of
 	-- my balls is also kept as a candidate; after the search we re-rank the top
 	-- ones by aim-robustness so a reliable fat shot beats a razor-thin cut that
 	-- merely tied on raw score.
 	local cands = {}
+	local evalN = 0
 	local function tryShot(d, p, src)
+		-- hard budget so one findBest can never explode (and freeze the client),
+		-- whatever generators/flags are on. Refinement/re-rank run after this.
+		evalN = evalN + 1
+		if evalN > (C.SEARCH.MAX_EVALS or 1400) then return end
 		local s, pk, sk = evalShot(cb, cp, d, p, snap, rule)
 		if s > best.score then
 			best = {score=s, dir=d, power=p, pocketed=pk, sunk=sk,
@@ -963,6 +1248,7 @@ local function findBest(ultraPrecise)
 					local cueToGhostLen = cueToGhost.Magnitude
 					if cueToGhostLen > 0.5 then
 						local dir = cueToGhost.Unit
+						dir = aimToSend(cp, bp, toPocketDir) or dir
 						-- Required object-ball launch speed to reach pocket:
 						--   vB0² = 2·K·toPocketLen  → vB0 = sqrt(2K·D)
 						-- Plus comfort margin so the ball clearly enters the pocket.
@@ -980,6 +1266,91 @@ local function findBest(ultraPrecise)
 							tryShot(dir, math.min(21, p_needed + 2.5), "ghost+")
 						end
 						ghostCount = ghostCount + 1
+					end
+				end
+			end
+		end
+	end
+
+	-- --- (1b) SHOT-TYPE GENERATORS (combo / bank / kick) ---
+	local function powerForDist(D, bounces)
+		local v = math.sqrt(2 * Kref * D) + 3
+		if bounces and bounces > 0 then v = v / (math.max(0.4, CAL.cushionRest) ^ bounces) end
+		return clamp((v - CAL.powB) / math.max(0.1, CAL.powA), 6, 21)
+	end
+	-- combos/banks/kicks are O(myballs²·pockets) and explode on a crowded/just-broken
+	-- rack (with no group assigned, isMy matches all 15 balls). They matter mainly in
+	-- the endgame, so HARD-skip them when many target balls remain — this guard is what
+	-- keeps a single findBest from freezing the client. (They are also off by default.)
+	local myCount = 0
+	for _b, _ in pairs(snap) do if _b ~= cb and isMy(_b.Name, rule) then myCount = myCount + 1 end end
+	local deepOK = myCount <= (C.SEARCH.MAX_BALLS or 6)
+	if C.SEARCH.COMBO and deepOK then
+		for ballA, posA in pairs(snap) do
+			if ballA ~= cb and isMy(ballA.Name, rule) then
+				for ballB, posB in pairs(snap) do
+					if ballB ~= cb and ballB ~= ballA and isMy(ballB.Name, rule) then
+						for _, pp in ipairs(userPockets or {}) do
+							local toP = Vector3.new(pp.X - posB.X, 0, pp.Z - posB.Z)
+							if toP.Magnitude > 0.5 then
+								local tpd = toP.Unit
+								local ghostB = Vector3.new(posB.X - tpd.X*2*R, posB.Y, posB.Z - tpd.Z*2*R)
+								local aToB = Vector3.new(ghostB.X - posA.X, 0, ghostB.Z - posA.Z)
+								if aToB.Magnitude > 0.5 then
+									local aToBdir = aToB.Unit
+									local pPos = Vector3.new(pp.X, posB.Y, pp.Z)
+									if pathClear(posA, ghostB, snap, ballA, ballB)
+									   and pathClear(posB, pPos, snap, ballB, nil) then
+										local dir = aimToSend(cp, posA, aToBdir)
+										if dir and aToBdir:Dot(tpd) > 0.35 and dir:Dot(aToBdir) > 0.35 then
+											local Dtot = toP.Magnitude + aToB.Magnitude
+												+ (Vector3.new(posA.X-cp.X,0,posA.Z-cp.Z)).Magnitude
+											tryShot(dir, powerForDist(Dtot, 0), "combo")
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	local function mirror(pt, axis, c)
+		if axis == "x" then return Vector3.new(2*c - pt.X, pt.Y, pt.Z)
+		else return Vector3.new(pt.X, pt.Y, 2*c - pt.Z) end
+	end
+	if userBounds and deepOK and (C.SEARCH.BANK or C.SEARCH.KICK) then
+		local rails = { {"x", userBounds.xMin}, {"x", userBounds.xMax},
+		                {"z", userBounds.zMin}, {"z", userBounds.zMax} }
+		for ball, bp in pairs(snap) do
+			if ball ~= cb and isMy(ball.Name, rule) then
+				for _, pp in ipairs(userPockets or {}) do
+					local pPos = Vector3.new(pp.X, bp.Y, pp.Z)
+					if C.SEARCH.BANK then
+						for _, rl in ipairs(rails) do
+							local Pm = mirror(pPos, rl[1], rl[2])
+							local aim = Vector3.new(Pm.X - bp.X, 0, Pm.Z - bp.Z)
+							if aim.Magnitude > 0.5 then
+								local dir = aimToSend(cp, bp, aim.Unit)
+								if dir then tryShot(dir, powerForDist(aim.Magnitude, 1), "bank") end
+							end
+						end
+					end
+					if C.SEARCH.KICK then
+						local toP = Vector3.new(pp.X - bp.X, 0, pp.Z - bp.Z)
+						if toP.Magnitude > 0.5 then
+							local tpd = toP.Unit
+							local ghostA = Vector3.new(bp.X - tpd.X*2*R, bp.Y, bp.Z - tpd.Z*2*R)
+							for _, rl in ipairs(rails) do
+								local Gm = mirror(ghostA, rl[1], rl[2])
+								local cd = Vector3.new(Gm.X - cp.X, 0, Gm.Z - cp.Z)
+								if cd.Magnitude > 0.5 then
+									local D = (Vector3.new(ghostA.X-cp.X,0,ghostA.Z-cp.Z)).Magnitude + toP.Magnitude
+									tryShot(cd.Unit, powerForDist(D, 1), "kick")
+								end
+							end
+						end
 					end
 				end
 			end
@@ -1038,69 +1409,201 @@ local function findBest(ultraPrecise)
 				if da < 0.6 and math.abs(c.power - d.power) < 0.6 then dup = true; break end
 			end
 			if not dup then distinct[#distinct+1] = c end
-			if #distinct >= 10 then break end
+			if #distinct >= 6 then break end
 		end
 		local probes = {-1.2, -0.8, -0.4, 0.4, 0.8, 1.2}  -- degrees of aim error
 		local bestC, bestCombined = nil, -math.huge
 		for _,c in ipairs(distinct) do
-			local ok = 0
+			local ok, scr, foul = 0, 0, 0
 			for _,deg in ipairs(probes) do
 				local r = math.rad(deg)
 				local cr, sr = math.cos(r), math.sin(r)
 				local rd = Vector3.new(c.dir.X*cr - c.dir.Z*sr, 0, c.dir.X*sr + c.dir.Z*cr)
-				local s2, _, sk2 = evalShot(cb, cp, rd, c.power, snap, rule)
+				local s2, pk2, sk2 = evalShot(cb, cp, rd, c.power, snap, rule)
 				if s2 > 0 and sk2 and sk2 >= 1 then ok = ok + 1 end
+				if s2 <= -20 then foul = foul + 1 end
+				if pk2 then for _,k in pairs(pk2) do if k == "scratch" then scr = scr + 1; break end end end
 			end
-			c.robust = ok / #probes
+			local nP = #probes
+			c.robust   = ok / nP
+			c.makePct  = c.robust
+			c.pScratch = scr / nP
+			c.pFoul    = foul / nP
 			-- Position play: where does the cue come to rest, and does that leave
 			-- a clean look at my next ball(s)? A modest tie-breaker between pots.
 			local finals2, pocket2 = {}, {}
 			simulate(cb, cp, c.dir, shotPhysics(c.power), 0, snap, true, nil, pocket2, {}, finals2)
 			local sunkSet = {}
 			for ball,k in pairs(pocket2) do if k == "pocket" then sunkSet[ball] = true end end
-			c.leave = leaveScore(finals2[cb], snap, sunkSet, rule)
+			local sunkMy = 0
+			for _b, _k in pairs(pocket2) do if _k == "pocket" and isMy(_b.Name, rule) then sunkMy = sunkMy + 1 end end
+			local forceEight = (rule ~= "" and (myBallsLeft(snap, rule) - sunkMy) <= 0)
+			c.leave = leaveScore(finals2[cb], snap, sunkSet, rule, forceEight)
 			-- A fully aim-tolerant shot gains +12 — enough to outrank a fragile
 			-- equal-score cut, while still respecting how many balls it pots; the
-			-- leave score then breaks ties toward better position.
-			local combined = c.score + c.robust * 12 + c.leave
+			-- leave score then breaks ties toward better position. Scratch/foul
+			-- probabilities (from the aim-error probes) now dock the shot directly.
+			c.ev = (c.sunk or 1) * c.robust * (1 - c.pScratch) * (1 + 0.15 * math.min((c.leave or 0), 3.6)/3.6)
+			       - c.pScratch * 0.8 - c.pFoul * 0.6
+			local combined = c.score + c.robust * 12 + (c.leave or 0) - c.pScratch * 6 - c.pFoul * 4
+				+ (forceEight and (c.leave > 0 and 4 or -2) or 0)
 			if combined > bestCombined then bestCombined = combined; bestC = c end
+			c.combined = combined
 		end
 		if bestC then bestC.score = bestCombined; best = bestC end
+		if bestC then
+			local f2, pk2 = {}, {}
+			simulate(cb, cp, bestC.dir, shotPhysics(bestC.power), 0, snap, true, nil, pk2, {}, f2)
+			local cueAfter = f2[cb]
+			if cueAfter then
+				local snap2 = {}; for k, v in pairs(snap) do snap2[k] = v end
+				for b, k in pairs(pk2) do if k == "pocket" then snap2[b] = nil end end
+				snap2[cb] = cueAfter
+				local nextMakeable = 0
+				for ball, bp in pairs(snap2) do
+					if ball ~= cb and isMy(ball.Name, rule) then
+						for _, pp in ipairs(userPockets or {}) do
+							if pathClear(bp, Vector3.new(pp.X, bp.Y, pp.Z), snap2, ball, nil)
+							   and pathClear(cueAfter, bp, snap2, cb, ball) then
+								nextMakeable = nextMakeable + 1; break
+							end
+						end
+					end
+				end
+				bestC.next2 = nextMakeable
+				bestC.score = bestC.score + math.min(nextMakeable, 2) * 0.6
+			end
+		end
+		table.sort(distinct, function(a,b) return (a.combined or a.score) > (b.combined or b.score) end)
+		bestState.list = {}
+		for _,c in ipairs(distinct) do
+			bestState.list[#bestState.list+1] = c
+			if #bestState.list >= 6 then break end
+		end
+		bestState.selIdx = 1
 	end
 	return best
 end
 local function renderBest(best)
 	-- Only ever show a best shot that actually pots one of MY balls (sunk >= 1).
 	-- No pot found → hide entirely instead of pointing the cue at a cushion.
-	if not bestState.enabled or not best or best.score <= 0 or (best.sunk or 0) < 1 then
+	if not bestState.enabled or not best
+	   or (not best.safety and not best["break"] and (best.score <= 0 or (best.sunk or 0) < 1)) then
 		clearBP(); if setHudInfo then setHudInfo(nil) end
+		if makeTagLabel then makeTagLabel.Text = "" end
+		if makeTagPart then makeTagPart.Transparency = 1 end
+		if pocketMarker then pocketMarker.Transparency = 1 end
 		_G.__POOL_PRED_BEST = nil; bestState.current = nil; return
 	end
 	local cb = userBalls:FindFirstChild("Cue"); if not cb then return end
-	local segs, pocket, ctx = {}, {}, {}
-	simulate(cb, cb.Position, best.dir, shotPhysics(best.power), 0, snapshotBalls(), true, segs, pocket, ctx, nil)
+	local segs, pocket, ctx, finals = {}, {}, {}, {}
+	simulate(cb, cb.Position, best.dir, shotPhysics(best.power), 0, snapshotBalls(), true, segs, pocket, ctx, finals)
+	-- Normal best-shot colour is shaded by make-%: high → gold, low → hot red, with
+	-- a touch more transparency on weak shots. Safety keeps its dedicated orange.
+	local isNormal = (not best.safety) and (not best["break"])
+	local mp = best.makePct
+	local tubeTransp = 0.05
+	local col
+	if best.safety then
+		col = Color3.fromRGB(255,150,40)
+	elseif isNormal and mp ~= nil then
+		local t = clamp(mp, 0, 1)
+		col = C.COL_BEST:Lerp(Color3.fromRGB(255,80,40), 1 - t)
+		tubeTransp = clamp(0.05 + (1 - t) * 0.30, 0.05, 0.4)
+	else
+		col = C.COL_BEST
+	end
 	local idx = 0
 	for _,s in ipairs(segs) do
 		local show = s.isCue or pocket[s.ball] or not C.FILTER_NON_POCKETED
 		if show then
 			idx = idx + 1
-			local p = getBP(idx, C.COL_BEST)
+			local p = getBP(idx, col)
+			p.Transparency = tubeTransp
 			setTube(p, s.p1, s.p2, 0.22)
 		end
 	end
 	for i = idx+1, #bestState.parts do bestState.parts[i].Transparency = 1 end
+	-- (a) make-% billboard + (c) target-pocket highlight (off the per-frame path).
+	do
+		-- locate the potted object ball (first non-cue ball flagged as a pot)
+		local potInst
+		for ball, k in pairs(pocket) do
+			if k == "pocket" and ball ~= cb then potInst = ball; break end
+		end
+		if isNormal and mp ~= nil then
+			local part, lbl = getMakeTag()
+			local anchorPos = (potInst and finals[potInst]) or finals[cb]
+				or (cb.Position + best.dir * 2)
+			part.CFrame = CFrame.new(anchorPos.X, anchorPos.Y, anchorPos.Z)
+			part.Transparency = 1   -- anchor stays invisible; only the label shows
+			lbl.Text = string.format("%d%%", math.floor(clamp(mp, 0, 1) * 100))
+			lbl.TextColor3 = (mp >= 0.7 and Color3.fromRGB(60,235,90))
+				or (mp >= 0.4 and Color3.fromRGB(255,205,60))
+				or Color3.fromRGB(255,70,70)
+		else
+			if makeTagLabel then makeTagLabel.Text = "" end
+			if makeTagPart then makeTagPart.Transparency = 1 end
+		end
+		-- target-pocket neon marker
+		local potPocket = potInst and finals[potInst] and endpointInPocket(finals[potInst])
+		if potPocket then
+			local pm = getPocketMarker()
+			pm.Transparency = 0.2
+			pm.CFrame = CFrame.new(potPocket.X, potPocket.Y, potPocket.Z)
+		elseif pocketMarker then
+			pocketMarker.Transparency = 1
+		end
+	end
 	if setHudInfo then
-		-- %.0f (not %d): best.power can be fractional and Luau's %d errors on that.
-		setHudInfo(string.format("BEST: Power %.0f · Sink %d", best.power, best.sunk or 0))
+		if best.safety then
+			setHudInfo(string.format("SAFETY: Power %.0f · no clean pot", best.power))
+		elseif best["break"] then
+			setHudInfo(string.format("BREAK: Power %.0f", best.power))
+		else
+			setHudInfo(string.format("BEST: Power %.0f · Sink %d · %d%% make",
+				best.power, best.sunk or 0, math.floor((best.makePct or 0) * 100)))
+		end
 	end
 	bestState.current = best
 	_G.__POOL_PRED_BEST = best
 end
-local function recompute() bestState.lastCompute = tick(); local b = findBest(); if b then renderBest(b) end end
+local function selectedShot()
+	local L = bestState.list
+	if not L or #L == 0 then return nil end
+	local i = math.max(1, math.min(bestState.selIdx or 1, #L))
+	return L[i]
+end
+local function renderSelected()
+	local sel = selectedShot()
+	if sel then renderBest(sel) end
+	if refreshShotList then refreshShotList() end
+end
+local function recompute()
+	aimOffsetDeg = 0
+	lastBestHash = ballHashQuick()
+	bestState.lastCompute = tick()
+	local b = findBest()
+	local sel = selectedShot()
+	if sel then
+		renderBest(sel)
+	elseif b and (b["break"] or (b.score > 0 and (b.sunk or 0) >= 1)) then
+		renderBest(b)
+	else
+		local alt = (bestState.safetyEnabled ~= false) and findSafety() or nil
+		renderBest(alt or b)
+	end
+	if refreshShotList then refreshShotList() end
+end
 local autoBest = rsv.Heartbeat:Connect(function()
+	local __ok, __e = pcall(function()
 	if not bestState.enabled then return end
 	if tick() - bestState.lastCompute < C.BEST_INTERVAL then return end
+	local h = ballHashQuick()
+	if bestState.current and h == lastBestHash then bestState.lastCompute = tick(); return end
 	recompute()
+	end)
+	if not __ok then poolWarn(__e) end
 end)
 
 -- ============ ball-in-hand placement finder ============
@@ -1232,22 +1735,35 @@ local function recomputePlacement()
 	renderPlacement(findBestPlacement())
 end
 local autoPlace = rsv.Heartbeat:Connect(function()
+	local __ok, __e = pcall(function()
 	if not placeState.enabled then return end
 	if tick() - placeState.lastCompute < C.PLACE_INTERVAL then return end
+	local h = ballHashQuick()
+	if placeState.current and h == lastPlaceHash then placeState.lastCompute = tick(); return end
+	lastPlaceHash = h
 	recomputePlacement()
+	end)
+	if not __ok then poolWarn(__e) end
 end)
 
 -- ============ auto-aim ============
 local autoAimEnabled = false
 _G.__POOL_PRED_AIM_ON = false
+local AIM_FIELD_NAMES = {"AimNormal","AimDirection","ShotDirection","ShotNormal"}
 local function applyAutoAim()
+	local __ok, __e = pcall(function()
 	if not autoAimEnabled then return end
 	local best = _G.__POOL_PRED_BEST
 	if not best or best.score <= 0 then return end
 	if not (userBalls and userBalls.Parent) then return end
 	local cb = userBalls:FindFirstChild("Cue")
 	if not cb then return end
-	local dir = best.dir.Unit
+	local bdir = best.dir.Unit
+	if aimOffsetDeg ~= 0 then
+		local r = math.rad(aimOffsetDeg); local cr, sr = math.cos(r), math.sin(r)
+		bdir = Vector3.new(bdir.X*cr - bdir.Z*sr, 0, bdir.X*sr + bdir.Z*cr)
+	end
+	local dir = bdir
 	local ballPos = cb.Position
 	-- Force the shot direction for BOTH input paths the game uses
 	-- (GameRunnerClient): mouse fires FireServer(MouseNormal.Unit*-1, power) so
@@ -1255,7 +1771,7 @@ local function applyAutoAim()
 	-- so travel = toward TouchHit. Setting both makes the ball go along `dir`.
 	pcall(function() guideMod.MouseNormal = -dir end)
 	pcall(function() guideMod.TouchHit = ballPos + dir * 10 end)
-	for _,name in ipairs({"AimNormal","AimDirection","ShotDirection","ShotNormal"}) do
+	for _,name in ipairs(AIM_FIELD_NAMES) do
 		pcall(function()
 			if typeof(guideMod[name]) == "Vector3" then guideMod[name] = -dir end
 		end)
@@ -1271,9 +1787,11 @@ local function applyAutoAim()
 	end
 	-- Cache so the live predictor (getAimDir) immediately reflects the override.
 	lastAimDir = dir; lastAimDirT = tick()
+	end)
+	if not __ok then poolWarn(__e) end
 end
 rsv:BindToRenderStep("PoolAimOverride", Enum.RenderPriority.Last.Value + 1, applyAutoAim)
-local autoAimHB = rsv.Heartbeat:Connect(applyAutoAim)
+local autoAimHB = nil  -- (removed redundant Heartbeat copy; RenderStep at Last+1 wins the frame)
 
 -- ============ HUD ============
 local hudVisible = true
@@ -1313,6 +1831,109 @@ setHudInfo = function(text)
 	infoLine.Text = text or ""
 end
 
+-- ===== draggable + collapsible main HUD =====
+-- Collapse button shrinks the panel to just its title bar; the title doubles as
+-- a drag handle (touch-friendly, so it works on iOS). No render loop — purely
+-- the GUI objects' own input events.
+local hudOrigSize = frame.Size
+local hudCollapsed = false
+local collapseBtn = Instance.new("TextButton")
+collapseBtn.Name = "Collapse"
+collapseBtn.Size = UDim2.new(0,20,0,20); collapseBtn.Position = UDim2.new(1,-22,0,0)
+collapseBtn.BackgroundColor3 = Color3.fromRGB(40,40,50); collapseBtn.BackgroundTransparency = 0.2
+collapseBtn.BorderSizePixel = 0; collapseBtn.AutoButtonColor = true
+collapseBtn.Font = Enum.Font.GothamBold; collapseBtn.TextSize = 16
+collapseBtn.TextColor3 = Color3.fromRGB(230,230,235); collapseBtn.Text = "_"
+collapseBtn.ZIndex = 3; collapseBtn.Parent = frame
+local cbCor = Instance.new("UICorner"); cbCor.CornerRadius = UDim.new(0,4); cbCor.Parent = collapseBtn
+collapseBtn.MouseButton1Click:Connect(function()
+	hudCollapsed = not hudCollapsed
+	if hudCollapsed then
+		frame.Size = UDim2.new(0,270,0,28)
+		infoLine.Visible = false; body.Visible = false; aimLine.Visible = false
+	else
+		frame.Size = hudOrigSize
+		infoLine.Visible = true; body.Visible = true; aimLine.Visible = true
+	end
+end)
+
+do  -- scope drag locals (keeps them out of the 200-local main-chunk budget)
+local dragging, dragStart, startPos
+title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true; dragStart = input.Position; startPos = frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+title.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local d = input.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+	end
+end)
+end
+
+-- ============ ranked shot-list panel ============
+-- A compact board listing the top candidate shots from findBest's re-rank.
+-- [ ] cycle through them; clicking a row selects it. Sits just below the HUD.
+local shotFrame = Instance.new("Frame")
+shotFrame.Name = "ShotList"
+shotFrame.Position = UDim2.new(0, 10, 0.5, 72); shotFrame.Size = UDim2.new(0, 270, 0, 150)
+shotFrame.BackgroundColor3 = Color3.fromRGB(18,18,24); shotFrame.BackgroundTransparency = 0.15
+shotFrame.BorderSizePixel = 0; shotFrame.Visible = false; shotFrame.Parent = sg
+local sfcor = Instance.new("UICorner"); sfcor.CornerRadius = UDim.new(0,8); sfcor.Parent = shotFrame
+local sfstr = Instance.new("UIStroke"); sfstr.Thickness = 1; sfstr.Color = Color3.fromRGB(70,70,85); sfstr.Parent = shotFrame
+local sfTitle = Instance.new("TextLabel")
+sfTitle.BackgroundTransparency = 1; sfTitle.Position = UDim2.new(0,8,0,4); sfTitle.Size = UDim2.new(1,-16,0,16)
+sfTitle.Font = Enum.Font.GothamBold; sfTitle.TextSize = 12; sfTitle.TextXAlignment = Enum.TextXAlignment.Left
+sfTitle.TextColor3 = Color3.fromRGB(150,150,160); sfTitle.Text = "SHOTS  ([ ] cycle)"; sfTitle.Parent = shotFrame
+local shotRows = {}
+for i = 1, 6 do
+	local row = Instance.new("TextButton")
+	row.Name = "Row"..i
+	row.Position = UDim2.new(0,6,0,20 + (i-1)*21); row.Size = UDim2.new(1,-12,0,21)
+	row.BackgroundColor3 = Color3.fromRGB(18,18,24); row.BackgroundTransparency = 0.2
+	row.BorderSizePixel = 0; row.AutoButtonColor = false
+	row.Font = Enum.Font.Code; row.TextSize = 13; row.TextXAlignment = Enum.TextXAlignment.Left
+	row.TextColor3 = Color3.fromRGB(220,220,225); row.Text = ""; row.Visible = false
+	row.Parent = shotFrame
+	local rcor = Instance.new("UICorner"); rcor.CornerRadius = UDim.new(0,4); rcor.Parent = row
+	local idx = i
+	row.MouseButton1Click:Connect(function()
+		bestState.selIdx = idx
+		renderSelected()
+	end)
+	shotRows[i] = row
+end
+refreshShotList = function()
+	if (not bestState.enabled) or (#bestState.list == 0) then
+		shotFrame.Visible = false; return
+	end
+	shotFrame.Visible = true
+	for i = 1, 6 do
+		local sh = bestState.list[i]
+		local row = shotRows[i]
+		if sh then
+			row.Visible = true
+			local tag = (sh.sunk and sh.sunk > 0) and ("pot"..sh.sunk) or (sh.safety and "safe" or "·")
+			row.Text = string.format("#%d  %d%%  P%.0f  %s",
+				i, math.floor((sh.makePct or 0)*100), sh.power, tag)
+			if i == bestState.selIdx then
+				row.BackgroundColor3 = C.COL_BEST; row.BackgroundTransparency = 0.05
+				row.TextColor3 = Color3.fromRGB(20,20,20)
+			else
+				row.BackgroundColor3 = Color3.fromRGB(18,18,24); row.BackgroundTransparency = 0.2
+				row.TextColor3 = Color3.fromRGB(220,220,225)
+			end
+		else
+			row.Visible = false
+		end
+	end
+end
+refreshShotList()
+
 local function refreshHUD()
 	frame.Visible = hudVisible
 	if not hudVisible then return end
@@ -1332,6 +1953,53 @@ local function refreshHUD()
 	end
 end
 refreshHUD()
+
+-- ============ hotkey legend overlay (toggle: H / "?" button / MENU) ============
+-- A static cheat-sheet of every control. Built once, parented to sg, hidden by
+-- default; toggleLegend flips its visibility. No render loop.
+local legendFrame = Instance.new("Frame")
+legendFrame.Name = "Legend"
+legendFrame.Position = UDim2.new(0,290,0,8); legendFrame.Size = UDim2.new(0,260,0,150)
+legendFrame.AutomaticSize = Enum.AutomaticSize.Y
+legendFrame.BackgroundColor3 = Color3.fromRGB(12,12,18); legendFrame.BackgroundTransparency = 0.08
+legendFrame.BorderSizePixel = 0; legendFrame.Visible = false; legendFrame.Parent = sg
+local lgCor = Instance.new("UICorner"); lgCor.CornerRadius = UDim.new(0,8); lgCor.Parent = legendFrame
+local lgStr = Instance.new("UIStroke"); lgStr.Thickness = 2; lgStr.Color = C.COL_BEST; lgStr.Parent = legendFrame
+local lgPad = Instance.new("UIPadding")
+lgPad.PaddingLeft = UDim.new(0,12); lgPad.PaddingTop = UDim.new(0,10)
+lgPad.PaddingRight = UDim.new(0,12); lgPad.PaddingBottom = UDim.new(0,10); lgPad.Parent = legendFrame
+local lgList = Instance.new("UIListLayout")
+lgList.SortOrder = Enum.SortOrder.LayoutOrder; lgList.Padding = UDim.new(0,4); lgList.Parent = legendFrame
+local function legendLine(order, txt, col, bold)
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1; t.Size = UDim2.new(1,0,0,16); t.AutomaticSize = Enum.AutomaticSize.Y
+	t.LayoutOrder = order; t.TextWrapped = true
+	t.Font = bold and Enum.Font.GothamBold or Enum.Font.Code
+	t.TextSize = bold and 15 or 13; t.TextXAlignment = Enum.TextXAlignment.Left
+	t.TextColor3 = col or Color3.fromRGB(210,220,228); t.Text = txt; t.Parent = legendFrame
+	return t
+end
+legendLine(1, "CONTROLS (H)", C.COL_BEST, true)
+legendLine(2, "B BestShot · V AutoAim · F AutoFire · G BallInHand")
+legendLine(3, "K CalDetail · C HUD · X ResetCal · H Legend")
+legendLine(4, "[ ] cycle shot  ·  , . aim nudge  ·  / reset aim")
+
+toggleLegend = function() legendFrame.Visible = not legendFrame.Visible end
+
+local legendBtn = Instance.new("TextButton")
+legendBtn.Name = "LegendBtn"
+legendBtn.Position = UDim2.new(1,-34,0,8); legendBtn.Size = UDim2.new(0,26,0,26)
+legendBtn.BackgroundColor3 = Color3.fromRGB(40,40,50); legendBtn.BackgroundTransparency = 0.15
+legendBtn.BorderSizePixel = 0; legendBtn.AutoButtonColor = true
+legendBtn.Font = Enum.Font.GothamBold; legendBtn.TextSize = 16
+legendBtn.TextColor3 = C.COL_BEST; legendBtn.Text = "?"; legendBtn.Parent = sg
+local lgbCor = Instance.new("UICorner"); lgbCor.CornerRadius = UDim.new(0,6); lgbCor.Parent = legendBtn
+local lgbStr = Instance.new("UIStroke"); lgbStr.Thickness = 1; lgbStr.Color = Color3.fromRGB(70,70,85); lgbStr.Parent = legendBtn
+legendBtn.MouseButton1Click:Connect(function() toggleLegend() end)
+
+-- Briefly reveal the legend on load so new users see the controls, then hide.
+legendFrame.Visible = true
+task.delay(6, function() if legendFrame and legendFrame.Parent then legendFrame.Visible = false end end)
 
 -- ============ calibration detail panel (toggle: K) ============
 -- A read-out of EVERYTHING that feeds the calibration: the learned model, how
@@ -1409,7 +2077,10 @@ end
 -- keep the panel live while open (throttled — it's just text)
 local calRefreshT = 0
 local calMenuConn = rsv.Heartbeat:Connect(function()
+	local __ok, __e = pcall(function()
 	if calMenuVisible and tick() - calRefreshT > 0.4 then calRefreshT = tick(); refreshCalMenu() end
+	end)
+	if not __ok then poolWarn(__e) end
 end)
 
 -- ============ recording-status dot (top centre) ============
@@ -1498,6 +2169,43 @@ local function median(list)
 	local n = #c
 	if n % 2 == 1 then return c[math.ceil(n/2)] end
 	return (c[n/2] + c[n/2 + 1]) * 0.5
+end
+
+local function robustPush(buf, v, cap)
+	cap = cap or 25
+	if #buf >= 6 then
+		local m = median(buf)
+		if m then
+			local devs = {}
+			for i,x in ipairs(buf) do devs[i] = math.abs(x - m) end
+			local mad = median(devs) or 0
+			if mad > 1e-6 and math.abs(v - m) > 3 * 1.4826 * mad then return m end
+		end
+	end
+	buf[#buf+1] = v
+	while #buf > cap do table.remove(buf, 1) end
+	return median(buf)
+end
+
+local function calConfidence()
+	local function conf(n, nFull, buf)
+		local c = clamp(n / nFull, 0, 1)
+		if buf and #buf >= 3 then
+			local m = median(buf)
+			if m and math.abs(m) > 1e-6 then
+				local s = 0
+				for _,x in ipairs(buf) do s = s + (x - m)^2 end
+				local sd = math.sqrt(s / #buf)
+				c = c * clamp(1 - sd/math.abs(m), 0.2, 1)
+			end
+		end
+		return c
+	end
+	local v0c   = conf(CAL.vN, 12, CAL.vRatioBuf)
+	local kc    = conf(#CAL.kfBuf, 12, CAL.kfBuf)
+	local ballc = conf(#CAL.brBuf, 10, CAL.brBuf)
+	local overall = clamp((v0c + kc + ballc)/3 * clamp(CAL.shots/15, 0.3, 1), 0, 1)
+	return { v0 = v0c, k = kc, ball = ballc, overall = overall }
 end
 
 -- smoothed speed/direction series for a trajectory {{t,x,z},...}
@@ -1628,10 +2336,13 @@ local function refitCal()
 			end
 		end
 		-- Through-origin fallback (always physically reasonable: v0=0 at power=0)
-		if not used then CAL.powA = clamp(CAL.vSy/CAL.vSx, 0.3, 15); CAL.powB = 0 end
+		if not used then
+			local mr = (#CAL.vRatioBuf > 0) and median(CAL.vRatioBuf) or (CAL.vSx > 0 and CAL.vSy/CAL.vSx or CAL.powA)
+			CAL.powA = clamp(mr, 0.3, 15); CAL.powB = 0
+		end
 	end
 	-- K (decel) vs power. Under real friction K is roughly constant, kB→0.
-	local kmean = CAL.kfN > 0 and CAL.kfSum/CAL.kfN or 40.0
+	local kmean = (#CAL.kfBuf > 0) and median(CAL.kfBuf) or (CAL.kfN > 0 and CAL.kfSum/CAL.kfN or 40.0)
 	local used = false
 	if CAL.kN >= 5 then
 		local cv = powerCV(CAL.kN, CAL.kSx, CAL.kSxx)
@@ -1652,8 +2363,9 @@ end
 -- decay an online-regression accumulator group so that the most recent ~maxN
 -- shots dominate the fit (otherwise early shots, taken with a default model,
 -- pollute the regression forever).
-local function decayAcc(maxN, fields)
-	if CAL[fields[1]] > maxN then
+local function decayAcc(maxN, fields, trigger)
+	local t = trigger or CAL[fields[1]]
+	if t > maxN then
 		local f = (maxN - 1) / maxN
 		for _,fld in ipairs(fields) do CAL[fld] = CAL[fld] * f end
 	end
@@ -1757,6 +2469,17 @@ local function finalizeShot()
 	end
 	local function sankAt(x, z) return nearestPocketDist(x, z) < (CAL.pocketR + 0.15) end
 
+	-- A clipped/teleport-tail trajectory shows a sudden speed jump frame-to-frame;
+	-- such a run is not free-rolling friction and would corrupt K. Reject it.
+	local function monotonicRoll(tr)
+		local sp = buildSeries(tr, 1)
+		if not sp or #sp < 3 then return true end
+		for i = 2, #sp - 1 do
+			if sp[i+1] > sp[i] * 1.5 + 1.0 then return false end
+		end
+		return true
+	end
+
 	-- K: from each object ball that launched and stopped on its own (not sunk).
 	local kSamples = {}
 	for inst, tr in pairs(S.traj) do
@@ -1764,7 +2487,7 @@ local function finalizeShot()
 			local L = pathLen(tr)
 			local T = tr[#tr][1] - tr[1][1]
 			local fin = tr[#tr]
-			if L > 0.6 and T > 0.10 and not sankAt(fin[2], fin[3]) then
+			if L > 0.6 and T > 0.10 and not sankAt(fin[2], fin[3]) and monotonicRoll(tr) then
 				kSamples[#kSamples+1] = clamp(2*L/(T*T), 10, 90)
 			end
 		end
@@ -1773,6 +2496,7 @@ local function finalizeShot()
 
 	-- v0: from the cue's free-rolling pre-contact arc, decel known.
 	local realV0
+	local fitR2 = 0
 	do
 		local idxContact = #cueTraj
 		if firstHit and firstHitT < math.huge then
@@ -1797,9 +2521,16 @@ local function finalizeShot()
 				if not realK then realK = clamp(2*L/(T*T), 10, 90) end
 			end
 		end
+		if realV0 then
+			local arc = {}
+			for i = 1, idxContact do arc[i] = cueTraj[i] end
+			local aFit, _kFit, r2Fit = fitConstDecel(arc, 0, p0.X, p0.Z, launch.X, launch.Z, 0.30)
+			if r2Fit then
+				fitR2 = r2Fit
+				if r2Fit > 0.9 and aFit and aFit > 0 then realV0 = clamp(aFit, 1, 400) end
+			end
+		end
 	end
-	-- Integral method has no R²; treat "measured" as accept-worthy for the gate.
-	local fitR2 = realV0 and 1 or 0
 
 	-- ===== real outcomes per ball =====
 	local realFinal, moved = {}, {}
@@ -1814,6 +2545,13 @@ local function finalizeShot()
 		end
 	end
 
+	-- ===== calibration accumulators — only on shots we can attribute to ME =====
+	-- With the FireServer hook installed, capFresh proves the shot was fired from
+	-- this client. The opponent's replicated ball motion would otherwise feed the
+	-- model wrong power/launch and rot the calibration; gate the whole accumulator
+	-- block on S.trusted. refitCal/sanityCheck and the error stats stay outside.
+	if S.trusted then
+	CAL.tick = (CAL.tick or 0) + 1
 	-- ===== pocketR bracket =====
 	-- Leak the bracket back toward defaults every shot (~35-shot half-life) so
 	-- it FORGETS old extremes. Without this the bracket is a monotonic ratchet
@@ -1890,7 +2628,7 @@ local function finalizeShot()
 					if along > 0.25 and va*along > 1 then
 						local e = clamp(2*vb/(va*along) - 1, 0.5, 1.0)
 						CAL.brN = CAL.brN + 1; CAL.brSum = CAL.brSum + e
-						CAL.ballRest = clamp(CAL.brSum/CAL.brN, 0.5, 1.0)
+						CAL.ballRest = clamp(robustPush(CAL.brBuf, e, 25) or CAL.ballRest, 0.5, 1.0)
 					end
 				end
 			end
@@ -1901,12 +2639,14 @@ local function finalizeShot()
 	for _,r in ipairs(bounces) do
 		local rr = clamp(r, 0.3, 0.98)
 		CAL.crN = CAL.crN + 1; CAL.crSum = CAL.crSum + rr
-		CAL.cushionRest = clamp(CAL.crSum/CAL.crN, 0.3, 0.98)
+		robustPush(CAL.crBuf, rr, 25)
 	end
+	if #CAL.crBuf > 0 then CAL.cushionRest = clamp(median(CAL.crBuf), 0.3, 0.98) end
 
 	-- ===== K accumulators =====
 	if realK then
 		CAL.kfN = CAL.kfN + 1; CAL.kfSum = CAL.kfSum + realK
+		robustPush(CAL.kfBuf, realK, 25)
 		if S.power then
 			CAL.kN=CAL.kN+1; CAL.kSx=CAL.kSx+S.power; CAL.kSy=CAL.kSy+realK
 			CAL.kSxx=CAL.kSxx+S.power*S.power; CAL.kSxy=CAL.kSxy+S.power*realK
@@ -1919,14 +2659,16 @@ local function finalizeShot()
 	if realV0 and S.power and fitR2 and fitR2 > 0.85 then
 		CAL.vN=CAL.vN+1; CAL.vSx=CAL.vSx+S.power; CAL.vSy=CAL.vSy+realV0
 		CAL.vSxx=CAL.vSxx+S.power*S.power; CAL.vSxy=CAL.vSxy+S.power*realV0
+		robustPush(CAL.vRatioBuf, realV0 / S.power, 25)
 	end
 
 	-- ===== decay so the most recent ~40 shots dominate the regression =====
-	decayAcc(40, {"vN","vSx","vSy","vSxx","vSxy"})
-	decayAcc(40, {"kN","kSx","kSy","kSxx","kSxy"})
-	decayAcc(40, {"kfN","kfSum"})
-	decayAcc(40, {"crN","crSum"})
-	decayAcc(40, {"brN","brSum"})
+	decayAcc(40, {"vN","vSx","vSy","vSxx","vSxy"}, CAL.tick)
+	decayAcc(40, {"kN","kSx","kSy","kSxx","kSxy"}, CAL.tick)
+	decayAcc(40, {"kfN","kfSum"}, CAL.tick)
+	decayAcc(40, {"crN","crSum"}, CAL.tick)
+	decayAcc(40, {"brN","brSum"}, CAL.tick)
+	end -- S.trusted
 
 	refitCal()
 	-- Safety net: if the regression has drifted into physically impossible
@@ -1951,6 +2693,18 @@ local function finalizeShot()
 		end
 	end
 	local err = errCnt > 0 and errSum/errCnt or 0
+
+	if S.trusted then
+		local pf = predFinals[S.cueInst]
+		local rf = realFinal[S.cueInst]
+		if pf and rf and launch then
+			local eLong = (Vector3.new(pf.X - rf.X, 0, pf.Z - rf.Z)):Dot(launch)
+			CAL.errEMA = (CAL.errEMA or 0) * 0.9 + eLong * 0.1
+			if CAL.shots > 15 and math.abs(CAL.errEMA) > 0.4 then
+				CAL.kBias = clamp((CAL.kBias or 0) + (CAL.errEMA > 0 and 0.25 or -0.25), -25, 25)
+			end
+		end
+	end
 
 	CAL.shots  = CAL.shots + 1
 	CAL.lastErr = err
@@ -1978,6 +2732,7 @@ local function finalizeShot()
 		realK or 0, #kSamples,
 		CAL.ballRest, CAL.cushionRest, CAL.pocketR,
 		err, errMax))
+	pcall(showReplay, predFinals, realFinal, moved)
 end
 
 -- A shot is "mine" iff the Power UI was visible on my client recently. The
@@ -1990,6 +2745,7 @@ local MINE_RECENT_S = 2.0   -- max age of last visible Power reading
 local lastInvisibleT = 0    -- when the UI was last NOT visible
 
 local obsConn = rsv.Heartbeat:Connect(function(dt)
+	local __ok, __e = pcall(function()
 	if not userBalls or not userBalls.Parent then OBS.shot = nil; return end
 	local cue = userBalls:FindFirstChild("Cue")
 	if not cue then return end
@@ -2028,6 +2784,7 @@ local obsConn = rsv.Heartbeat:Connect(function(dt)
 					preSnap = OBS.restSnap, traj = {}, lastPos = {}, lastMoveT = now,
 					power = capFresh and clamp(cap.power, 1, 21) or (OBS.lastPower and OBS.lastPower.v),
 					firedDir = capFresh and Vector3.new(cap.dir.X, 0, cap.dir.Z) or nil,
+					trusted = capFresh or (not _G.__POOL_SHOTHOOK_INSTALLED),
 				}
 				for inst,pos in pairs(S.preSnap) do
 					S.traj[inst]  = {}
@@ -2045,8 +2802,11 @@ local obsConn = rsv.Heartbeat:Connect(function(dt)
 				local lpos = S.lastPos[b]
 				if not lpos or math.abs(bp.X-lpos.X) > 1e-4 or math.abs(bp.Z-lpos.Z) > 1e-4 then
 					local tr = S.traj[b]
-					tr[#tr+1] = {now-S.t0, bp.X, bp.Z}
-					if #tr > 2500 then table.remove(tr,1) end
+					if #tr >= 2000 then
+						tr[#tr] = {now - S.t0, bp.X, bp.Z}
+					else
+						tr[#tr + 1] = {now - S.t0, bp.X, bp.Z}
+					end
 					if lpos then anyMove = true end
 					S.lastPos[b] = bp
 				end
@@ -2065,55 +2825,159 @@ local obsConn = rsv.Heartbeat:Connect(function(dt)
 	elseif OBS.restCue and OBS.restSnap then setRecDot("armed")
 	else setRecDot("idle") end
 	OBS.cuePrev = p
+	end)
+	if not __ok then poolWarn(__e) end
 end)
 
 -- ============ hotkeys ============
+local function doToggleBest()
+	bestState.enabled = not bestState.enabled
+	if bestState.enabled then print("[BestShot] ON"); recompute()
+	else print("[BestShot] OFF"); clearBP(); _G.__POOL_PRED_BEST = nil; if setHudInfo then setHudInfo(nil) end end
+end
+local function doToggleAim()
+	autoAimEnabled = not autoAimEnabled
+	_G.__POOL_PRED_AIM_ON = autoAimEnabled
+	refreshHUD()
+	print(autoAimEnabled and "[AutoAim] ON" or "[AutoAim] OFF")
+	if autoAimEnabled then recompute() end
+end
+-- Is it actually my turn and is the table at rest? (don't fire on the opponent's
+-- turn or while balls are still moving.)
+local function canShootNow()
+	local _, vis = readPower()
+	if not vis then return false end
+	if OBS.shot ~= nil then return false end
+	return true
+end
+-- Fire `shot` like a human: small randomized delay, slight aim/power jitter inside
+-- the shot's proven tolerance, re-validated so jitter never turns a make into a miss.
+local function humanFire(shot)
+	if not (shot and shot.dir and userComm) then print("[AutoFire] No good shot."); return end
+	if not canShootNow() then print("[AutoFire] not my turn / table not at rest."); return end
+	if not C.HUMANIZE.ENABLED then
+		userComm:FireServer(shot.dir.Unit, shot.power); return
+	end
+	task.spawn(function()
+		local H = C.HUMANIZE
+		task.wait(clamp(H.MIN_DELAY + math.random()*(H.MAX_DELAY - H.MIN_DELAY), 0.15, 2.0))
+		if not canShootNow() then return end
+		local ang = (math.random()*2 - 1) * H.ANGLE_JITTER
+		local pw  = clamp(shot.power + (math.random()*2 - 1) * H.POWER_JITTER, 1, 21)
+		local r = math.rad(ang); local cr, sr = math.cos(r), math.sin(r)
+		local jd = Vector3.new(shot.dir.X*cr - shot.dir.Z*sr, 0, shot.dir.X*sr + shot.dir.Z*cr)
+		if jd.Magnitude > 1e-4 then jd = jd.Unit else jd = shot.dir.Unit end
+		-- re-validate the jittered shot; if it no longer pots, fire the exact one
+		local cb = userBalls and userBalls:FindFirstChild("Cue")
+		if cb and not shot.safety and not shot["break"] then
+			local s2, _, sk2 = evalShot(cb, cb.Position, jd, pw, snapshotBalls(), guideMod.Rule or "")
+			if not (s2 > 0 and sk2 and sk2 >= 1) then jd = shot.dir.Unit; pw = shot.power end
+		end
+		userComm:FireServer(jd, pw)
+		print(string.format("[AutoFire] fired pow=%.2f jitter=%.2f°", pw, ang))
+	end)
+end
+local function doFire()
+	bestState.lastCompute = tick()
+	local b = _G.__POOL_PRED_BEST
+	if not b then recompute(); b = _G.__POOL_PRED_BEST end
+	humanFire(b)
+end
+local function doTogglePlace()
+	placeState.enabled = not placeState.enabled
+	if placeState.enabled then
+		print("[Place] Ball-in-hand finder ON")
+		recomputePlacement()
+	else
+		print("[Place] OFF"); renderPlacement(nil)
+	end
+	refreshHUD()
+end
+local function doToggleHud()
+	hudVisible = not hudVisible
+	refreshHUD()
+end
+local function doResetCal()
+	cloneDefaultCalInto(CAL)
+	saveCal(true); refreshHUD()
+	print("[Cal] calibration reset to defaults")
+end
+local function doCycle(delta)
+	local n = #bestState.list
+	if n == 0 then return end
+	bestState.selIdx = ((bestState.selIdx - 1 + delta) % n) + 1
+	renderSelected()
+end
+local function doAimNudge(d)
+	aimOffsetDeg = math.clamp(aimOffsetDeg + d, -15, 15)
+	if aimLine then aimLine.Text = string.format("AIM %+.2f°  (, . nudge · / reset)", aimOffsetDeg) end
+end
 local hk = uis.InputBegan:Connect(function(input, proc)
 	if proc then return end
-	if input.KeyCode == C.BEST_HOTKEY then
-		bestState.enabled = not bestState.enabled
-		if bestState.enabled then print("[BestShot] ON"); recompute()
-		else print("[BestShot] OFF"); clearBP(); _G.__POOL_PRED_BEST = nil; if setHudInfo then setHudInfo(nil) end end
-	elseif input.KeyCode == C.AUTO_AIM_HOTKEY then
-		autoAimEnabled = not autoAimEnabled
-		_G.__POOL_PRED_AIM_ON = autoAimEnabled
-		refreshHUD()
-		print(autoAimEnabled and "[AutoAim] ON" or "[AutoAim] OFF")
-		if autoAimEnabled then recompute() end
-	elseif input.KeyCode == C.AUTO_FIRE_HOTKEY then
-		-- Re-search with the ultra-precise refinement (±1° in 0.05° steps,
-		-- ±0.5 power in 0.1 steps) immediately before firing. This costs
-		-- ~400 extra evaluations but the shot lands sub-degree accurate.
-		bestState.lastCompute = tick()
-		local b = findBest(true)
-		if b then renderBest(b) end
-		if b and b.score > 0 and userComm then
-			print(string.format("[AutoFire] pow=%.2f angle=%.2f° sink=%d src=%s score=%.1f",
-				b.power, b.angle, b.sunk or 0, tostring(b.src), b.score))
-			userComm:FireServer(b.dir.Unit, b.power)
-		else
-			print("[AutoFire] No good shot.")
-		end
-	elseif input.KeyCode == C.PLACE_HOTKEY then
-		placeState.enabled = not placeState.enabled
-		if placeState.enabled then
-			print("[Place] Ball-in-hand finder ON")
-			recomputePlacement()
-		else
-			print("[Place] OFF"); renderPlacement(nil)
-		end
-		refreshHUD()
-	elseif input.KeyCode == C.CAL_MENU_HOTKEY then
-		toggleCalMenu()
-	elseif input.KeyCode == C.HUD_HOTKEY then
-		hudVisible = not hudVisible
-		refreshHUD()
-	elseif input.KeyCode == C.RESET_HOTKEY then
-		for k,v in pairs(DEFAULT_CAL) do CAL[k]=v end
-		saveCal(); refreshHUD()
-		print("[Cal] calibration reset to defaults")
+	local kc = input.KeyCode
+	if kc == C.BEST_HOTKEY then doToggleBest()
+	elseif kc == C.AUTO_AIM_HOTKEY then doToggleAim()
+	elseif kc == C.AUTO_FIRE_HOTKEY then doFire()
+	elseif kc == C.PLACE_HOTKEY then doTogglePlace()
+	elseif kc == C.CAL_MENU_HOTKEY then toggleCalMenu()
+	elseif kc == C.HUD_HOTKEY then doToggleHud()
+	elseif kc == C.LEGEND_HOTKEY then toggleLegend()
+	elseif kc == C.RESET_HOTKEY then doResetCal()
+	elseif kc == C.CYCLE_PREV_HOTKEY then doCycle(-1)
+	elseif kc == C.CYCLE_NEXT_HOTKEY then doCycle(1)
+	elseif kc == C.AIM_NUDGE_L_HOTKEY then doAimNudge(-C.AIM_STEP)
+	elseif kc == C.AIM_NUDGE_R_HOTKEY then doAimNudge(C.AIM_STEP)
+	elseif kc == C.AIM_RESET_HOTKEY then aimOffsetDeg = 0; if aimLine then aimLine.Text = "AIM 0.00°" end
 	end
 end)
+
+-- ============ mobile tap bar ============
+-- Big touch targets (>=44px tall) along the bottom centre, mirroring the
+-- keyboard hotkeys so the script is fully usable on iOS. Static buttons — every
+-- click body is pcall-wrapped so a transient nil never breaks the bar.
+do  -- scope tap-bar construction locals out of the 200-local main-chunk budget
+local tapBar = Instance.new("Frame")
+tapBar.Name = "TapBar"
+tapBar.AnchorPoint = Vector2.new(0.5,1)
+tapBar.Position = UDim2.new(0.5,0,1,-8); tapBar.Size = UDim2.new(0,0,0,44)
+tapBar.AutomaticSize = Enum.AutomaticSize.X
+tapBar.BackgroundColor3 = Color3.fromRGB(15,15,20); tapBar.BackgroundTransparency = 0.25
+tapBar.BorderSizePixel = 0; tapBar.Parent = sg
+local tbCor = Instance.new("UICorner"); tbCor.CornerRadius = UDim.new(0,10); tbCor.Parent = tapBar
+local tbStr = Instance.new("UIStroke"); tbStr.Thickness = 1; tbStr.Color = Color3.fromRGB(60,60,70); tbStr.Parent = tapBar
+local tbPad = Instance.new("UIPadding")
+tbPad.PaddingLeft = UDim.new(0,6); tbPad.PaddingRight = UDim.new(0,6)
+tbPad.PaddingTop = UDim.new(0,0); tbPad.PaddingBottom = UDim.new(0,0); tbPad.Parent = tapBar
+local tbList = Instance.new("UIListLayout")
+tbList.FillDirection = Enum.FillDirection.Horizontal
+tbList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tbList.VerticalAlignment = Enum.VerticalAlignment.Center
+tbList.SortOrder = Enum.SortOrder.LayoutOrder; tbList.Padding = UDim.new(0,6); tbList.Parent = tapBar
+local function tapBtn(order, label, cb)
+	local b = Instance.new("TextButton")
+	b.Name = label; b.LayoutOrder = order
+	b.Size = UDim2.new(0,58,0,44)
+	b.BackgroundColor3 = Color3.fromRGB(35,35,45); b.BackgroundTransparency = 0.05
+	b.BorderSizePixel = 0; b.AutoButtonColor = true
+	b.Font = Enum.Font.GothamBold; b.TextSize = 15; b.TextColor3 = Color3.fromRGB(230,230,235)
+	b.Text = label; b.Parent = tapBar
+	local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0,8); bc.Parent = b
+	b.MouseButton1Click:Connect(function() pcall(cb) end)
+	return b
+end
+tapBtn(1, "AIM",  doToggleAim)
+tapBtn(2, "FIRE", doFire)
+tapBtn(3, "BEST", doToggleBest)
+tapBtn(4, "HAND", doTogglePlace)
+tapBtn(5, "SAFE", function()
+	if _G.__POOL_PREDICTOR and _G.__POOL_PREDICTOR.toggleSafety then
+		_G.__POOL_PREDICTOR.toggleSafety()
+	end
+end)
+tapBtn(6, "◀", function() doCycle(-1) end)
+tapBtn(7, "▶", function() doCycle(1) end)
+tapBtn(8, "MENU", toggleLegend)
+end  -- tap-bar scope
 
 -- ============ public handle ============
 _G.__POOL_PREDICTOR = {
@@ -2124,6 +2988,7 @@ _G.__POOL_PREDICTOR = {
 		if autoAimHB then autoAimHB:Disconnect() end
 		if obsConn then obsConn:Disconnect() end
 		if calMenuConn then calMenuConn:Disconnect() end
+		if gameStartConn then gameStartConn:Disconnect() end
 		if hk then hk:Disconnect() end
 		pcall(rsv.UnbindFromRenderStep, rsv, "PoolAimOverride")
 		if sg then sg:Destroy() end
@@ -2134,20 +2999,38 @@ _G.__POOL_PREDICTOR = {
 		if placeState.ghost then placeState.ghost:Destroy() end
 		if placeState.label then placeState.label:Destroy() end
 		for _,h in pairs(hl) do if h.Parent then h:Destroy() end end
+		-- on-table polish parts live under workspace, so sg:Destroy() misses them
+		if makeTagPart then makeTagPart:Destroy() end
+		if pocketMarker then pocketMarker:Destroy() end
+		for _,p in ipairs(replayParts) do if p then p:Destroy() end end
+		_G.__POOL_COMM = nil
+		_G.__POOL_SHOTCAP = nil
+		_G.__POOL_PRED_BEST = nil
+		_G.__POOL_PRED_AIM_ON = false
 		_G.__POOL_PREDICTOR = nil
-		print("[Pred v13] Cleaned up.")
+		print("[Pred v12] Cleaned up.")
 	end,
 	config = C,
 	cal = CAL,
 	saveCal = saveCal,
 	resetCal = function()
-		for k,v in pairs(DEFAULT_CAL) do CAL[k]=v end
-		saveCal(); refreshHUD(); print("[Cal] reset")
+		cloneDefaultCalInto(CAL)
+		saveCal(true); refreshHUD(); print("[Cal] reset")
 	end,
 	recomputeBest = recompute,
+	toggleSafety = function() bestState.safetyEnabled = not bestState.safetyEnabled; recompute() end,
+	cycleShot = function(delta)
+		local n = #bestState.list
+		if n == 0 then return end
+		bestState.selIdx = ((bestState.selIdx - 1 + (delta or 1)) % n) + 1
+		renderSelected()
+	end,
+	shotList = function() return bestState.list end,
+	confidence = calConfidence,
+	actions = { best = doToggleBest, aim = doToggleAim, fire = doFire, place = doTogglePlace, cal = toggleCalMenu, hud = doToggleHud, reset = doResetCal },
 }
 
 recompute()
-print(string.format("[Pred v13] Self-calibrating predictor loaded. Shots learned so far: %d. Avg error: %.2f st.",
+print(string.format("[Pred v12] Self-calibrating predictor loaded. Shots learned so far: %d. Avg error: %.2f st.",
 	CAL.shots, CAL.errN > 0 and CAL.errSum/CAL.errN or 0))
-print("[Pred v13] B=BestShot  V=AutoAim  F=AutoFire  G=BallInHand  K=CalDetail  C=HUD  X=reset calibration")
+print("[Pred v12] B=BestShot  V=AutoAim  F=AutoFire  G=BallInHand  |  [ ]=cycle shot  , .=aim-nudge  /=reset-aim  |  K=CalDetail  C=HUD  H=Legend  X=reset  (tap bar on mobile)")

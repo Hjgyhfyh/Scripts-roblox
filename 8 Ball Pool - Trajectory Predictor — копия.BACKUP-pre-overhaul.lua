@@ -1,17 +1,11 @@
--- ====== 8 Ball Pool Trajectory Predictor v13 — Self-Calibrating ======
--- v13 (accuracy overhaul, verified against the decompiled GuidelinesRunner):
---  • RAILS: bounces now use the REAL cushion surface (the segmented "TableCloth"
---    wall parts), not the invisible "Barrier" rectangle the old code read. The
---    Barrier sits ~1 stud OUTSIDE the cushions, so every bounce used to land a
---    full stud too far out. Cushions are modelled as six finite segments, so the
---    six pockets are real gaps — a ball aimed at a pocket rolls in, not bounces.
---  • DEFLECTION: the striker (cue) now follows the exact 90° tangent rule the
---    game's own guideline draws, instead of bending off it.
---  • Collision matches the game: contact at ball-centre distance 2R (=0.4).
--- The predictor still records, for every shot, what it PREDICTED versus what
--- REALLY happened (using the true aim angle + power captured from the shoot
--- remote) and tunes its physics model (initial speed per power, friction decel,
--- cushion bounce, ball transfer, pocket capture radius) toward perfect accuracy.
+-- ====== 8 Ball Pool Trajectory Predictor v12 — Self-Calibrating ======
+-- v12: power scale corrected to the game's true 1..21; cushion bounds read
+-- exactly from the Barrier rail geometry; head-on contact no longer inflates K.
+-- The predictor records, for every shot, what it PREDICTED (where each ball
+-- would go) versus what REALLY happened, taking the actual aim angle and power
+-- into account. After each shot it measures the error and tunes its physics
+-- model (initial speed per power, damping, cushion bounce, ball transfer,
+-- pocket capture radius) toward perfect accuracy.
 --
 -- Calibration is saved to disk and is automatically reloaded after a Roblox
 -- restart, so the model keeps getting better across sessions.
@@ -41,7 +35,7 @@ local lp  = game.Players.LocalPlayer
 
 local guideModInst = rs:WaitForChild("GuidelinesRunner", 10)
 if not guideModInst then
-	warn("[Pred v13] GuidelinesRunner not found — open this script while inside 8 Ball Pool (1v1 Pool).")
+	warn("[Pred v12] GuidelinesRunner not found — open this script while inside 8 Ball Pool (1v1 Pool).")
 	return
 end
 local guideMod = require(guideModInst)
@@ -136,20 +130,14 @@ local CAL_FILE = "sigmatik_pool_predictor_cal.json"
 -- under the OLD linear v-vs-d model (incompatible parameters).
 -- Schema 3: power is now the game's true 1..21 scale (was 1..18), so any cal
 -- persisted under schema 2 has the wrong powA/K and must be wiped on load.
--- v13 keeps schema 3 ON PURPOSE: the v13 fixes are to GEOMETRY (cushions read
--- from the real TableCloth, striker on the pure 90° line) which live in code and
--- apply regardless of calibration. The learned REACH (powA/powB/kA/kB) is
--- geometry-independent and expensive to relearn, so it is preserved; the only
--- geometry-coupled params (cushionRest / pocketR) self-heal via the 40-shot
--- decay, and sanityCheckCal still resets anything that drifted out of range.
 local CAL_SCHEMA = 3
 local DEFAULT_CAL = {
 	schema = CAL_SCHEMA,
 	powA = 2.20, powB = 0.0,
 	kA   = 40.0, kB   = 0.0,
-	cushionRest = 0.80,
-	ballRest    = 1.00,
-	pocketR     = 0.70, pocketLow = 0.45, pocketHigh = 0.95,
+	cushionRest = 0.90,
+	ballRest    = 0.92,
+	pocketR     = 0.50, pocketLow = 0.20, pocketHigh = 1.10,
 	-- regression accumulators: v0 vs power
 	vN=0, vSx=0, vSy=0, vSxx=0, vSxy=0,
 	-- regression accumulators: K vs power
@@ -184,7 +172,7 @@ local function loadCal()
 						if type(data[k])=="number" then CAL[k]=data[k] end
 					end
 				else
-					warn("[Pred v13] Persisted cal is for an older physics model — starting fresh under constant-deceleration model.")
+					warn("[Pred v12] Persisted cal is for an older physics model — starting fresh under constant-deceleration model.")
 				end
 			end
 		end
@@ -207,7 +195,7 @@ local function sanityCheckCal()
 	   or CAL.pocketR < 0.15 or CAL.pocketR > 1.5
 	   or CAL.ballRest < 0.5 or CAL.ballRest > 1.0
 	   or CAL.cushionRest < 0.2 or CAL.cushionRest > 1.0 then
-		warn(string.format("[Pred v13] Calibration looked bad (v0(1)=%.2f v0(21)=%.2f K(1)=%.2f K(21)=%.2f reach=%.2f pocketR=%.2f ballR=%.2f) -> resetting to defaults.",
+		warn(string.format("[Pred v12] Calibration looked bad (v0(1)=%.2f v0(21)=%.2f K(1)=%.2f K(21)=%.2f reach=%.2f pocketR=%.2f ballR=%.2f) -> resetting to defaults.",
 			v_at_1, v_at_21, k_at_1, k_at_21, reach21, CAL.pocketR, CAL.ballRest))
 		for k,v in pairs(DEFAULT_CAL) do CAL[k]=v end
 		pcall(function() if writefile then writefile(CAL_FILE, http:JSONEncode(CAL)) end end)
@@ -220,7 +208,7 @@ sanityCheckCal()
 -- approximated as v² = v0² - 2K·d (kinematics under a constant force).
 local PHYS = {
 	ballR = C.BALL_R, maxDepth = C.MAX_DEPTH, minSpeed = C.MIN_SPEED,
-	K = 40.0, cushionRest = 0.8, ballRest = 1.0, pocketR = 0.7,
+	K = 40.0, cushionRest = 0.9, ballRest = 0.92, pocketR = 0.5,
 }
 -- set PHYS for a given shot power, return predicted initial speed v0
 local function shotPhysics(power)
@@ -236,55 +224,7 @@ end
 
 -- ============ table binding ============
 local userTable, userBalls, userBarrier, userPockets, userBounds, userCue, userComm
-local userCushions = {}   -- v13: exact reflective cushion segments read from Table.TableCloth
 
--- ====== EXACT cushion model (v13) — the real bounce surface ======
--- The invisible "Barrier" rectangle the old code used sits ~1 stud OUTSIDE the
--- real cushions, so every rail bounce landed a full stud too far out. The actual
--- collidable cushions are the waist-high "TableCloth" wall parts under the table
--- (CanQuery=true, CanCollide=true). Each long rail is split in TWO by its middle
--- pocket, and all six segments stop short of the pockets — so we model them as
--- six individual reflective segments. That makes the pocket mouths real gaps:
--- a ball aimed into a gap rolls toward the pocket instead of phantom-bouncing.
--- A ball CENTRE reflects off the inner cushion face pulled inward by one radius:
---   plane = facePos ± (thickness/2 + BALL_R)   (sign = toward table centre)
--- The segment's perpendicular span [lo,hi] is the cushion's real extent, so a
--- ball whose contact point falls in a pocket gap simply isn't reflected.
-local function buildCushions(tbl, cx, cz)
-	local segs = {}
-	local xMin, xMax = -math.huge, math.huge
-	local zMin, zMax = -math.huge, math.huge
-	local R = C.BALL_R
-	for _,c in ipairs(tbl:GetDescendants()) do
-		if c:IsA("BasePart") and c.Name == "TableCloth" then
-			local sx, sy, sz = c.Size.X, c.Size.Y, c.Size.Z
-			if sy >= 0.5 and sy <= 2.5 then
-				if sx < 0.35 and sz > 2 then          -- vertical wall → reflects X
-					local toC  = (c.Position.X < cx) and 1 or -1
-					local plane = c.Position.X + toC * (sx*0.5 + R)
-					segs[#segs+1] = { axis="x", plane=plane, n=Vector3.new(toC,0,0),
-						lo = c.Position.Z - sz*0.5, hi = c.Position.Z + sz*0.5 }
-					if toC > 0 then xMin = math.max(xMin, plane) else xMax = math.min(xMax, plane) end
-				elseif sz < 0.35 and sx > 2 then      -- horizontal wall → reflects Z
-					local toC  = (c.Position.Z < cz) and 1 or -1
-					local plane = c.Position.Z + toC * (sz*0.5 + R)
-					segs[#segs+1] = { axis="z", plane=plane, n=Vector3.new(0,0,toC),
-						lo = c.Position.X - sx*0.5, hi = c.Position.X + sx*0.5 }
-					if toC > 0 then zMin = math.max(zMin, plane) else zMax = math.min(zMax, plane) end
-				end
-			end
-		end
-	end
-	if #segs < 4 then return nil, nil end
-	local bounds = nil
-	if xMin > -math.huge and xMax < math.huge and zMin > -math.huge and zMax < math.huge then
-		bounds = { xMin = xMin, xMax = xMax, zMin = zMin, zMax = zMax }
-	end
-	return segs, bounds
-end
-
--- v13 FALLBACK ONLY (used if TableCloth can't be read): bounds from the invisible
--- Barrier rectangle, which sits ~1 stud OUTSIDE the real cushions.
 -- EXACT cushion bounds straight from the Barrier rail geometry. The Barrier is
 -- four axis-aligned box parts (the cushions). A ball-CENTRE reflects when it is
 -- one radius from a rail's inner face, so the reflective rectangle is each inner
@@ -337,33 +277,20 @@ end
 local function bindTable(tbl)
 	userTable   = tbl
 	userBalls   = tbl:WaitForChild("Balls")
-	userBarrier = tbl:FindFirstChild("Barrier")
+	userBarrier = tbl:WaitForChild("Barrier")
 	userPockets = {}
-	local cx, cz, n = 0, 0, 0
 	local pp = tbl:WaitForChild("PocketPoints")
 	for _,x in ipairs(pp:GetChildren()) do
-		if x:IsA("BasePart") then
-			table.insert(userPockets, x.Position)
-			cx = cx + x.Position.X; cz = cz + x.Position.Z; n = n + 1
-		end
+		if x:IsA("BasePart") then table.insert(userPockets, x.Position) end
 	end
-	if n > 0 then cx, cz = cx/n, cz/n end
-	-- Prefer the EXACT segmented TableCloth cushions; fall back to the Barrier
-	-- rectangle, then to loose pocket inference, only if those can't be read.
-	local segs, segBounds = buildCushions(tbl, cx, cz)
-	if segs then
-		userCushions = segs
-		userBounds   = segBounds or (userBarrier and boundsFromRails(userBarrier)) or computeBounds(userPockets)
-	else
-		userCushions = {}
-		userBounds   = (userBarrier and boundsFromRails(userBarrier)) or computeBounds(userPockets)
-	end
+	-- Prefer exact rail geometry; fall back to pocket-point inference.
+	userBounds = boundsFromRails(userBarrier) or computeBounds(userPockets)
 	local gd = tbl:WaitForChild("_GameData")
 	userComm = gd:WaitForChild("Communication")
 	_G.__POOL_COMM = userComm   -- let the shoot-remote hook recognise our table's remote
 	if userBounds then
-		print(string.format("[Pred v13] Bound table via %s (%d cushion segs). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
-			(#userCushions > 0) and "TableCloth" or "Barrier-fallback", #userCushions,
+		print(string.format("[Pred v12] Bound table (%s). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
+			boundsFromRails(userBarrier) and "rails" or "pockets",
 			userBounds.xMin, userBounds.xMax, userBounds.zMin, userBounds.zMax))
 	end
 end
@@ -566,36 +493,6 @@ end
 
 -- ============ ray casters ============
 local function castCushion(pos, dir, maxDist)
-	-- Preferred: exact segmented cushions (each a finite reflective face with a
-	-- gap at every pocket). A ball only bounces if its contact point lands on a
-	-- real cushion segment; in a pocket gap it passes through toward the pocket.
-	if userCushions and #userCushions > 0 then
-		local bT, bN, bP = math.huge, nil, nil
-		for _,s in ipairs(userCushions) do
-			if s.axis == "x" then
-				local dx = dir.X
-				if dx * s.n.X < -1e-9 then               -- moving INTO this face
-					local t = (s.plane - pos.X) / dx
-					if t > 1e-4 and t <= maxDist and t < bT then
-						local zc = pos.Z + dir.Z * t
-						if zc >= s.lo and zc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
-					end
-				end
-			else
-				local dz = dir.Z
-				if dz * s.n.Z < -1e-9 then
-					local t = (s.plane - pos.Z) / dz
-					if t > 1e-4 and t <= maxDist and t < bT then
-						local xc = pos.X + dir.X * t
-						if xc >= s.lo and xc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
-					end
-				end
-			end
-		end
-		if bT < math.huge then return bT, bN, bP end
-		return nil
-	end
-	-- Fallback: single rectangle (Barrier/pocket-derived bounds).
 	if not userBounds then return nil end
 	local b = userBounds
 	local bT, bN = math.huge, nil
@@ -724,28 +621,31 @@ local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx
 		local sI = math.sqrt(sIsq)
 		if sI < PHYS.minSpeed then if finals then finals[ball]=e.p end return end
 		local objPos = snap[e.ball]
-		local cl = objPos - e.p                         -- line of centres (contact → object)
+		local cl = objPos - e.p
 		if cl.Magnitude < 1e-4 then if finals then finals[ball]=e.p end return end
 		cl = cl.Unit
-		local along = dir:Dot(cl)                        -- cos(impact angle)
-		if along <= 1e-3 then if finals then finals[ball]=e.p end return end
-		-- Equal-mass elastic transfer = the game's own guideline EXACTLY (verified
-		-- against the decompiled GuidelinesRunner): the object ball leaves straight
-		-- along the line of centres at sI*cosθ, and the striker deflects along the
-		-- PURE TANGENT (the 90° rule) at sI*sinθ. The old model bent the striker
-		-- off the 90° line by folding a line-of-centres term in (because ballRest<1),
-		-- which is the single biggest reason the white's path looked wrong.
-		local vObj  = sI * along * PHYS.ballRest         -- ballRest≈1 (tiny inelastic loss only)
-		local vTang = sI * math.sqrt(math.max(0, 1 - along*along))
+		local along = dir:Dot(cl)
+		if along < 0 then if finals then finals[ball]=e.p end return end
+		local restE = PHYS.ballRest
+		local va_along = sI * along
+		local va_after = (1 - restE) / 2 * va_along
+		local vb_after = (1 + restE) / 2 * va_along
+		local va_tang  = sI * math.sqrt(math.max(0, 1 - along*along))
 		local nSnap = {}; for k,v in pairs(snap) do nSnap[k]=v end
-		nSnap[e.ball] = objPos + cl*0.05                 -- nudge so the striker can't re-hit it
-		if vObj > PHYS.minSpeed then
-			simulate(e.ball, objPos, cl, vObj, depth+1, nSnap, false, segs, pT, ctx, finals)
+		nSnap[e.ball] = objPos + cl*0.001
+		if vb_after > PHYS.minSpeed then
+			simulate(e.ball, objPos, cl, vb_after, depth+1, nSnap, false, segs, pT, ctx, finals)
 		elseif finals then finals[e.ball] = objPos end
-		if vTang > PHYS.minSpeed then
-			local rawTang = dir - cl*along                -- component of travel ⟂ to line of centres
-			if rawTang.Magnitude > 1e-4 then
-				simulate(ball, e.p, rawTang.Unit, vTang, depth+1, nSnap, isCue, segs, pT, ctx, finals)
+		local cueNewSp = math.sqrt(va_after*va_after + va_tang*va_tang)
+		if cueNewSp > PHYS.minSpeed then
+			local tangDir = Vector3.zero
+			if va_tang > 1e-3 then
+				local rawTang = dir - cl*along
+				if rawTang.Magnitude > 1e-4 then tangDir = rawTang.Unit end
+			end
+			local cueNewDir = cl*va_after + tangDir*va_tang
+			if cueNewDir.Magnitude > 1e-4 then
+				simulate(ball, e.p, cueNewDir.Unit, cueNewSp, depth+1, nSnap, isCue, segs, pT, ctx, finals)
 			elseif finals then finals[ball] = e.p end
 		elseif finals then finals[ball] = e.p end
 	end
@@ -2135,7 +2035,7 @@ _G.__POOL_PREDICTOR = {
 		if placeState.label then placeState.label:Destroy() end
 		for _,h in pairs(hl) do if h.Parent then h:Destroy() end end
 		_G.__POOL_PREDICTOR = nil
-		print("[Pred v13] Cleaned up.")
+		print("[Pred v12] Cleaned up.")
 	end,
 	config = C,
 	cal = CAL,
@@ -2148,6 +2048,6 @@ _G.__POOL_PREDICTOR = {
 }
 
 recompute()
-print(string.format("[Pred v13] Self-calibrating predictor loaded. Shots learned so far: %d. Avg error: %.2f st.",
+print(string.format("[Pred v12] Self-calibrating predictor loaded. Shots learned so far: %d. Avg error: %.2f st.",
 	CAL.shots, CAL.errN > 0 and CAL.errSum/CAL.errN or 0))
-print("[Pred v13] B=BestShot  V=AutoAim  F=AutoFire  G=BallInHand  K=CalDetail  C=HUD  X=reset calibration")
+print("[Pred v12] B=BestShot  V=AutoAim  F=AutoFire  G=BallInHand  K=CalDetail  C=HUD  X=reset calibration")
