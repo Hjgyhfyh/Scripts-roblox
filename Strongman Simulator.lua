@@ -22,8 +22,6 @@ end
 
 local DUP_TARGET     = "Currency_Knivsta"   -- 3 Knivsta = 1 Energy
 local RATIO          = 3
-local CHUNK_ENERGY   = 1e12                  -- energy delivered per redeem call
-local CALLS_PER_SEC  = 200                   -- burst throttle, well under the 400/sec ceiling
 
 local function getConverter()
     if TGSMisc and TGSMisc.RemoteFunction then
