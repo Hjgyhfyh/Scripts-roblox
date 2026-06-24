@@ -33,7 +33,7 @@ local State = {
 }
 
 local connections = {}
-local function track(conn)
+local function addConn(conn)
 	connections[#connections + 1] = conn
 	return conn
 end
