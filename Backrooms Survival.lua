@@ -629,7 +629,7 @@ unloadBtn.AutoButtonColor = true
 unloadBtn.Parent = body
 corner(unloadBtn, 8)
 
-track(RunService.Heartbeat:Connect(function()
+addConn(RunService.Heartbeat:Connect(function()
 	lblAction.Text = "Action:  " .. State.currentAction
 	lblKills.Text = "Kills:  +" .. (statValue("NPC Kills") - State.startKills)
 	lblEXP.Text = "EXP:  +" .. (statValue("EXP") - State.startEXP)
