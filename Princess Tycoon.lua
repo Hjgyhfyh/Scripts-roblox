@@ -114,15 +114,21 @@ local function pickCandidate(plot)
 			local obj = objV.Value
 			if owned[obj] then
 				attempts[obj] = nil
-			elseif not blacklist[obj] and not b:FindFirstChild("Gamepass") then
-				local depV  = b:FindFirstChild("Dependency")
-				local dep   = depV and depV.Value
-				local depOk = (not dep) or dep == "" or owned[dep]
-				local price = (b:FindFirstChild("Price") and b.Price.Value) or 0
-				local cool  = lastFire[obj] and (now - lastFire[obj] < 0.5)
-				if depOk and price <= money and not cool then
-					if not bestPrice or price < bestPrice then
-						best, bestPrice = b, price
+			elseif not b:FindFirstChild("Gamepass") then
+				local bl = blacklist[obj]
+				if bl and now < bl then
+					-- temporarily skipped; it will be retried once the timer expires
+				else
+					if bl then blacklist[obj] = nil; attempts[obj] = nil end
+					local depV  = b:FindFirstChild("Dependency")
+					local dep   = depV and depV.Value
+					local depOk = (not dep) or dep == "" or owned[dep]
+					local price = (b:FindFirstChild("Price") and b.Price.Value) or 0
+					local cool  = lastFire[obj] and (now - lastFire[obj] < 0.5)
+					if depOk and price <= money and not cool then
+						if not bestPrice or price < bestPrice then
+							best, bestPrice = b, price
+						end
 					end
 				end
 			end
