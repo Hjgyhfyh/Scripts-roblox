@@ -125,14 +125,38 @@ local function isHashedName(name)
     return type(name) == "string" and #name >= 24 and name:match("^%x+$") ~= nil
 end
 
-local function scanStrengthRemote()
+local workoutRE
+
+local function findStrengthRemote()
+    if TGSMisc and TGSMisc.RemoteFunction then
+        local ok, r = pcall(TGSMisc.RemoteFunction, "StrongMan_UpgradeStrength")
+        if ok and typeof(r) == "Instance" and r.ClassName == "RemoteFunction" then return r end
+    end
     local hits = {}
-    for _, d in ipairs(ReplicatedStorage:GetDescendants()) do
-        if d.ClassName == "RemoteFunction" and isHashedName(d.Name) then
-            hits[#hits + 1] = d
+    local function scan(root)
+        pcall(function()
+            for _, d in ipairs(root:GetDescendants()) do
+                if d.ClassName == "RemoteFunction" and isHashedName(d.Name) then
+                    hits[#hits+1] = d
+                end
+            end
+        end)
+    end
+    scan(ReplicatedStorage)
+    pcall(function() scan(workspace.Lib) end)
+    if #hits == 1 then return hits[1] end
+    return nil
+end
+
+local function getWorkoutRE()
+    if workoutRE then return workoutRE end
+    if TGSMisc and TGSMisc.RemoteEvent then
+        local ok, r = pcall(TGSMisc.RemoteEvent, "StrongmanWorkout_SetIsWorkingOut")
+        if ok and typeof(r) == "Instance" and r.ClassName == "RemoteEvent" then
+            workoutRE = r
+            return r
         end
     end
-    if #hits == 1 then return hits[1] end
     return nil
 end
 
