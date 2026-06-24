@@ -5,6 +5,9 @@ local TweenService       = game:GetService("TweenService")
 local VirtualUser        = game:GetService("VirtualUser")
 local LocalPlayer        = Players.LocalPlayer
 
+local connections = {}
+local function track(c) connections[#connections + 1] = c; return c end
+
 ----------------------------------------------------------------------
 -- Game bindings
 ----------------------------------------------------------------------
@@ -20,8 +23,9 @@ local Items, ItemCat do
     ItemCat = ok2 and c or nil
 end
 
-local DUP_TARGET     = "Currency_Knivsta"   -- 3 Knivsta = 1 Energy
-local RATIO          = 3
+local CURRENCY_TARGET = "Currency_Knivsta"   -- 3 Knivsta = 1 Energy
+local RATIO           = 3
+local GIVE_KEY        = "Default"
 
 local function getConverter()
     if TGSMisc and TGSMisc.RemoteFunction then
@@ -38,11 +42,11 @@ local function readCurrency(key)
     return nil
 end
 
-local function readEnergy()  return readCurrency("Default") end
+local function readEnergy()  return readCurrency(GIVE_KEY) end
 local function readKnivsta() return readCurrency("Knivsta") end
 
 ----------------------------------------------------------------------
--- Amount parsing: 1k · 1000 · 90000SP · 1.5m · 2kk · 1 000 000 · 3b
+-- Amount parsing: 1k · 1000 · 1.5m · 1sx · 1sp · 2kk · 1 000 000
 ----------------------------------------------------------------------
 local SUFFIX = {
     [""] = 1,
@@ -87,7 +91,7 @@ local function fmt(n)
 end
 
 ----------------------------------------------------------------------
--- Delivery
+-- Energy delivery (mint Knivsta via sign-bypass, then convert)
 ----------------------------------------------------------------------
 local State = { busy = false }
 
@@ -95,25 +99,77 @@ local function ensureKnivsta(cv, needKnivsta)
     if (readKnivsta() or 0) >= needKnivsta then return end
     local energy = readEnergy() or 0
     local mint = (energy + needKnivsta / RATIO + 1e6) * RATIO
-    pcall(function() cv:InvokeServer(DUP_TARGET, -mint) end)
+    pcall(function() cv:InvokeServer(CURRENCY_TARGET, -mint) end)
     task.wait(0.6)
 end
 
 local function giveEnergy(target)
     local cv = getConverter()
-    if not cv then return false, 0, "remote not found" end
+    if not cv then return false, 0 end
     local needKnivsta = target * RATIO
     ensureKnivsta(cv, needKnivsta)
-    local ok = pcall(function() cv:InvokeServer(DUP_TARGET, needKnivsta) end)
+    local ok = pcall(function() cv:InvokeServer(CURRENCY_TARGET, needKnivsta) end)
+    return ok, ok and target or 0
+end
+
+----------------------------------------------------------------------
+-- Strength delivery — remote name is randomized per session, so it is
+-- resolved live instead of hard-coded: scan for the hashed RemoteFunction
+-- and learn it from the game's own calls via a namecall hook.
+----------------------------------------------------------------------
+local StrengthRemote
+local hookActive = true
+
+local function isHashedName(name)
+    return type(name) == "string" and #name >= 24 and name:match("^%x+$") ~= nil
+end
+
+local function scanStrengthRemote()
+    local hits = {}
+    for _, d in ipairs(ReplicatedStorage:GetDescendants()) do
+        if d:IsA("RemoteFunction") and isHashedName(d.Name) then
+            hits[#hits + 1] = d
+        end
+    end
+    if #hits == 1 then return hits[1] end
+    return nil
+end
+
+StrengthRemote = scanStrengthRemote()
+
+do
+    if hookmetamethod and getnamecallmethod then
+        local function wrap(f) return (newcclosure and newcclosure(f)) or f end
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", wrap(function(self, ...)
+            if hookActive then
+                pcall(function(...)
+                    if getnamecallmethod() == "InvokeServer"
+                        and typeof(self) == "Instance" and self:IsA("RemoteFunction")
+                        and self:IsDescendantOf(ReplicatedStorage) then
+                        local a = { ... }
+                        if type(a[1]) == "number" and a[2] == GIVE_KEY then
+                            StrengthRemote = self
+                        end
+                    end
+                end, ...)
+            end
+            return oldNamecall(self, ...)
+        end))
+    end
+end
+
+local function giveStrength(target)
+    local remote = StrengthRemote or scanStrengthRemote()
+    if not remote then return false, 0 end
+    StrengthRemote = remote
+    local ok = pcall(function() remote:InvokeServer(target, GIVE_KEY) end)
     return ok, ok and target or 0
 end
 
 ----------------------------------------------------------------------
 -- GUI
 ----------------------------------------------------------------------
-local connections = {}
-local function track(c) connections[#connections + 1] = c; return c end
-
 local function resolveParent()
     if gethui then
         local ok, h = pcall(gethui)
@@ -125,6 +181,7 @@ local function resolveParent()
 end
 
 local ACCENT = Color3.fromRGB(34, 197, 94)
+local STR    = Color3.fromRGB(249, 168, 64)
 local GOOD   = Color3.fromRGB(120, 255, 160)
 local WARN   = Color3.fromRGB(255, 190, 90)
 local BAD    = Color3.fromRGB(255, 110, 110)
@@ -143,7 +200,7 @@ if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
 local window = Instance.new("Frame")
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(330, 240)
+window.Size = UDim2.fromOffset(330, 328)
 window.BackgroundColor3 = Color3.fromRGB(12, 16, 28)
 window.BorderSizePixel = 0
 window.Parent = gui
@@ -183,57 +240,9 @@ closeBtn.AutoButtonColor = true
 closeBtn.Parent = titleBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
 
-local prompt = Instance.new("TextLabel")
-prompt.Position = UDim2.fromOffset(16, 46)
-prompt.Size = UDim2.new(1, -32, 0, 40)
-prompt.BackgroundTransparency = 1
-prompt.Font = Enum.Font.GothamSemibold
-prompt.TextSize = 15
-prompt.TextColor3 = Color3.fromRGB(225, 232, 245)
-prompt.TextXAlignment = Enum.TextXAlignment.Left
-prompt.TextYAlignment = Enum.TextYAlignment.Top
-prompt.RichText = true
-prompt.Text = "Сколько выдать энергии?\n<font color=\"rgb(150,160,185)\">How much energy to give?</font>"
-prompt.Parent = window
-
-local box = Instance.new("TextBox")
-box.Position = UDim2.fromOffset(16, 92)
-box.Size = UDim2.new(1, -32, 0, 42)
-box.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
-box.Font = Enum.Font.GothamMedium
-box.TextSize = 16
-box.TextColor3 = Color3.fromRGB(235, 240, 250)
-box.PlaceholderText = "1k · 1000 · 90000SP"
-box.PlaceholderColor3 = MUTED
-box.Text = ""
-box.ClearTextOnFocus = false
-box.TextXAlignment = Enum.TextXAlignment.Left
-box.Parent = window
-Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
-do
-    local p = Instance.new("UIPadding", box)
-    p.PaddingLeft = UDim.new(0, 12)
-    p.PaddingRight = UDim.new(0, 12)
-    local s = Instance.new("UIStroke", box)
-    s.Color = Color3.fromRGB(50, 60, 86)
-    s.Transparency = 0.2
-end
-
-local giveBtn = Instance.new("TextButton")
-giveBtn.Position = UDim2.fromOffset(16, 146)
-giveBtn.Size = UDim2.new(1, -32, 0, 42)
-giveBtn.BackgroundColor3 = ACCENT
-giveBtn.Font = Enum.Font.GothamBold
-giveBtn.TextSize = 16
-giveBtn.TextColor3 = Color3.fromRGB(8, 16, 12)
-giveBtn.Text = "Выдать"
-giveBtn.AutoButtonColor = true
-giveBtn.Parent = window
-Instance.new("UICorner", giveBtn).CornerRadius = UDim.new(0, 10)
-
 local status = Instance.new("TextLabel")
-status.Position = UDim2.fromOffset(16, 198)
-status.Size = UDim2.new(1, -32, 0, 30)
+status.Position = UDim2.fromOffset(16, 288)
+status.Size = UDim2.new(1, -32, 0, 28)
 status.BackgroundTransparency = 1
 status.Font = Enum.Font.GothamMedium
 status.TextSize = 14
@@ -251,34 +260,92 @@ end
 ----------------------------------------------------------------------
 -- Behaviour
 ----------------------------------------------------------------------
-local function doGive()
+local function runTask(box, btn, label, unit, worker)
     if State.busy then return end
     local target = parseAmount(box.Text)
     if not target then
-        setStatus("Не понял число. Примеры: 1k, 1000, 90000SP", WARN)
+        setStatus("Не понял число. Примеры: 1k · 1000 · 1sx", WARN)
         return
     end
     State.busy = true
-    giveBtn.Text = "Выдаю..."
-    setStatus("Выдаю " .. fmt(target) .. " ⚡", ACCENT)
+    btn.Text = "Выдаю..."
+    setStatus("Выдаю " .. fmt(target) .. " " .. unit .. "...", ACCENT)
     task.spawn(function()
-        local ok, given = giveEnergy(target)
+        local ok, given = worker(target)
         if ok then
-            setStatus("Готово: +" .. fmt(given) .. " энергии ⚡", GOOD)
+            setStatus("Готово: +" .. fmt(given) .. " " .. unit .. " ✅", GOOD)
         elseif given and given > 0 then
-            setStatus("Частично: +" .. fmt(given) .. " (ремоут отказал)", WARN)
+            setStatus("Частично: +" .. fmt(given) .. " " .. unit, WARN)
         else
-            setStatus("Не вышло — ремоут не найден / отказал", BAD)
+            setStatus("Не вышло — remote не найден / отказал", BAD)
         end
-        giveBtn.Text = "Выдать"
+        btn.Text = label
         State.busy = false
     end)
 end
 
-track(giveBtn.MouseButton1Click:Connect(doGive))
-track(box.FocusLost:Connect(function(enter) if enter then doGive() end end))
+local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker)
+    local p = Instance.new("TextLabel")
+    p.Position = UDim2.fromOffset(16, yPrompt)
+    p.Size = UDim2.new(1, -32, 0, 34)
+    p.BackgroundTransparency = 1
+    p.Font = Enum.Font.GothamSemibold
+    p.TextSize = 14
+    p.TextColor3 = Color3.fromRGB(225, 232, 245)
+    p.TextXAlignment = Enum.TextXAlignment.Left
+    p.TextYAlignment = Enum.TextYAlignment.Top
+    p.RichText = true
+    p.Text = ru .. "\n<font color=\"rgb(150,160,185)\">" .. en .. "</font>"
+    p.Parent = window
 
+    local box = Instance.new("TextBox")
+    box.Position = UDim2.fromOffset(16, yPrompt + 36)
+    box.Size = UDim2.new(1, -32, 0, 38)
+    box.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
+    box.Font = Enum.Font.GothamMedium
+    box.TextSize = 16
+    box.TextColor3 = Color3.fromRGB(235, 240, 250)
+    box.PlaceholderText = "1k · 1000 · 1sx"
+    box.PlaceholderColor3 = MUTED
+    box.Text = ""
+    box.ClearTextOnFocus = false
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.Parent = window
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
+    local pad = Instance.new("UIPadding", box)
+    pad.PaddingLeft = UDim.new(0, 12)
+    pad.PaddingRight = UDim.new(0, 12)
+    local bs = Instance.new("UIStroke", box)
+    bs.Color = Color3.fromRGB(50, 60, 86)
+    bs.Transparency = 0.2
+
+    local btn = Instance.new("TextButton")
+    btn.Position = UDim2.fromOffset(16, yPrompt + 80)
+    btn.Size = UDim2.new(1, -32, 0, 36)
+    btn.BackgroundColor3 = btnColor
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 15
+    btn.TextColor3 = Color3.fromRGB(8, 16, 12)
+    btn.Text = btnLabel
+    btn.AutoButtonColor = true
+    btn.Parent = window
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+    track(btn.MouseButton1Click:Connect(function() runTask(box, btn, btnLabel, unit, worker) end))
+    track(box.FocusLost:Connect(function(enter) if enter then runTask(box, btn, btnLabel, unit, worker) end end))
+end
+
+makeRow(46, "Сколько выдать энергии?", "How much energy to give?",
+    "Выдать энергию", ACCENT, "энергии", giveEnergy)
+
+makeRow(166, "Сколько выдать силы?", "How much strength to give?",
+    "Выдать силу", STR, "силы", giveStrength)
+
+----------------------------------------------------------------------
+-- Unload
+----------------------------------------------------------------------
 local function unload()
+    hookActive = false
     for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
     table.clear(connections)
     if gui then gui:Destroy() end
