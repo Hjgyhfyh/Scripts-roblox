@@ -59,7 +59,6 @@ local SUFFIX = {
 local function parseAmount(input)
     if type(input) ~= "string" then return nil end
     local s = input:lower():gsub("%s+", ""):gsub(",", ""):gsub("_", "")
-    s = s:gsub("sp$", ""):gsub("energy$", "")
     if s == "" then return nil end
     local num, suf = s:match("^(%d*%.?%d+)([a-z]*)$")
     if not num then return nil end
@@ -72,13 +71,18 @@ local function parseAmount(input)
     return math.floor(total + 0.5)
 end
 
+local SCALE = {
+    {1e90,"NoVg"},{1e87,"OcVg"},{1e84,"SpVg"},{1e81,"SxVg"},{1e78,"QnVg"},{1e75,"QaVg"},
+    {1e72,"TVg"},{1e69,"DVg"},{1e66,"UVg"},{1e63,"Vg"},{1e60,"NoD"},{1e57,"OcD"},
+    {1e54,"SpD"},{1e51,"SxD"},{1e48,"QnD"},{1e45,"QaD"},{1e42,"Td"},{1e39,"Dd"},
+    {1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},{1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},
+    {1e18,"Qn"},{1e15,"Qd"},{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"K"},
+}
+
 local function fmt(n)
-    if n >= 1e18 then return string.format("%.2fQi", n / 1e18) end
-    if n >= 1e15 then return string.format("%.2fQ",  n / 1e15) end
-    if n >= 1e12 then return string.format("%.2fT",  n / 1e12) end
-    if n >= 1e9  then return string.format("%.2fB",  n / 1e9)  end
-    if n >= 1e6  then return string.format("%.2fM",  n / 1e6)  end
-    if n >= 1e3  then return string.format("%.2fK",  n / 1e3)  end
+    for _, e in ipairs(SCALE) do
+        if n >= e[1] then return string.format("%.2f%s", n / e[1], e[2]) end
+    end
     return tostring(math.floor(n))
 end
 
