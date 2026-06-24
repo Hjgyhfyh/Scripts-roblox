@@ -147,7 +147,7 @@ if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
 local window = Instance.new("Frame")
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(330, 196)
+window.Size = UDim2.fromOffset(330, 240)
 window.BackgroundColor3 = Color3.fromRGB(12, 16, 28)
 window.BorderSizePixel = 0
 window.Parent = gui
