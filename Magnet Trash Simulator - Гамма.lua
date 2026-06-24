@@ -11,7 +11,7 @@ end
 
 local State = {
 	Connections = {},
-	Min = 0.20,
+	Min = -5.00,
 	Max = 3.00,
 	Value = 1.00,
 }
