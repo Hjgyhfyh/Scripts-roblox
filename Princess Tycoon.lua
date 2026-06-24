@@ -29,8 +29,8 @@ local State = {
 }
 
 local conns      = {}   -- every connection lives here, killed on unload
-local attempts   = {}   -- objectId -> times we fired its button
-local blacklist  = {}   -- objectId -> true (gamepass / stuck, stop retrying)
+local attempts   = {}   -- objectId -> contiguous no-progress fire count
+local blacklist  = {}   -- objectId -> os.clock() expiry (temporary skip, then retry)
 local lastFire   = {}   -- objectId -> os.clock() of last touch
 
 --==============================================================--
