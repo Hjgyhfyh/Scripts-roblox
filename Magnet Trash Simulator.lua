@@ -36,6 +36,7 @@ local petGUID = {}
 local trashBuf = {}
 local stats   = { trash = 0, sells = 0 }
 local running = true
+local zoneFilter = {}
 
 local function addConn(c) conns[#conns+1] = c end
 
