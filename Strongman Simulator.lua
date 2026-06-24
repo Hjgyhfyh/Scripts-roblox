@@ -348,7 +348,15 @@ makeRow(46, "Сколько выдать энергии?", "How much energy to g
     "Выдать энергию", ACCENT, "энергии", giveEnergy)
 
 makeRow(166, "Сколько выдать силы?", "How much strength to give?",
-    "Выдать силу", STR, "силы", giveStrength)
+    "Выдать силу", STR, "силы", giveStrength, "1111111")
+
+onStrengthCaptured = function()
+    setStatus("✅ Remote силы пойман — теперь можно выдавать", GOOD)
+end
+
+if not StrengthRemote then
+    setStatus("Для силы: покачайся 1 раз, чтобы поймать remote", MUTED)
+end
 
 ----------------------------------------------------------------------
 -- Unload
