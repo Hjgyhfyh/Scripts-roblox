@@ -171,7 +171,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.fromRGB(235, 240, 250)
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.Text = "Strongman · Выдача энергии"
+title.Text = "@sigmatik323"
 title.Parent = titleBar
 
 local closeBtn = Instance.new("TextButton")
@@ -187,14 +187,27 @@ closeBtn.AutoButtonColor = true
 closeBtn.Parent = titleBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
 
+local prompt = Instance.new("TextLabel")
+prompt.Position = UDim2.fromOffset(16, 46)
+prompt.Size = UDim2.new(1, -32, 0, 40)
+prompt.BackgroundTransparency = 1
+prompt.Font = Enum.Font.GothamSemibold
+prompt.TextSize = 15
+prompt.TextColor3 = Color3.fromRGB(225, 232, 245)
+prompt.TextXAlignment = Enum.TextXAlignment.Left
+prompt.TextYAlignment = Enum.TextYAlignment.Top
+prompt.RichText = true
+prompt.Text = "Сколько выдать энергии?\n<font color=\"rgb(150,160,185)\">How much energy to give?</font>"
+prompt.Parent = window
+
 local box = Instance.new("TextBox")
-box.Position = UDim2.fromOffset(16, 50)
+box.Position = UDim2.fromOffset(16, 92)
 box.Size = UDim2.new(1, -32, 0, 42)
 box.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
 box.Font = Enum.Font.GothamMedium
 box.TextSize = 16
 box.TextColor3 = Color3.fromRGB(235, 240, 250)
-box.PlaceholderText = "Сколько выдать?  напр. 1k · 1000 · 90000SP"
+box.PlaceholderText = "1k · 1000 · 90000SP"
 box.PlaceholderColor3 = MUTED
 box.Text = ""
 box.ClearTextOnFocus = false
