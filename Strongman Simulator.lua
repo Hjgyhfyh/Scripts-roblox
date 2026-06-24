@@ -191,11 +191,15 @@ do
 end
 
 local function giveStrength(target)
-    local remote = StrengthRemote or scanStrengthRemote()
-    if not remote then return false, 0, true end    -- not captured yet → train once
+    local remote = StrengthRemote or findStrengthRemote()
+    if not remote then return false, 0, true end
     StrengthRemote = remote
-    local ok = pcall(function() remote:InvokeServer(target, GIVE_KEY) end)
-    return ok, ok and target or 0
+    local re = getWorkoutRE()
+    if re then pcall(function() re:FireServer(true) end); task.wait(0.15) end
+    local ok, res = pcall(function() return remote:InvokeServer(target, GIVE_KEY) end)
+    if re then pcall(function() re:FireServer(false) end) end
+    local success = ok and res ~= false
+    return success, success and target or 0
 end
 
 ----------------------------------------------------------------------
