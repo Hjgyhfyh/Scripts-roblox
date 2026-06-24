@@ -280,11 +280,11 @@ local function runTask(box, btn, label, unit, worker)
     btn.Text = "Выдаю..."
     setStatus("Выдаю " .. fmt(target) .. " " .. unit .. "...", ACCENT)
     task.spawn(function()
-        local ok, given = worker(target)
+        local ok, given, needCapture = worker(target)
         if ok then
             setStatus("Готово: +" .. fmt(given) .. " " .. unit .. " ✅", GOOD)
-        elseif given and given > 0 then
-            setStatus("Частично: +" .. fmt(given) .. " " .. unit, WARN)
+        elseif needCapture then
+            setStatus("Покачайся 1 раз — ловлю remote, потом жми снова", WARN)
         else
             setStatus("Не вышло — remote не найден / отказал", BAD)
         end
