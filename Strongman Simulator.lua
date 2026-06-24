@@ -119,6 +119,7 @@ end
 ----------------------------------------------------------------------
 local StrengthRemote
 local hookActive = true
+local onStrengthCaptured            -- assigned by the GUI once it exists
 
 local function isHashedName(name)
     return type(name) == "string" and #name >= 24 and name:match("^%x+$") ~= nil
@@ -135,8 +136,16 @@ local function scanStrengthRemote()
     return nil
 end
 
-StrengthRemote = scanStrengthRemote()
+local function setStrengthRemote(remote)
+    local wasEmpty = (StrengthRemote == nil)
+    StrengthRemote = remote
+    if wasEmpty and onStrengthCaptured then pcall(onStrengthCaptured) end
+end
 
+-- Learn the training remote from the game's own call: the instant the player
+-- lifts once, the game fires InvokeServer(amount, "Default") on its randomly
+-- named RemoteFunction. We grab that exact object and reuse it for any amount,
+-- so a changed name after a rejoin / new training spot fixes itself on the next lift.
 do
     if hookmetamethod and getnamecallmethod then
         local function wrap(f) return (newcclosure and newcclosure(f)) or f end
@@ -149,7 +158,7 @@ do
                         and self:IsDescendantOf(ReplicatedStorage) then
                         local a = { ... }
                         if type(a[1]) == "number" and a[2] == GIVE_KEY then
-                            StrengthRemote = self
+                            setStrengthRemote(self)
                         end
                     end
                 end, ...)
@@ -161,7 +170,7 @@ end
 
 local function giveStrength(target)
     local remote = StrengthRemote or scanStrengthRemote()
-    if not remote then return false, 0 end
+    if not remote then return false, 0, true end    -- not captured yet → train once
     StrengthRemote = remote
     local ok = pcall(function() remote:InvokeServer(target, GIVE_KEY) end)
     return ok, ok and target or 0
