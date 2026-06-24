@@ -164,13 +164,21 @@ do
 end
 
 local function giveStrength(target)
-    local remote = StrengthRemote or findStrengthRemote()
+    local remote = StrengthRemote
     if not remote then return false, 0, true end
-    StrengthRemote = remote
-    local re = getWorkoutRE()
-    if re then pcall(function() re:FireServer(true) end); task.wait(0.15) end
+    local char = LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.Anchored = true end
+    local swm = getWorkoutModule()
+    if swm and swm.SetIsWorkingOut then
+        pcall(swm.SetIsWorkingOut, LocalPlayer, true)
+    end
+    task.wait(0.25)
     local ok, res = pcall(function() return remote:InvokeServer(target, GIVE_KEY) end)
-    if re then pcall(function() re:FireServer(false) end) end
+    if hrp then hrp.Anchored = false end
+    if swm and swm.SetIsWorkingOut then
+        pcall(swm.SetIsWorkingOut, LocalPlayer, false)
+    end
     local success = ok and res ~= false
     return success, success and target or 0
 end
