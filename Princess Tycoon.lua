@@ -148,51 +148,62 @@ end
 -- Collect: drain CurrencyToCollect into spendable cash via the Giver pad
 task.spawn(function()
 	while State.running do
-		if not State.collect then
-			task.wait(0.2)
-		else
+		local rest = 0.2
+		pcall(function()
+			if not State.collect then return end
+			rest = 1 / math.clamp(State.collectRate, 1, 200)
 			local plot, hrp = getPlot(), getHRP()
-			if plot and hrp then
-				local ess   = plot:FindFirstChild("Essentials")
-				local giver = ess and ess:FindFirstChild("Giver")
-				if giver and budgetTake(2) then
-					touch(giver, hrp)
-				end
+			if not (plot and hrp) then return end
+			local ctc   = plot:FindFirstChild("CurrencyToCollect")
+			local ess   = plot:FindFirstChild("Essentials")
+			local giver = ess and ess:FindFirstChild("Giver")
+			if giver and ctc and ctc.Value > 0 and budgetTake(2) then
+				touch(giver, hrp)
 			end
-			task.wait(1 / math.clamp(State.collectRate, 1, 200))
-		end
+		end)
+		task.wait(rest)
 	end
 end)
 
 -- Buy: walk the dependency tree, cheapest first
 task.spawn(function()
+	local lastBuilt = -1
 	while State.running do
-		if not State.buy then
-			task.wait(0.2)
-		else
+		local rest = 0.2
+		pcall(function()
+			if not State.buy then return end
+			rest = 1 / math.clamp(State.buyRate, 1, 200)
 			local plot, hrp = getPlot(), getHRP()
-			if plot and hrp then
-				local head, obj = pickCandidate(plot)
-				if head and budgetTake(2) then
-					touch(head, hrp)
-					lastFire[obj] = os.clock()
-					attempts[obj] = (attempts[obj] or 0) + 1
-					if attempts[obj] >= 12 then
-						blacklist[obj] = true
-					end
+			if not (plot and hrp) then return end
+			-- a purchase landed → nothing is genuinely stuck, clear the counters
+			local po = plot:FindFirstChild("PurchasedObjects")
+			local built = po and #po:GetChildren() or 0
+			if built ~= lastBuilt then
+				if lastBuilt >= 0 and built > lastBuilt then table.clear(attempts) end
+				lastBuilt = built
+			end
+			local head, obj = pickCandidate(plot)
+			if head and budgetTake(2) then
+				touch(head, hrp)
+				lastFire[obj] = os.clock()
+				attempts[obj] = (attempts[obj] or 0) + 1
+				if attempts[obj] >= 10 then
+					blacklist[obj] = os.clock() + 30   -- temporary; retried after 30s
+					attempts[obj] = 0
 				end
 			end
-			task.wait(1 / math.clamp(State.buyRate, 1, 200))
-		end
+		end)
+		task.wait(rest)
 	end
 end)
 
 -- Crates: open collected crates + scoop up any world crate by touch
 task.spawn(function()
 	while State.running do
-		if not State.crates then
-			task.wait(0.3)
-		else
+		local rest = 0.3
+		pcall(function()
+			if not State.crates then return end
+			rest = 1 / math.clamp(State.crateRate, 1, 60)
 			local events = ReplicatedStorage:FindFirstChild("Events")
 			local open   = events and events:FindFirstChild("OpenCrate")
 			local store  = LocalPlayer:FindFirstChild("Crates")
@@ -206,18 +217,19 @@ task.spawn(function()
 					pcall(function() open:FireServer("Gear") end)
 				end
 			end
-
+			-- one world crate per tick keeps touches evenly spread across the second
 			local parent, hrp = workspace:FindFirstChild("CrateParent"), getHRP()
 			if parent and hrp then
 				for _, m in ipairs(parent:GetChildren()) do
 					local part = m:IsA("BasePart") and m or m:FindFirstChildWhichIsA("BasePart", true)
 					if part and budgetTake(2) then
 						touch(part, hrp)
+						break
 					end
 				end
 			end
-			task.wait(1 / math.clamp(State.crateRate, 1, 60))
-		end
+		end)
+		task.wait(rest)
 	end
 end)
 
