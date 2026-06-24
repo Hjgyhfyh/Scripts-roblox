@@ -1004,9 +1004,6 @@ end
 showTab("FARM")
 
 local function fmt(n) n = math.floor(n) if n >= 1000000 then return string.format("%.1fM", n / 1e6) elseif n >= 1000 then return string.format("%.1fk", n / 1000) end return tostring(n) end
-addConn(RunService.Heartbeat:Connect(function()
-	if State.fullBright then end
-end))
 do
 	local acc = 0
 	addConn(RunService.Heartbeat:Connect(function(dt)
