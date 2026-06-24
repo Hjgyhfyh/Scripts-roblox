@@ -224,7 +224,7 @@ do
 end
 
 local giveBtn = Instance.new("TextButton")
-giveBtn.Position = UDim2.fromOffset(16, 102)
+giveBtn.Position = UDim2.fromOffset(16, 146)
 giveBtn.Size = UDim2.new(1, -32, 0, 42)
 giveBtn.BackgroundColor3 = ACCENT
 giveBtn.Font = Enum.Font.GothamBold
@@ -236,7 +236,7 @@ giveBtn.Parent = window
 Instance.new("UICorner", giveBtn).CornerRadius = UDim.new(0, 10)
 
 local status = Instance.new("TextLabel")
-status.Position = UDim2.fromOffset(16, 154)
+status.Position = UDim2.fromOffset(16, 198)
 status.Size = UDim2.new(1, -32, 0, 30)
 status.BackgroundTransparency = 1
 status.Font = Enum.Font.GothamMedium
