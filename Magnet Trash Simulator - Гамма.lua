@@ -41,18 +41,46 @@ local function applyGamma(g)
 	Lighting.ExposureCompensation = originalExposure + (g - 1) * 0.55
 end
 
-local tintReg = {}
-local function reg(obj, prop)
-	tintReg[#tintReg + 1] = { obj = obj, prop = prop, base = obj[prop] }
+local function parentTo(g)
+	local ok = pcall(function()
+		if syn and syn.protect_gui then
+			syn.protect_gui(g)
+			g.Parent = game:GetService("CoreGui")
+		elseif gethui then
+			g.Parent = gethui()
+		else
+			g.Parent = game:GetService("CoreGui")
+		end
+	end)
+	if not ok then
+		g.Parent = LocalPlayer:WaitForChild("PlayerGui")
+	end
 end
+
+local tintGui = Instance.new("ScreenGui")
+tintGui.Name = "UITint_" .. tostring(math.random(1000, 9999))
+tintGui.ResetOnSpawn = false
+tintGui.IgnoreGuiInset = true
+tintGui.DisplayOrder = 2000000000
+tintGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+State.TintGui = tintGui
+parentTo(tintGui)
+
+local tintFrame = Instance.new("Frame")
+tintFrame.Size = UDim2.new(1, 0, 1, 0)
+tintFrame.Position = UDim2.new(0, 0, 0, 0)
+tintFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+tintFrame.BackgroundTransparency = 1
+tintFrame.BorderSizePixel = 0
+tintFrame.Active = false
+tintFrame.ZIndex = 1
+tintFrame.Parent = tintGui
 
 local function applyUIBrightness(b)
 	State.UIValue = b
-	local t = (math.abs(b) / 5) * 0.85
-	local target = (b >= 0) and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
-	for _, e in ipairs(tintReg) do
-		e.obj[e.prop] = e.base:Lerp(target, t)
-	end
+	local opacity = (math.abs(b) / 5) * 0.85
+	tintFrame.BackgroundColor3 = (b >= 0) and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
+	tintFrame.BackgroundTransparency = 1 - opacity
 end
 
 local gui = Instance.new("ScreenGui")
@@ -60,23 +88,9 @@ gui.Name = "GammaUI_" .. tostring(math.random(1000, 9999))
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.IgnoreGuiInset = true
+gui.DisplayOrder = 2000000001
 State.Gui = gui
-
-do
-	local ok = pcall(function()
-		if syn and syn.protect_gui then
-			syn.protect_gui(gui)
-			gui.Parent = game:GetService("CoreGui")
-		elseif gethui then
-			gui.Parent = gethui()
-		else
-			gui.Parent = game:GetService("CoreGui")
-		end
-	end)
-	if not ok then
-		gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-	end
-end
+parentTo(gui)
 
 local main = Instance.new("Frame")
 main.Size = UDim2.new(0, 270, 0, 192)
@@ -85,7 +99,6 @@ main.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 main.BorderSizePixel = 0
 main.Active = true
 main.Parent = gui
-reg(main, "BackgroundColor3")
 
 local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 12)
@@ -96,7 +109,6 @@ stroke.Color = Color3.fromRGB(0, 170, 255)
 stroke.Thickness = 1.4
 stroke.Transparency = 0.35
 stroke.Parent = main
-reg(stroke, "Color")
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.new(0, 28, 0, 28)
@@ -108,8 +120,6 @@ close.TextSize = 14
 close.TextColor3 = Color3.fromRGB(235, 120, 120)
 close.AutoButtonColor = true
 close.Parent = main
-reg(close, "BackgroundColor3")
-reg(close, "TextColor3")
 
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 8)
@@ -126,7 +136,6 @@ local function makeSlider(opts)
 	lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Parent = main
-	reg(lbl, "TextColor3")
 
 	local val = Instance.new("TextLabel")
 	val.BackgroundTransparency = 1
@@ -138,7 +147,6 @@ local function makeSlider(opts)
 	val.TextColor3 = Color3.fromRGB(0, 200, 255)
 	val.TextXAlignment = Enum.TextXAlignment.Right
 	val.Parent = main
-	reg(val, "TextColor3")
 
 	local track = Instance.new("Frame")
 	track.Size = UDim2.new(1, -32, 0, 8)
@@ -149,7 +157,6 @@ local function makeSlider(opts)
 	local tc = Instance.new("UICorner")
 	tc.CornerRadius = UDim.new(1, 0)
 	tc.Parent = track
-	reg(track, "BackgroundColor3")
 
 	local fill = Instance.new("Frame")
 	fill.Size = UDim2.new(0.5, 0, 1, 0)
@@ -159,7 +166,6 @@ local function makeSlider(opts)
 	local fc = Instance.new("UICorner")
 	fc.CornerRadius = UDim.new(1, 0)
 	fc.Parent = fill
-	reg(fill, "BackgroundColor3")
 
 	local knob = Instance.new("Frame")
 	knob.Size = UDim2.new(0, 18, 0, 18)
@@ -249,8 +255,6 @@ reset.Parent = main
 local resetCorner = Instance.new("UICorner")
 resetCorner.CornerRadius = UDim.new(0, 8)
 resetCorner.Parent = reset
-reg(reset, "BackgroundColor3")
-reg(reset, "TextColor3")
 
 local dragBar = Instance.new("TextButton")
 dragBar.BackgroundTransparency = 1
@@ -267,6 +271,7 @@ function State.Unload()
 	pcall(function() effect:Destroy() end)
 	Lighting.ExposureCompensation = originalExposure
 	pcall(function() gui:Destroy() end)
+	pcall(function() tintGui:Destroy() end)
 	getgenv().GammaController = nil
 end
 
