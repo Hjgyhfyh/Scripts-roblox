@@ -561,35 +561,21 @@ local function makeSlider(text, minV, maxV, default, decimals, suffix, cb)
 			fromInput(input)
 		end
 	end)
-	track.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
-	track:SetAttribute("isSlider", true)
-	track.AncestryChanged:Connect(function() end)
-	local kc = knob
-	kc.InputBegan:Connect(function(input)
+	knob.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 		end
 	end)
-	track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() end)
-	local moveConn = UserInputService.InputChanged:Connect(function(input)
+	addConn(UserInputService.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			fromInput(input)
 		end
-	end)
-	local endConn = UserInputService.InputEnded:Connect(function(input)
+	end))
+	addConn(UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = false
 		end
-	end)
-	track:SetAttribute("ready", true)
-	track.Destroying:Connect(function()
-		pcall(function() moveConn:Disconnect() end)
-		pcall(function() endConn:Disconnect() end)
-	end)
+	end))
 end
 
 section("Farming")
