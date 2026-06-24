@@ -680,7 +680,7 @@ local afkConn = lp.Idled:Connect(function()
 		VirtualUser:ClickButton2(Vector2.new())
 	end)
 end)
-track(afkConn)
+addConn(afkConn)
 
 local function unload()
 	State.running = false
