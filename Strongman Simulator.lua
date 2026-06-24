@@ -91,23 +91,13 @@ local function ensureKnivsta(cv, needKnivsta)
     task.wait(0.6)
 end
 
-local function giveEnergy(target, onStep)
+local function giveEnergy(target)
     local cv = getConverter()
     if not cv then return false, 0, "remote not found" end
-    ensureKnivsta(cv, target * RATIO)
-    local interval = 1 / CALLS_PER_SEC
-    local given = 0
-    while given < target do
-        local chunkE = math.min(CHUNK_ENERGY, target - given)
-        local chunkK = chunkE * RATIO
-        ensureKnivsta(cv, chunkK)
-        local ok = pcall(function() cv:InvokeServer(DUP_TARGET, chunkK) end)
-        if not ok then break end
-        given = given + chunkE
-        if onStep then onStep(given, target) end
-        if given < target then task.wait(interval) end
-    end
-    return given >= target, given
+    local needKnivsta = target * RATIO
+    ensureKnivsta(cv, needKnivsta)
+    local ok = pcall(function() cv:InvokeServer(DUP_TARGET, needKnivsta) end)
+    return ok, ok and target or 0
 end
 
 ----------------------------------------------------------------------
