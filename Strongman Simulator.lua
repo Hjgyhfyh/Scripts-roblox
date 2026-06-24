@@ -45,10 +45,14 @@ local function readKnivsta() return readCurrency("Knivsta") end
 -- Amount parsing: 1k · 1000 · 90000SP · 1.5m · 2kk · 1 000 000 · 3b
 ----------------------------------------------------------------------
 local SUFFIX = {
-    [""]   = 1,
-    k      = 1e3,  kk = 1e6, kkk = 1e9,
-    m      = 1e6,  b  = 1e9, t   = 1e12,
-    q      = 1e15, qa = 1e15, qi = 1e18,
+    [""] = 1,
+    k = 1e3, m = 1e6, b = 1e9, t = 1e12,
+    qd = 1e15, qn = 1e18, sx = 1e21, sp = 1e24, oc = 1e27, no = 1e30,
+    dc = 1e33, ud = 1e36, dd = 1e39, td = 1e42, qad = 1e45, qnd = 1e48,
+    sxd = 1e51, spd = 1e54, ocd = 1e57, nod = 1e60,
+    vg = 1e63, uvg = 1e66, dvg = 1e69, tvg = 1e72, qavg = 1e75,
+    qnvg = 1e78, sxvg = 1e81, spvg = 1e84, ocvg = 1e87, novg = 1e90,
+    kk = 1e6, kkk = 1e9, q = 1e15, qa = 1e15, qi = 1e18,
     thousand = 1e3, million = 1e6, billion = 1e9, trillion = 1e12,
 }
 
@@ -254,9 +258,7 @@ local function doGive()
     giveBtn.Text = "Выдаю..."
     setStatus("Выдаю " .. fmt(target) .. " ⚡", ACCENT)
     task.spawn(function()
-        local ok, given = giveEnergy(target, function(g, t)
-            setStatus(string.format("Выдаю... %s / %s", fmt(g), fmt(t)), ACCENT)
-        end)
+        local ok, given = giveEnergy(target)
         if ok then
             setStatus("Готово: +" .. fmt(given) .. " энергии ⚡", GOOD)
         elseif given and given > 0 then
