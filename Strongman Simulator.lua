@@ -153,11 +153,9 @@ do
         oldNamecall = hookmetamethod(game, "__namecall", wrap(function(self, ...)
             if hookActive then
                 pcall(function(...)
-                    if getnamecallmethod() == "InvokeServer"
-                        and typeof(self) == "Instance" and self:IsA("RemoteFunction")
-                        and self:IsDescendantOf(ReplicatedStorage) then
-                        local a = { ... }
-                        if type(a[1]) == "number" and a[2] == GIVE_KEY then
+                    if getnamecallmethod() == "InvokeServer" and self.ClassName == "RemoteFunction" then
+                        local a1, a2 = ...
+                        if type(a1) == "number" and a2 == GIVE_KEY then
                             setStrengthRemote(self)
                         end
                     end
