@@ -128,7 +128,7 @@ end
 local function scanStrengthRemote()
     local hits = {}
     for _, d in ipairs(ReplicatedStorage:GetDescendants()) do
-        if d:IsA("RemoteFunction") and isHashedName(d.Name) then
+        if d.ClassName == "RemoteFunction" and isHashedName(d.Name) then
             hits[#hits + 1] = d
         end
     end
