@@ -64,7 +64,10 @@ local function startFarm()
     if active.farm then return end
     local c = TR.OnClientEvent:Connect(function(a, d)
         if a == "Render" and d and d[1] then
-            trashBuf[#trashBuf+1] = d[1]
+            local zone = d[2] and d[2].Zone
+            if next(zoneFilter) == nil or zoneFilter[zone] then
+                trashBuf[#trashBuf+1] = d[1]
+            end
         end
     end)
     addConn(c)
@@ -743,6 +746,67 @@ mkToggle(pFarm, "Auto Farm Trash", "Render → мгновенный Destroy", 2,
     if v then startFarm() else active.farm = false end
 end)
 mkRate(pFarm, "Farm Rate", "farmRate", 50, 3)
+
+do
+    secLabel(pFarm, "ФИЛЬТР ЗОН", 3.2)
+    local zoneRow = mkRow(pFarm, 86, 3.4)
+
+    local ZONES = {"Spawn", "The Forest", "Autumn Fall", "Blossom Realm"}
+    local zBtns = {}
+
+    local grid = Instance.new("Frame", zoneRow)
+    grid.Size = UDim2.new(1, -16, 1, -16)
+    grid.Position = UDim2.new(0, 8, 0, 8)
+    grid.BackgroundTransparency = 1
+    local gl = Instance.new("UIGridLayout", grid)
+    gl.CellSize = UDim2.new(0.5, -4, 0.5, -4)
+    gl.CellPadding = UDim2.new(0, 4, 0, 4)
+    gl.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local hintZ = Instance.new("TextLabel", zoneRow)
+    hintZ.Size = UDim2.new(1, 0, 0, 10)
+    hintZ.Position = UDim2.new(0, 0, 1, -12)
+    hintZ.BackgroundTransparency = 1
+    hintZ.TextColor3 = C.sub
+    hintZ.Font = Enum.Font.Gotham
+    hintZ.TextSize = 9
+    hintZ.TextXAlignment = Enum.TextXAlignment.Center
+    hintZ.Text = "Ничего не выбрано = все зоны"
+
+    local function refreshZoneHint()
+        local sel = {}
+        for z in pairs(zoneFilter) do sel[#sel+1] = z end
+        hintZ.Text = #sel == 0 and "Ничего не выбрано = все зоны" or ("Только: "..table.concat(sel, ", "))
+    end
+
+    for i, zoneName in ipairs(ZONES) do
+        local btn = Instance.new("TextButton", grid)
+        btn.LayoutOrder = i
+        btn.Text = zoneName
+        btn.BackgroundColor3 = C.tabOff
+        btn.TextColor3 = C.sub
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 10
+        btn.AutoButtonColor = false
+        btn.BorderSizePixel = 0
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        local bs = Instance.new("UIStroke", btn); bs.Color = C.border; bs.Thickness = 1
+        zBtns[zoneName] = btn
+
+        addConn(btn.MouseButton1Click:Connect(function()
+            if zoneFilter[zoneName] then
+                zoneFilter[zoneName] = nil
+                tween(btn, TW_FAST, {BackgroundColor3 = C.tabOff, TextColor3 = C.sub})
+                tween(bs, TW_FAST, {Color = C.border})
+            else
+                zoneFilter[zoneName] = true
+                tween(btn, TW_FAST, {BackgroundColor3 = C.accent, TextColor3 = Color3.new(1,1,1)})
+                tween(bs, TW_FAST, {Color = C.accentD})
+            end
+            refreshZoneHint()
+        end))
+    end
+end
 
 secLabel(pFarm, "ПРОДАЖА", 4)
 mkToggle(pFarm, "Auto Sell", "SellEvent The Forest", 5, function(v)
