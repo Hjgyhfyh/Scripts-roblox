@@ -293,7 +293,7 @@ local function runTask(box, btn, label, unit, worker)
     end)
 end
 
-local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker)
+local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker, defaultText)
     local p = Instance.new("TextLabel")
     p.Position = UDim2.fromOffset(16, yPrompt)
     p.Size = UDim2.new(1, -32, 0, 34)
@@ -316,7 +316,7 @@ local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker)
     box.TextColor3 = Color3.fromRGB(235, 240, 250)
     box.PlaceholderText = "1k · 1000 · 1sx"
     box.PlaceholderColor3 = MUTED
-    box.Text = ""
+    box.Text = defaultText or ""
     box.ClearTextOnFocus = false
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.Parent = window
