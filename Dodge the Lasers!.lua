@@ -26,6 +26,8 @@ local State = {
     dying = false,
     hbInsane = false,
     hbRate = 200,
+    autoVote = false,
+    voteMap = "Any",
     connections = {},
 }
 
