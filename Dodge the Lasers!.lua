@@ -128,6 +128,26 @@ track(RoundResults.OnClientEvent:Connect(function()
     end
 end))
 
+local lastVoteKey = nil
+if MapVoteState and MapVoteCast then
+    track(MapVoteState.OnClientEvent:Connect(function(st)
+        if not (State.loaded and State.autoVote) then return end
+        if type(st) ~= "table" or st.phase ~= "active" then return end
+        local opts = st.options
+        if type(opts) ~= "table" or #opts == 0 then return end
+        local key = st.voteEndsAt or st.voteOpensAt
+        if key and lastVoteKey == key then return end
+        local idx = 1
+        if State.voteMap ~= "Any" then
+            for i, name in ipairs(opts) do
+                if name == State.voteMap then idx = i break end
+            end
+        end
+        lastVoteKey = key
+        pcall(function() MapVoteCast:FireServer(idx) end)
+    end))
+end
+
 if RoundStateRequest then
     pcall(function() RoundStateRequest:FireServer() end)
 end
