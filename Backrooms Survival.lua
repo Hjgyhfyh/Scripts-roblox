@@ -15,7 +15,7 @@ if getgenv then local prev = getgenv().__BackroomsAF if type(prev) == "function"
 local State = {
 	running = true,
 	autoKill = false, autoBoxes = false, autoLockpick = false, autoLoot = false,
-	autoMinigames = false, autoBestWeapon = false, useMapWeapons = false, aoeMelee = true, includeBoss = false,
+	autoMinigames = false, autoBestWeapon = false, aoeMelee = true, includeBoss = false,
 	attackType = "M1", attacksPerSec = 2.2, searchRadius = 16,
 	godmode = false, godmodeMode = "Stealth", infStamina = false,
 	autoHeal = false, autoBuyHeal = false, hitRun = false, autoFlee = false,
