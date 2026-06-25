@@ -327,8 +327,8 @@ if not screenGui.Parent then
 end
 
 local main = Instance.new("Frame")
-main.Size = UDim2.fromOffset(320, 470)
-main.Position = UDim2.new(0.5, -160, 0.5, -235)
+main.Size = UDim2.fromOffset(320, 536)
+main.Position = UDim2.new(0.5, -160, 0.5, -268)
 main.BackgroundColor3 = THEME.bg
 main.BorderSizePixel = 0
 main.Parent = screenGui
@@ -378,7 +378,7 @@ closeBtn.Parent = header
 corner(closeBtn, 8)
 
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, 0, 1, -50 - 96)
+list.Size = UDim2.new(1, 0, 1, -50 - 162)
 list.Position = UDim2.fromOffset(0, 50)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
