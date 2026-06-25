@@ -181,7 +181,7 @@ local ROWS = {
 }
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 286, 0, 44 + (#ROWS * 44) + 12 + 44 + 12)
+main.Size = UDim2.new(0, 286, 0, 44 + 8 + (#ROWS * 44) + 44 + 36 + 12)
 main.Position = UDim2.new(0, 24, 0.5, -160)
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
@@ -352,6 +352,19 @@ for idx, row in ipairs(ROWS) do
     switches[row.key] = sw
     sw.MouseButton1Click:Connect(function() toggle(row.key) end)
 end
+
+local simBtn = Instance.new("TextButton")
+simBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44))
+simBtn.Size = UDim2.new(1, -24, 0, 36)
+simBtn.BackgroundColor3 = Color3.fromRGB(245, 170, 60)
+simBtn.Text = "SIMULATE LASER DEATH"
+simBtn.Font = Enum.Font.GothamBold
+simBtn.TextSize = 13
+simBtn.TextColor3 = Color3.fromRGB(20, 16, 8)
+simBtn.BorderSizePixel = 0
+simBtn.Parent = main
+corner(simBtn, 8)
+simBtn.MouseButton1Click:Connect(simulateDeath)
 
 local unloadBtn = Instance.new("TextButton")
 unloadBtn.Position = UDim2.new(0, 12, 1, -48)
