@@ -599,46 +599,45 @@ end
 -- ============================ ESP ============================
 local espFolder
 local espCache = {}
-local function clearEsp() for _, v in pairs(espCache) do pcall(function() v:Destroy() end) end espCache = {} end
+local function clearEsp() for _, e in pairs(espCache) do pcall(function() e.hl:Destroy() end) pcall(function() e.bb:Destroy() end) end espCache = {} end
 local bunkerMarker
 local function ensureBunkerMarker()
 	if bunkerMarker and bunkerMarker.Parent then return end
-	bunkerMarker = new("Part", { Name = "NR_BunkerMarker", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false, Transparency = 0.55, Size = Vector3.new(6, 60, 6), Position = BUNKER_ENTRANCE + Vector3.new(0, 28, 0), Color = Color3.fromRGB(59, 240, 160), Material = Enum.Material.Neon }, espFolder)
-	local bb = new("BillboardGui", { Adornee = bunkerMarker, Size = UDim2.fromOffset(180, 40), StudsOffset = Vector3.new(0, 32, 0), AlwaysOnTop = true }, bunkerMarker)
-	new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = "🛡 БУНКЕР (вход)", TextSize = 15, TextColor3 = Color3.fromRGB(59, 240, 160), TextStrokeTransparency = 0.4 }, bb)
+	bunkerMarker = new("Part", { Name = "NR_BunkerMarker", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false, Transparency = 0.5, Size = Vector3.new(6, 60, 6), Position = BUNKER_ENTRANCE + Vector3.new(0, 28, 0), Color = Color3.fromRGB(59, 240, 160), Material = Enum.Material.Neon }, workspace)
+	local bb = new("BillboardGui", { Name = "NR_BunkerLbl", Adornee = bunkerMarker, Size = UDim2.fromOffset(190, 40), StudsOffset = Vector3.new(0, 32, 0), AlwaysOnTop = true }, bunkerMarker)
+	new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = "БУНКЕР (вход)", TextSize = 15, TextColor3 = Color3.fromRGB(59, 240, 160), TextStrokeTransparency = 0.4 }, bb)
 end
 local function espRefresh()
 	if not espFolder then return end
 	if State.espBunker then ensureBunkerMarker() elseif bunkerMarker then bunkerMarker:Destroy() bunkerMarker = nil end
 	local seen = {}
 	local hrp = getHRP()
-	local function add(inst, color, label)
-		if not inst then return end
+	local function add(inst, part, color, lbl)
+		if not (inst and part) then return end
 		seen[inst] = true
-		local h = espCache[inst]
-		if not h then
-			h = new("Highlight", { Adornee = inst, FillColor = color, OutlineColor = Color3.new(1, 1, 1), FillTransparency = 0.6, OutlineTransparency = 0, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop }, espFolder)
-			local bb = new("BillboardGui", { Name = "lbl", Adornee = inst, Size = UDim2.fromOffset(150, 18), StudsOffset = Vector3.new(0, 2.5, 0), AlwaysOnTop = true }, h)
-			new("TextLabel", { Name = "t", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamSemibold, TextSize = 12, TextColor3 = color, TextStrokeTransparency = 0.5 }, bb)
-			espCache[inst] = h
+		local e = espCache[inst]
+		if not e then
+			local hl = new("Highlight", { Adornee = inst, FillColor = color, OutlineColor = Color3.new(1, 1, 1), FillTransparency = 0.6, OutlineTransparency = 0.1, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop }, espFolder)
+			local bb = new("BillboardGui", { Adornee = part, Size = UDim2.fromOffset(160, 18), StudsOffset = Vector3.new(0, 2.6, 0), AlwaysOnTop = true }, espFolder)
+			local tl = new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Font = Enum.Font.GothamSemibold, TextSize = 12, TextColor3 = color, TextStrokeTransparency = 0.5 }, bb)
+			e = { hl = hl, bb = bb, tl = tl } espCache[inst] = e
 		end
-		h.FillColor = color
-		local t = h:FindFirstChild("lbl") and h.lbl:FindFirstChildOfClass("TextLabel")
-		if t then local dist = (hrp and inst:IsA("BasePart")) and math.floor((inst.Position - hrp.Position).Magnitude) or (hrp and inst:IsA("Model") and inst.PrimaryPart and math.floor((inst.PrimaryPart.Position - hrp.Position).Magnitude)) or nil
-			t.Text = label .. (dist and ("  " .. dist .. "m") or "") t.TextColor3 = color end
+		e.hl.FillColor = color e.bb.Adornee = part
+		local dist = hrp and math.floor((part.Position - hrp.Position).Magnitude) or nil
+		e.tl.Text = lbl .. (dist and ("  " .. dist .. "м") or "") e.tl.TextColor3 = color
 	end
 	if hrp then
 		if State.espMobs then local npcs = workspace:FindFirstChild("NPCs") if npcs then for _, fn in ipairs({ "Zombies", "Enemy", "Recon", "Neutrals", "Boss" }) do local f = npcs:FindFirstChild(fn)
 			if f then for _, m in ipairs(f:GetChildren()) do local h = m:FindFirstChildOfClass("Humanoid") local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart
-				if h and r and h.Health > 0 and h.Health < 1e6 and (r.Position - hrp.Position).Magnitude <= State.espDistance then add(m, Color3.fromRGB(255, 77, 94), m.Name .. " [" .. math.floor(h.Health) .. "]") end end end end end end
-		if State.espBoxes then local items = itemsFolder() local boxes = items and items:FindFirstChild("Boxes") if boxes then for _, m in ipairs(boxes:GetDescendants()) do if m:IsA("Model") and BOXNAMES[m.Name] and m:FindFirstChild("Body") and not m:FindFirstChild("Destroyed") and (m.Body.Position - hrp.Position).Magnitude <= State.espDistance then add(m, Color3.fromRGB(255, 178, 35), "Ящик") end end end end
-		if State.espCrates then local items = itemsFolder() local lc = items and items:FindFirstChild("LockpickCrates") if lc then for _, m in ipairs(lc:GetDescendants()) do if m:IsA("Model") and m:FindFirstChild("PromptAttachment") and not m:FindFirstChild("Destroyed") then local body = m:FindFirstChild("Body") local pos = body and body:IsA("BasePart") and body.Position or m:GetPivot().Position if (pos - hrp.Position).Magnitude <= State.espDistance then add(m, Color3.fromRGB(183, 0, 255), "Сундук") end end end end end
+				if h and r and h.Health > 0 and h.Health < 1e6 and (r.Position - hrp.Position).Magnitude <= State.espDistance then add(m, r, Color3.fromRGB(255, 77, 94), m.Name .. " [" .. math.floor(h.Health) .. "]") end end end end end end
+		if State.espBoxes then local items = itemsFolder() local boxes = items and items:FindFirstChild("Boxes") if boxes then for _, m in ipairs(boxes:GetDescendants()) do if m:IsA("Model") and BOXNAMES[m.Name] and m:FindFirstChild("Body") and m.Body:IsA("BasePart") and not m:FindFirstChild("Destroyed") and (m.Body.Position - hrp.Position).Magnitude <= State.espDistance then add(m, m.Body, Color3.fromRGB(255, 178, 35), "Ящик") end end end end
+		if State.espCrates then local items = itemsFolder() local lc = items and items:FindFirstChild("LockpickCrates") if lc then for _, m in ipairs(lc:GetDescendants()) do if m:IsA("Model") and m:FindFirstChild("PromptAttachment") and not m:FindFirstChild("Destroyed") then local body = m:FindFirstChild("Body") if not (body and body:IsA("BasePart")) then body = m:FindFirstChildWhichIsA("BasePart") end if body and (body.Position - hrp.Position).Magnitude <= State.espDistance then add(m, body, Color3.fromRGB(183, 0, 255), "Сундук") end end end end end
 		if State.espLoot then local cache = boxLootCache() if cache then for _, m in ipairs(cache:GetChildren()) do local part = (m:IsA("BasePart") and m) or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
 			if part and (part.Position - hrp.Position).Magnitude <= State.espDistance then local pp for _, d in ipairs(m:GetDescendants()) do if d:IsA("ProximityPrompt") then pp = d break end end
-				local lbl = pp and pp.ActionText ~= "" and pp.ActionText or "Лут" add(m, Color3.fromRGB(54, 226, 255), lbl) end end end end
-		if State.espPlayers then for _, pl in ipairs(Players:GetPlayers()) do if pl ~= lp and pl.Character then local r = pl.Character:FindFirstChild("HumanoidRootPart") if r and (r.Position - hrp.Position).Magnitude <= State.espDistance then add(pl.Character, Color3.fromRGB(255, 255, 255), pl.Name) end end end end
+				local lbl = (pp and pp.ActionText ~= "" and pp.ActionText) or "Лут" add(m, part, Color3.fromRGB(54, 226, 255), lbl) end end end end
+		if State.espPlayers then for _, pl in ipairs(Players:GetPlayers()) do if pl ~= lp and pl.Character then local r = pl.Character:FindFirstChild("HumanoidRootPart") if r and (r.Position - hrp.Position).Magnitude <= State.espDistance then add(pl.Character, r, Color3.fromRGB(255, 255, 255), pl.Name) end end end end
 	end
-	for inst, h in pairs(espCache) do if not seen[inst] or not inst.Parent then pcall(function() h:Destroy() end) espCache[inst] = nil end end
+	for inst, e in pairs(espCache) do if not seen[inst] or not inst.Parent then pcall(function() e.hl:Destroy() end) pcall(function() e.bb:Destroy() end) espCache[inst] = nil end end
 end
 
 -- ============================ GUI ============================
