@@ -308,7 +308,14 @@ local function toggle(key)
     elseif key == "kick" then State.antiKick = not State.antiKick
     elseif key == "farm" then setMode(State.mode == "farm" and "idle" or "farm")
     elseif key == "lb" then setMode(State.mode == "lb" and "idle" or "lb")
-    elseif key == "hb" then State.hbInsane = not State.hbInsane end
+    elseif key == "hb" then State.hbInsane = not State.hbInsane
+    elseif key == "vote" then
+        State.autoVote = not State.autoVote
+        if State.autoVote and MapVoteStateRequest then
+            lastVoteKey = nil
+            pcall(function() MapVoteStateRequest:FireServer() end)
+        end
+    end
     refresh()
 end
 
