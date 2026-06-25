@@ -23,6 +23,7 @@ local State = {
     antiKick = true,
     mode = "idle",
     wantPractice = false,
+    dying = false,
     connections = {},
 }
 
