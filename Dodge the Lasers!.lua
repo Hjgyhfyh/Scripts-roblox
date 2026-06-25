@@ -80,20 +80,29 @@ track(lp.Idled:Connect(function()
     end
 end))
 
+local function pulseTest()
+    local test = getTestPart()
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if test and hrp and typeof(firetouchinterest) == "function" then
+        pcall(function()
+            firetouchinterest(hrp, test, 0)
+            firetouchinterest(hrp, test, 1)
+        end)
+    end
+end
+
 task.spawn(function()
     while State.loaded do
-        if State.antiKick then
-            local test = getTestPart()
-            local char = lp.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if test and hrp and typeof(firetouchinterest) == "function" then
-                pcall(function()
-                    firetouchinterest(hrp, test, 0)
-                    firetouchinterest(hrp, test, 1)
-                end)
-            end
+        if State.hbInsane then
+            pulseTest()
+            task.wait(1 / math.clamp(State.hbRate, 1, 350))
+        elseif State.antiKick then
+            pulseTest()
+            task.wait(8)
+        else
+            task.wait(0.5)
         end
-        task.wait(8)
     end
 end)
 
