@@ -144,6 +144,7 @@ local function collectLuckyDrops()
 			if invoke("Collect Lucky Block", model.Name) then
 				Counters.lucky += 1
 				pcall(function() model:Destroy() end)
+				break
 			end
 		end
 	end
@@ -161,8 +162,8 @@ local function tryOpenLucky()
 		end
 	end
 	if canOpen then
-		local ok = invoke("Open Lucky Block")
-		if ok then
+		local ok, result = invoke("Open Lucky Block")
+		if ok and type(result) == "number" then
 			fire("Claim Opened Chicken")
 			Counters.lucky += 1
 		end
