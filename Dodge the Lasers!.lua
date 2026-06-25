@@ -207,8 +207,8 @@ local ROWS = {
 }
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 286, 0, 44 + 8 + (#ROWS * 44) + 44 + 36 + 12)
-main.Position = UDim2.new(0, 24, 0.5, -160)
+main.Size = UDim2.new(0, 286, 0, 44 + 8 + (#ROWS * 44) + 44 + 44 + 36 + 12)
+main.Position = UDim2.new(0, 24, 0.5, -248)
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
 main.Active = true
