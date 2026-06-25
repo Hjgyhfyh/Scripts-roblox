@@ -13,6 +13,9 @@ local PracticeJoin = Remotes:WaitForChild("PracticeJoin")
 local RoundResults = Remotes:WaitForChild("RoundResults")
 local RoundResultsAck = Remotes:WaitForChild("RoundResultsAck")
 local RoundStateRequest = Remotes:FindFirstChild("RoundStateRequest")
+local MapVoteCast = Remotes:FindFirstChild("MapVoteCast")
+local MapVoteState = Remotes:FindFirstChild("MapVoteState")
+local MapVoteStateRequest = Remotes:FindFirstChild("MapVoteStateRequest")
 
 local LaserBeamGeometry = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("LaserBeamGeometry"))
 
