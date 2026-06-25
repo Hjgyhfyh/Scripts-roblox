@@ -24,6 +24,8 @@ local State = {
     mode = "idle",
     wantPractice = false,
     dying = false,
+    hbInsane = false,
+    hbRate = 200,
     connections = {},
 }
 
