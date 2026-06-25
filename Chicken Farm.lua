@@ -59,7 +59,7 @@ local Config = {
 	GroupReward = true,
 	LuckyBlocks = true,
 	OpenPaidLucky = true,
-	DepositThreshold = 1.3,
+	DepositThreshold = 1.15,
 	MaxHoldSeconds = 20,
 	CallsPerSec = 300,
 }
