@@ -245,10 +245,15 @@ local function setMode(m)
         if m == "farm" then
             task.spawn(function()
                 local t0 = os.clock()
-                while State.mode == "farm" and lp:GetAttribute("PracticeActive") == true and os.clock() - t0 < 8 do
-                    pcall(function() PracticeJoin:FireServer() end)
-                    local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-                    if hum then hum.Health = 0 end
+                while State.mode == "farm" and lp:GetAttribute("PracticeActive") == true and os.clock() - t0 < 12 do
+                    local char = lp.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local spawn = Workspace:FindFirstChild("SpawnLocation") or Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+                    if hrp and spawn then
+                        hrp.CFrame = spawn.CFrame + Vector3.new(0, 3, 0)
+                    elseif hrp then
+                        hrp.CFrame = hrp.CFrame + Vector3.new(0, 0, -130)
+                    end
                     task.wait(1)
                 end
             end)
