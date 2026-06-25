@@ -240,6 +240,7 @@ do
 end
 
 local switches = {}
+local knobs = {}
 
 local function isOn(key)
     if key == "god" then return State.god
