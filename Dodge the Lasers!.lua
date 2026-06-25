@@ -177,6 +177,7 @@ local ROWS = {
     { key = "lb",    label = "Leaderboard grind (survival)" },
     { key = "afk",   label = "Anti-AFK" },
     { key = "kick",  label = "Anti-Kick" },
+    { key = "hb",    label = "Heartbeat farm (insane)" },
 }
 
 local main = Instance.new("Frame")
