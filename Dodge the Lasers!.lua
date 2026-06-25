@@ -387,8 +387,31 @@ for idx, row in ipairs(ROWS) do
     sw.MouseButton1Click:Connect(function() toggle(row.key) end)
 end
 
+local VOTE_MAPS = { "Any", "Classic", "Rounded", "Squared", "Tiles" }
+
+local mapBtn = Instance.new("TextButton")
+mapBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44))
+mapBtn.Size = UDim2.new(1, -24, 0, 36)
+mapBtn.BackgroundColor3 = PANEL
+mapBtn.Font = Enum.Font.GothamBold
+mapBtn.TextSize = 13
+mapBtn.TextColor3 = TXT
+mapBtn.BorderSizePixel = 0
+mapBtn.AutoButtonColor = true
+mapBtn.Text = "Vote map: " .. State.voteMap
+mapBtn.Parent = main
+corner(mapBtn, 8)
+mapBtn.MouseButton1Click:Connect(function()
+    local cur = 1
+    for i, name in ipairs(VOTE_MAPS) do
+        if name == State.voteMap then cur = i break end
+    end
+    State.voteMap = VOTE_MAPS[(cur % #VOTE_MAPS) + 1]
+    mapBtn.Text = "Vote map: " .. State.voteMap
+end)
+
 local simBtn = Instance.new("TextButton")
-simBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44))
+simBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44) + 44)
 simBtn.Size = UDim2.new(1, -24, 0, 36)
 simBtn.BackgroundColor3 = Color3.fromRGB(245, 170, 60)
 simBtn.Text = "SIMULATE LASER DEATH"
