@@ -440,6 +440,8 @@ local function unload()
     State.god = false
     State.antiAfk = false
     State.antiKick = false
+    State.hbInsane = false
+    State.autoVote = false
     State.wantPractice = false
     State.mode = "idle"
     LaserBeamGeometry.clientConfirmedTouch = realConfirm
