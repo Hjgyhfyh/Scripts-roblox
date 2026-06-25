@@ -259,7 +259,8 @@ local function isOn(key)
     elseif key == "afk" then return State.antiAfk
     elseif key == "kick" then return State.antiKick
     elseif key == "farm" then return State.mode == "farm"
-    elseif key == "lb" then return State.mode == "lb" end
+    elseif key == "lb" then return State.mode == "lb"
+    elseif key == "hb" then return State.hbInsane end
     return false
 end
 
