@@ -495,17 +495,41 @@ track(rateBox.FocusLost:Connect(function()
 end))
 
 local footer = Instance.new("Frame")
-footer.Size = UDim2.new(1, 0, 0, 96)
-footer.Position = UDim2.new(0, 0, 1, -96)
+footer.Size = UDim2.new(1, 0, 0, 162)
+footer.Position = UDim2.new(0, 0, 1, -162)
 footer.BackgroundColor3 = THEME.panel
 footer.BorderSizePixel = 0
 footer.Parent = main
 corner(footer, 12)
 
+local lbTitle = Instance.new("TextLabel")
+lbTitle.BackgroundTransparency = 1
+lbTitle.Position = UDim2.fromOffset(14, 6)
+lbTitle.Size = UDim2.new(1, -28, 0, 16)
+lbTitle.Font = Enum.Font.GothamBold
+lbTitle.Text = "🏆 Leaderboards (last place = entry)"
+lbTitle.TextColor3 = THEME.accent
+lbTitle.TextSize = 12
+lbTitle.TextXAlignment = Enum.TextXAlignment.Left
+lbTitle.Parent = footer
+
+local lbLabel = Instance.new("TextLabel")
+lbLabel.BackgroundTransparency = 1
+lbLabel.Position = UDim2.fromOffset(14, 24)
+lbLabel.Size = UDim2.new(1, -28, 0, 50)
+lbLabel.Font = Enum.Font.Gotham
+lbLabel.Text = ""
+lbLabel.TextColor3 = THEME.text
+lbLabel.TextSize = 12
+lbLabel.TextXAlignment = Enum.TextXAlignment.Left
+lbLabel.TextYAlignment = Enum.TextYAlignment.Top
+lbLabel.RichText = true
+lbLabel.Parent = footer
+
 local statsLabel = Instance.new("TextLabel")
 statsLabel.BackgroundTransparency = 1
-statsLabel.Position = UDim2.fromOffset(14, 8)
-statsLabel.Size = UDim2.new(1, -28, 0, 56)
+statsLabel.Position = UDim2.fromOffset(14, 76)
+statsLabel.Size = UDim2.new(1, -28, 0, 52)
 statsLabel.Font = Enum.Font.Gotham
 statsLabel.Text = ""
 statsLabel.TextColor3 = THEME.dim
