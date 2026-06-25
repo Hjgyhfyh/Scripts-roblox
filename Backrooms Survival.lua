@@ -71,24 +71,22 @@ end
 
 local notify
 -- ============================ NOCLIP-SAFE MOVEMENT ============================
-local function boxClear(cf)
+local function boxClear(pos)
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { lp.Character }
-	local parts = workspace:GetPartBoundsInBox(cf, Vector3.new(4, 6, 4), params)
+	local parts = workspace:GetPartBoundsInBox(CFrame.new(pos), Vector3.new(3, 4.5, 3), params)
 	for _, p in ipairs(parts) do if p.CanCollide then return false end end
 	return true
 end
 local function safeTeleport(dest)
 	local hrp = getHRP() if not hrp then return false end
 	pcall(function() hrp.AssemblyLinearVelocity = Vector3.zero end)
-	if not State.noclipSafe or boxClear(dest) then hrp.CFrame = dest return true end
-	for _, off in ipairs({ Vector3.new(0, 3, 0), Vector3.new(0, 6, 0), Vector3.new(0, 9, 0), Vector3.new(0, -2, 0) }) do
-		local c = dest + off
-		if boxClear(CFrame.new(c) * (dest - dest.Position == Vector3.zero and CFrame.new() or CFrame.new())) then hrp.CFrame = CFrame.new(c, dest.Position + (dest.LookVector * 5)) return true end
+	if not State.noclipSafe or boxClear(dest.Position) then hrp.CFrame = dest return true end
+	local rot = dest - dest.Position
+	for _, off in ipairs({ Vector3.new(0, 4, 0), Vector3.new(0, 7, 0), Vector3.new(0, 10, 0) }) do
+		if boxClear(dest.Position + off) then hrp.CFrame = CFrame.new(dest.Position + off) * rot return true end
 	end
-	local raw = CFrame.new(dest.Position + Vector3.new(0, 4, 0))
-	if boxClear(raw) then hrp.CFrame = raw return true end
 	hrp.CFrame = dest
 	return true
 end
