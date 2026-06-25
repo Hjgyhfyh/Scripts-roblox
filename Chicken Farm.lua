@@ -218,6 +218,7 @@ end
 
 -- Management
 local lastMerge = 0
+local lastDeposit = os.clock()
 spawnLoop(function()
 	while running do
 		local cash = stat("Cash") or 0
@@ -225,7 +226,20 @@ spawnLoop(function()
 		local level = stat("ProcessingLevel") or 0
 
 		if Config.DepositEggs and (stat("Eggs") or 0) > 0 then
-			if invoke("Deposit Eggs") then Counters.deposits += 1 end
+			local doDeposit
+			if not Config.SmartDeposit then
+				doDeposit = true
+			elseif frenzyActive() then
+				doDeposit = true
+			elseif currentEggMult() >= Config.DepositThreshold then
+				doDeposit = true
+			elseif (os.clock() - lastDeposit) >= Config.MaxHoldSeconds then
+				doDeposit = true
+			end
+			if doDeposit and invoke("Deposit Eggs") then
+				Counters.deposits += 1
+				lastDeposit = os.clock()
+			end
 		end
 
 		if Config.CollectCash and (stat("CashCollect") or 0) > 0 then
