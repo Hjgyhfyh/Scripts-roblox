@@ -609,7 +609,7 @@ end
 -- ============================ ESP ============================
 local espFolder
 local espCache = {}
-local function clearEsp() for k, v in pairs(espCache) do pcall(function() v:Destroy() end) end espCache = {} if espFolder then for _, c in ipairs(espFolder:GetChildren()) do if c.Name ~= "BunkerMarker" then end end end end
+local function clearEsp() for _, v in pairs(espCache) do pcall(function() v:Destroy() end) end espCache = {} end
 local bunkerMarker
 local function ensureBunkerMarker()
 	if bunkerMarker and bunkerMarker.Parent then return end
