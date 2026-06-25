@@ -486,6 +486,7 @@ task.spawn(function()
 				if not c.box.Parent or c.box:FindFirstChild("Destroyed") then State.boxesBroken = State.boxesBroken + 1 end
 				collectNearby(45)
 			elseif c.kind == "crate" then doLockpick(c.crate, c.pos) end
+			end)
 		else State.currentAction = "Поиск целей..." task.wait(0.3) end
 	end
 end)
