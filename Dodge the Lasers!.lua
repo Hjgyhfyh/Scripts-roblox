@@ -257,7 +257,7 @@ local function refresh()
         sw.BackgroundColor3 = on and ACCENT or OFFCOL
         sw.Text = on and "ON" or "OFF"
         sw.TextColor3 = on and Color3.fromRGB(10, 12, 16) or TXT
-        sw.knob.Position = on and UDim2.new(1, -20, 0.5, -8) or UDim2.new(0, 4, 0.5, -8)
+        knobs[key].Position = on and UDim2.new(1, -20, 0.5, -8) or UDim2.new(0, 4, 0.5, -8)
     end
 end
 
