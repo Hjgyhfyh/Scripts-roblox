@@ -279,8 +279,31 @@ local function toggle(key)
     elseif key == "afk" then State.antiAfk = not State.antiAfk
     elseif key == "kick" then State.antiKick = not State.antiKick
     elseif key == "farm" then setMode(State.mode == "farm" and "idle" or "farm")
-    elseif key == "lb" then setMode(State.mode == "lb" and "idle" or "lb") end
+    elseif key == "lb" then setMode(State.mode == "lb" and "idle" or "lb")
+    elseif key == "hb" then State.hbInsane = not State.hbInsane end
     refresh()
+end
+
+local function simulateDeath()
+    if State.dying or not State.loaded then return end
+    State.dying = true
+    local prevGod = State.god
+    State.god = false
+    refresh()
+    task.spawn(function()
+        local t0 = os.clock()
+        while State.loaded and State.dying do
+            local role = lp:GetAttribute("RoundRole")
+            local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+            if role == "eliminated" or (hum and hum.Health <= 0) then break end
+            if os.clock() - t0 > 6 then break end
+            task.wait(0.1)
+        end
+        task.wait(0.4)
+        if State.loaded then State.god = prevGod end
+        State.dying = false
+        refresh()
+    end)
 end
 
 for idx, row in ipairs(ROWS) do
