@@ -563,6 +563,23 @@ spawnLoop(function()
 				Counters.collected, Counters.deposits, Counters.buys
 			)
 		end)
+		pcall(function()
+			local lines = {}
+			for _, name in LB_NAMES do
+				local place = LocalPlayer:GetAttribute("Place" .. name)
+				local myVal = stat(name)
+				local valStr
+				if name == "TimePlayed" then
+					local ok, s = pcall(function() return Paper.Time.formatSignificant(myVal, 2) end)
+					valStr = ok and s or tostring(myVal)
+				else
+					valStr = formatNumber(myVal)
+				end
+				local rankStr = place and ("<font color='#65B841'>#" .. place .. "</font>") or "<font color='#BE5A5C'>OUT</font>"
+				lines[#lines + 1] = string.format("%s  %s  %s / %s", LB_LABEL[name] or name, rankStr, valStr, LB_CUTOFF[name] or "?")
+			end
+			lbLabel.Text = table.concat(lines, "\n")
+		end)
 		task.wait(0.5)
 	end
 end)
