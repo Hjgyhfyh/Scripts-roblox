@@ -462,6 +462,7 @@ task.spawn(function()
 		if #candidates > 0 then
 			table.sort(candidates, function(a, b) if math.abs(a.dist - b.dist) < 8 then return a.prio < b.prio end return a.dist < b.dist end)
 			local c = candidates[1]
+			pcall(function()
 			if c.kind == "loot" then doCollect(c.loot)
 			elseif c.kind == "kill" then
 				State.currentAction = "Убиваю: " .. c.npc.Name
