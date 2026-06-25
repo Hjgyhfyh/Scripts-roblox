@@ -502,11 +502,13 @@ spawnLoop(function()
 		local held = stat("Eggs") or 0
 		local tc = stat("TotalChickens") or 0
 		local lvl = stat("ProcessingLevel") or 0
-		statsLabel.Text = string.format(
-			"<font color='#F7BC4B'>Cash</font> %s   <font color='#F7BC4B'>Eggs</font> %s\n<font color='#F7BC4B'>Chickens</font> %s   <font color='#F7BC4B'>Process Lv</font> %d\n<font color='#65B841'>Collected</font> %d  <font color='#65B841'>Deposits</font> %d  <font color='#65B841'>Buys</font> %d",
-			formatNumber(cash), formatNumber(held), formatNumber(tc), lvl,
-			Counters.collected, Counters.deposits, Counters.buys
-		)
+		pcall(function()
+			statsLabel.Text = string.format(
+				"<font color='#F7BC4B'>Cash</font> %s   <font color='#F7BC4B'>Eggs</font> %s\n<font color='#F7BC4B'>Chickens</font> %s   <font color='#F7BC4B'>Process Lv</font> %d\n<font color='#65B841'>Collected</font> %d  <font color='#65B841'>Deposits</font> %d  <font color='#65B841'>Buys</font> %d",
+				formatNumber(cash), formatNumber(held), formatNumber(tc), lvl,
+				Counters.collected, Counters.deposits, Counters.buys
+			)
+		end)
 		task.wait(0.5)
 	end
 end)
