@@ -1,11 +1,16 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 local CoreGui = game:GetService("CoreGui")
 
 local lp = Players.LocalPlayer
+
+if _G.__DL and _G.__DL.unload then
+    pcall(_G.__DL.unload)
+end
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local LaserHitClaim = Remotes:WaitForChild("LaserHitClaim")
@@ -19,62 +24,120 @@ local MapVoteStateRequest = Remotes:FindFirstChild("MapVoteStateRequest")
 
 local LaserBeamGeometry = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("LaserBeamGeometry"))
 
+local LB_TARGETS = {
+    { name = "Top-10 (4200s)", value = 4200 },
+    { name = "Top-1 (13500s)", value = 13500 },
+    { name = "Endless", value = math.huge },
+}
+
 local State = {
     loaded = true,
     god = true,
     antiAfk = true,
     antiKick = true,
+    hbInsane = false,
+    hbRate = 200,
+    autoVote = true,
+    voteMap = "Classic",
     mode = "idle",
     wantPractice = false,
     dying = false,
-    hbInsane = false,
-    hbRate = 200,
-    autoVote = false,
-    voteMap = "Any",
+    lbTargetIndex = 1,
     connections = {},
 }
-
-local realConfirm = LaserBeamGeometry.clientConfirmedTouch
-LaserBeamGeometry.clientConfirmedTouch = function(...)
-    if State.loaded and State.god then
-        return false
-    end
-    return realConfirm(...)
-end
-
-do
-    local ok = pcall(function()
-        local nameMethod = getnamecallmethod
-        local oldNamecall
-        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-            if State.loaded and State.god and self == LaserHitClaim and nameMethod() == "FireServer" then
-                return
-            end
-            return oldNamecall(self, ...)
-        end)
-    end)
-    if not ok then
-        local mt = getrawmetatable(game)
-        local old = mt.__namecall
-        setreadonly(mt, false)
-        mt.__namecall = newcclosure(function(self, ...)
-            if State.loaded and State.god and self == LaserHitClaim and getnamecallmethod() == "FireServer" then
-                return
-            end
-            return old(self, ...)
-        end)
-        setreadonly(mt, true)
-    end
-end
+_G.__DL = State
 
 local function track(conn)
     State.connections[#State.connections + 1] = conn
     return conn
 end
 
-local function getTestPart()
-    return Workspace:FindFirstChild("TEST") or Workspace:FindFirstChild("TEST", true)
+local function lbTarget()
+    return LB_TARGETS[State.lbTargetIndex].value
 end
+
+_G.__DLHitClaim = LaserHitClaim
+if not _G.__DLrealConfirm then
+    _G.__DLrealConfirm = LaserBeamGeometry.clientConfirmedTouch
+end
+local realConfirm = _G.__DLrealConfirm
+local ourConfirm = function(...)
+    if _G.__DL and _G.__DL.god then
+        return false
+    end
+    return realConfirm(...)
+end
+LaserBeamGeometry.clientConfirmedTouch = ourConfirm
+
+if not _G.__DLNamecallHooked then
+    _G.__DLNamecallHooked = true
+    local ok = pcall(function()
+        local nameMethod = getnamecallmethod
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if _G.__DL and _G.__DL.god and self == _G.__DLHitClaim and nameMethod() == "FireServer" then
+                return
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+    if not ok then
+        pcall(function()
+            local mt = getrawmetatable(game)
+            local old = mt.__namecall
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                if _G.__DL and _G.__DL.god and self == _G.__DLHitClaim and getnamecallmethod() == "FireServer" then
+                    return
+                end
+                return old(self, ...)
+            end)
+            setreadonly(mt, true)
+        end)
+    end
+end
+
+task.spawn(function()
+    while State.loaded do
+        if LaserBeamGeometry.clientConfirmedTouch ~= ourConfirm then
+            LaserBeamGeometry.clientConfirmedTouch = ourConfirm
+        end
+        task.wait(3)
+    end
+end)
+
+local function inPlay()
+    return lp:GetAttribute("RoundRole") == "playing"
+        or lp:GetAttribute("MatchHudActive") == true
+        or lp:GetAttribute("PracticeActive") == true
+end
+
+local lastSafe = nil
+track(lp.CharacterAdded:Connect(function()
+    lastSafe = nil
+end))
+
+track(RunService.Heartbeat:Connect(function()
+    if not (State.loaded and State.god) then return end
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not (hrp and hum) then return end
+    if not inPlay() then lastSafe = nil; return end
+
+    local vel = hrp.AssemblyLinearVelocity
+    local xz = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
+    if xz > 50 then
+        hrp.AssemblyLinearVelocity = Vector3.new(0, math.min(vel.Y, 0), 0)
+    end
+
+    if hum.FloorMaterial ~= Enum.Material.Air then
+        lastSafe = hrp.CFrame
+    elseif lastSafe and hrp.Position.Y < lastSafe.Position.Y - 10 then
+        hrp.CFrame = lastSafe
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+end))
 
 track(lp.Idled:Connect(function()
     if State.loaded and State.antiAfk then
@@ -84,6 +147,10 @@ track(lp.Idled:Connect(function()
         end)
     end
 end))
+
+local function getTestPart()
+    return Workspace:FindFirstChild("TEST") or Workspace:FindFirstChild("TEST", true)
+end
 
 local function pulseTest()
     local test = getTestPart()
@@ -101,20 +168,36 @@ task.spawn(function()
     while State.loaded do
         if State.hbInsane then
             pulseTest()
-            task.wait(1 / math.clamp(State.hbRate, 1, 350))
+            task.wait(1 / math.clamp(State.hbRate, 1, 300))
         elseif State.antiKick then
             pulseTest()
-            task.wait(8)
+            task.wait(10)
         else
             task.wait(0.5)
         end
     end
 end)
 
+local refresh
+
 task.spawn(function()
     while State.loaded do
-        if State.wantPractice and lp:GetAttribute("PracticeActive") ~= true then
-            pcall(function() PracticeJoin:FireServer() end)
+        if State.mode == "lb" then
+            local best = lp:GetAttribute("PracticePersonalBest") or 0
+            if lbTarget() ~= math.huge and best >= lbTarget() then
+                State.wantPractice = false
+                State.mode = "idle"
+                local prevGod = State.god
+                State.god = false
+                task.delay(10, function()
+                    if State.loaded then State.god = prevGod end
+                end)
+                if refresh then refresh() end
+            elseif State.wantPractice
+                and lp:GetAttribute("PracticeActive") ~= true
+                and lp:GetAttribute("RunStartTime") == nil then
+                pcall(function() PracticeJoin:FireServer() end)
+            end
         end
         task.wait(2)
     end
@@ -135,15 +218,15 @@ if MapVoteState and MapVoteCast then
         if type(st) ~= "table" or st.phase ~= "active" then return end
         local opts = st.options
         if type(opts) ~= "table" or #opts == 0 then return end
-        local key = st.voteEndsAt or st.voteOpensAt
-        if key and lastVoteKey == key then return end
+        local key = st.voteEndsAt or st.voteOpensAt or (table.concat(opts, ",") .. "|" .. tostring(st.phase))
+        if lastVoteKey == key then return end
+        lastVoteKey = key
         local idx = 1
         if State.voteMap ~= "Any" then
             for i, name in ipairs(opts) do
                 if name == State.voteMap then idx = i break end
             end
         end
-        lastVoteKey = key
         pcall(function() MapVoteCast:FireServer(idx) end)
     end))
 end
@@ -159,16 +242,40 @@ local function setMode(m)
         pcall(function() PracticeJoin:FireServer() end)
     else
         State.wantPractice = false
-        if m == "farm" and lp:GetAttribute("PracticeActive") == true then
-            pcall(function() PracticeJoin:FireServer() end)
-            task.delay(2, function()
-                if State.mode == "farm" and lp:GetAttribute("PracticeActive") == true then
+        if m == "farm" then
+            task.spawn(function()
+                local t0 = os.clock()
+                while State.mode == "farm" and lp:GetAttribute("PracticeActive") == true and os.clock() - t0 < 8 do
+                    pcall(function() PracticeJoin:FireServer() end)
                     local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
                     if hum then hum.Health = 0 end
+                    task.wait(1)
                 end
             end)
         end
     end
+end
+
+local function simulateDeath()
+    if State.dying or not State.loaded or State.mode == "lb" then return end
+    State.dying = true
+    local prevGod = State.god
+    State.god = false
+    if refresh then refresh() end
+    task.spawn(function()
+        local t0 = os.clock()
+        while State.loaded and State.dying do
+            local role = lp:GetAttribute("RoundRole")
+            local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+            if role == "eliminated" or (hum and hum.Health <= 0) then break end
+            if os.clock() - t0 > 6 then break end
+            task.wait(0.1)
+        end
+        task.wait(0.4)
+        if State.loaded and not State.god then State.god = prevGod end
+        State.dying = false
+        if State.loaded and refresh then refresh() end
+    end)
 end
 
 local parentGui = (gethui and gethui()) or CoreGui
@@ -186,6 +293,7 @@ gui.Parent = parentGui
 local ACCENT = Color3.fromRGB(0, 220, 160)
 local OFFCOL = Color3.fromRGB(70, 76, 90)
 local DANGER = Color3.fromRGB(255, 90, 120)
+local AMBER = Color3.fromRGB(245, 170, 60)
 local BG = Color3.fromRGB(18, 20, 26)
 local PANEL = Color3.fromRGB(30, 33, 43)
 local TXT = Color3.fromRGB(235, 238, 245)
@@ -197,7 +305,7 @@ local function corner(p, r)
 end
 
 local ROWS = {
-    { key = "god",   label = "Immortality (godmode)" },
+    { key = "god",   label = "Immortality (godmode + anti-fall)" },
     { key = "farm",  label = "Farm Cash / XP / Wins" },
     { key = "lb",    label = "Leaderboard grind (survival)" },
     { key = "afk",   label = "Anti-AFK" },
@@ -207,8 +315,8 @@ local ROWS = {
 }
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 286, 0, 44 + 8 + (#ROWS * 44) + 44 + 44 + 36 + 12)
-main.Position = UDim2.new(0, 24, 0.5, -248)
+main.Size = UDim2.new(0, 290, 0, 44 + 8 + (#ROWS * 44) + 44 * 3 + 36 + 12)
+main.Position = UDim2.new(0, 24, 0.5, -270)
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
 main.Active = true
@@ -258,24 +366,24 @@ corner(closeBtn, 6)
 
 do
     local dragging, dragStart, startPos
-    bar.InputBegan:Connect(function(i)
+    track(bar.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = i.Position
             startPos = main.Position
         end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
+    end))
+    track(UserInputService.InputChanged:Connect(function(i)
         if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
             local d = i.Position - dragStart
             main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
         end
-    end)
-    UserInputService.InputEnded:Connect(function(i)
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
-    end)
+    end))
 end
 
 local switches = {}
@@ -292,7 +400,7 @@ local function isOn(key)
     return false
 end
 
-local function refresh()
+refresh = function()
     for key, sw in pairs(switches) do
         local on = isOn(key)
         sw.BackgroundColor3 = on and ACCENT or OFFCOL
@@ -317,28 +425,6 @@ local function toggle(key)
         end
     end
     refresh()
-end
-
-local function simulateDeath()
-    if State.dying or not State.loaded then return end
-    State.dying = true
-    local prevGod = State.god
-    State.god = false
-    refresh()
-    task.spawn(function()
-        local t0 = os.clock()
-        while State.loaded and State.dying do
-            local role = lp:GetAttribute("RoundRole")
-            local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-            if role == "eliminated" or (hum and hum.Health <= 0) then break end
-            if os.clock() - t0 > 6 then break end
-            task.wait(0.1)
-        end
-        task.wait(0.4)
-        if State.loaded then State.god = prevGod end
-        State.dying = false
-        refresh()
-    end)
 end
 
 for idx, row in ipairs(ROWS) do
@@ -384,56 +470,48 @@ for idx, row in ipairs(ROWS) do
     knobs[row.key] = knob
 
     switches[row.key] = sw
-    sw.MouseButton1Click:Connect(function() toggle(row.key) end)
+    track(sw.MouseButton1Click:Connect(function() toggle(row.key) end))
 end
 
-local VOTE_MAPS = { "Any", "Classic", "Rounded", "Squared", "Tiles" }
+local function actionButton(y, text, col, txtCol)
+    local b = Instance.new("TextButton")
+    b.Position = UDim2.new(0, 12, 0, y)
+    b.Size = UDim2.new(1, -24, 0, 36)
+    b.BackgroundColor3 = col
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    b.TextColor3 = txtCol
+    b.BorderSizePixel = 0
+    b.AutoButtonColor = true
+    b.Parent = main
+    corner(b, 8)
+    return b
+end
 
-local mapBtn = Instance.new("TextButton")
-mapBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44))
-mapBtn.Size = UDim2.new(1, -24, 0, 36)
-mapBtn.BackgroundColor3 = PANEL
-mapBtn.Font = Enum.Font.GothamBold
-mapBtn.TextSize = 13
-mapBtn.TextColor3 = TXT
-mapBtn.BorderSizePixel = 0
-mapBtn.AutoButtonColor = true
-mapBtn.Text = "Vote map: " .. State.voteMap
-mapBtn.Parent = main
-corner(mapBtn, 8)
-mapBtn.MouseButton1Click:Connect(function()
+local base = 44 + 8 + (#ROWS * 44)
+
+local VOTE_MAPS = { "Any", "Classic", "Rounded", "Squared", "Tiles" }
+local mapBtn = actionButton(base, "Vote map: " .. State.voteMap, PANEL, TXT)
+track(mapBtn.MouseButton1Click:Connect(function()
     local cur = 1
     for i, name in ipairs(VOTE_MAPS) do
         if name == State.voteMap then cur = i break end
     end
     State.voteMap = VOTE_MAPS[(cur % #VOTE_MAPS) + 1]
     mapBtn.Text = "Vote map: " .. State.voteMap
-end)
+end))
 
-local simBtn = Instance.new("TextButton")
-simBtn.Position = UDim2.new(0, 12, 0, 44 + 8 + (#ROWS * 44) + 44)
-simBtn.Size = UDim2.new(1, -24, 0, 36)
-simBtn.BackgroundColor3 = Color3.fromRGB(245, 170, 60)
-simBtn.Text = "SIMULATE LASER DEATH"
-simBtn.Font = Enum.Font.GothamBold
-simBtn.TextSize = 13
-simBtn.TextColor3 = Color3.fromRGB(20, 16, 8)
-simBtn.BorderSizePixel = 0
-simBtn.Parent = main
-corner(simBtn, 8)
-simBtn.MouseButton1Click:Connect(simulateDeath)
+local lbBtn = actionButton(base + 44, "LB target: " .. LB_TARGETS[State.lbTargetIndex].name, PANEL, TXT)
+track(lbBtn.MouseButton1Click:Connect(function()
+    State.lbTargetIndex = (State.lbTargetIndex % #LB_TARGETS) + 1
+    lbBtn.Text = "LB target: " .. LB_TARGETS[State.lbTargetIndex].name
+end))
 
-local unloadBtn = Instance.new("TextButton")
-unloadBtn.Position = UDim2.new(0, 12, 1, -48)
-unloadBtn.Size = UDim2.new(1, -24, 0, 36)
-unloadBtn.BackgroundColor3 = DANGER
-unloadBtn.Text = "UNLOAD"
-unloadBtn.Font = Enum.Font.GothamBold
-unloadBtn.TextSize = 13
-unloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-unloadBtn.BorderSizePixel = 0
-unloadBtn.Parent = main
-corner(unloadBtn, 8)
+local simBtn = actionButton(base + 88, "SIMULATE LASER DEATH", AMBER, Color3.fromRGB(20, 16, 8))
+track(simBtn.MouseButton1Click:Connect(simulateDeath))
+
+local unloadBtn = actionButton(base + 132, "UNLOAD", DANGER, Color3.fromRGB(255, 255, 255))
 
 local function unload()
     State.loaded = false
@@ -444,15 +522,19 @@ local function unload()
     State.autoVote = false
     State.wantPractice = false
     State.mode = "idle"
-    LaserBeamGeometry.clientConfirmedTouch = realConfirm
+    if _G.__DLrealConfirm then
+        LaserBeamGeometry.clientConfirmedTouch = _G.__DLrealConfirm
+    end
     for _, c in ipairs(State.connections) do
         pcall(function() c:Disconnect() end)
     end
     table.clear(State.connections)
+    if _G.__DL == State then _G.__DL = nil end
     if gui then gui:Destroy() end
 end
+State.unload = unload
 
-closeBtn.MouseButton1Click:Connect(unload)
-unloadBtn.MouseButton1Click:Connect(unload)
+track(closeBtn.MouseButton1Click:Connect(unload))
+track(unloadBtn.MouseButton1Click:Connect(unload))
 
 refresh()
