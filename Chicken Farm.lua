@@ -19,6 +19,35 @@ local EggsFolder = workspace:WaitForChild("Eggs", 15)
 local BUY_AMOUNTS = { 100, 25, 5, 1 }
 local MAX_RATE = 400
 
+local LB_NAMES = { "TotalChickens", "Networth", "TimePlayed" }
+local LB_LABEL = { TotalChickens = "Chickens", Networth = "Networth", TimePlayed = "Time" }
+local LeaderboardsFolder = workspace:FindFirstChild("Leaderboards")
+local LB_CUTOFF = {}
+if LeaderboardsFolder then
+	for _, board in LeaderboardsFolder:GetChildren() do
+		local normal = board:FindFirstChild("Main")
+		normal = normal and normal:FindFirstChild("UI")
+		normal = normal and normal:FindFirstChild("Normal")
+		local lastText, lastPlace = nil, -1
+		if normal then
+			for _, e in normal:GetChildren() do
+				if e:IsA("Frame") then
+					local p = e:FindFirstChild("Place", true)
+					local a = e:FindFirstChild("Amount", true)
+					if p and a then
+						local num = tonumber((tostring(p.Text):gsub("#", ""):gsub("%s", "")))
+						if num and num > lastPlace then
+							lastPlace = num
+							lastText = tostring(a.Text)
+						end
+					end
+				end
+			end
+		end
+		LB_CUTOFF[board.Name] = lastText
+	end
+end
+
 local Config = {
 	CollectEggs = true,
 	DepositEggs = true,
