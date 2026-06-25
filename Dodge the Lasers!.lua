@@ -310,7 +310,7 @@ for idx, row in ipairs(ROWS) do
     knob.BorderSizePixel = 0
     knob.Parent = sw
     corner(knob, 8)
-    sw.knob = knob
+    knobs[row.key] = knob
 
     switches[row.key] = sw
     sw.MouseButton1Click:Connect(function() toggle(row.key) end)
