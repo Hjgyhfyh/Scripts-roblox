@@ -138,6 +138,20 @@ local function formatNumber(n)
 	return tostring(n)
 end
 
+local ValuesFolder = ReplicatedStorage:FindFirstChild("Values")
+local EggMultValue = ValuesFolder and ValuesFolder:FindFirstChild("EggMultiplier")
+local function currentEggMult()
+	if EggMultValue then
+		local v = EggMultValue.Value
+		if type(v) == "number" then return v end
+	end
+	return 1
+end
+local function frenzyActive()
+	local ok, v = pcall(function() return Paper.GlobalEvents.IsActive("EggMultiplier") end)
+	return ok and v == true
+end
+
 -- Egg collection
 local function collectEgg(egg)
 	if not Config.CollectEggs or not egg or not egg.Parent then return end
