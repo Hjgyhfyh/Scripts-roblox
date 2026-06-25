@@ -181,21 +181,11 @@ local function equipWeapon(tool)
 end
 local function ensureBestWeapon()
 	if not State.autoBestWeapon then return end
+	if os.clock() < State.weaponReadyAt then return end
 	local char = lp.Character if not char then return end
 	local equipped = char:FindFirstChildOfClass("Tool")
 	local best = strongestUsable()
 	if best and best.tool and (not equipped or equipped.Name ~= best.name) then equipWeapon(best.tool) end
-end
-local WEAPON_IDX
-local function weaponIndex()
-	if WEAPON_IDX then return WEAPON_IDX end
-	WEAPON_IDX = {}
-	local function add(folder, kind) if not folder then return end for _, t in ipairs(folder:GetChildren()) do
-		local m = t:FindFirstChild("MeleeStats") or t:FindFirstChild("WeaponStats")
-		if m then local ok, s = pcall(require, m) if ok then WEAPON_IDX[t.Name] = { kind = kind, power = weaponPower(s, kind == "melee" and "melee" or "gun"), reqLvl = s.requiredLevel } end end
-	end end
-	add(Tools:FindFirstChild("Melee"), "melee") add(Tools:FindFirstChild("Misc"), "melee") add(Tools:FindFirstChild("Weapons"), "gun")
-	return WEAPON_IDX
 end
 
 -- ============================ HEAL ============================
