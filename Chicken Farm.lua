@@ -28,7 +28,7 @@ local Config = {
 	UpgradeProcess = true,
 	GroupReward = true,
 	LuckyBlocks = true,
-	OpenPaidLucky = false,
+	OpenPaidLucky = true,
 	CallsPerSec = 300,
 }
 
