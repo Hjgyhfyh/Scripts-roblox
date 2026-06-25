@@ -51,6 +51,7 @@ end
 local Config = {
 	CollectEggs = true,
 	DepositEggs = true,
+	SmartDeposit = true,
 	CollectCash = true,
 	BuyChickens = true,
 	MergeChickens = true,
@@ -58,6 +59,8 @@ local Config = {
 	GroupReward = true,
 	LuckyBlocks = true,
 	OpenPaidLucky = true,
+	DepositThreshold = 1.3,
+	MaxHoldSeconds = 20,
 	CallsPerSec = 300,
 }
 
