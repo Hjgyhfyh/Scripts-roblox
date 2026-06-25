@@ -451,7 +451,7 @@ task.spawn(function()
 			end
 		end
 
-		if State.hauler then haulStep() continue end
+		if State.hauler then pcall(haulStep) continue end
 
 		local candidates = {}
 		if State.autoLoot then local l = nearestLoot() if l then candidates[#candidates + 1] = { kind = "loot", dist = l.dist, prio = 0, loot = l } end end
