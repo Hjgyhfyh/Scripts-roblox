@@ -478,6 +478,7 @@ end
 
 makeToggle("Auto Collect Eggs", "CollectEggs")
 makeToggle("Auto Deposit Eggs", "DepositEggs")
+makeToggle("Smart Deposit (peak x)", "SmartDeposit")
 makeToggle("Auto Collect Cash", "CollectCash")
 makeToggle("Auto Buy Chickens", "BuyChickens")
 makeToggle("Auto Merge Chickens", "MergeChickens")
