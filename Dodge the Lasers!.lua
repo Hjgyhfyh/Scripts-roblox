@@ -203,6 +203,7 @@ local ROWS = {
     { key = "afk",   label = "Anti-AFK" },
     { key = "kick",  label = "Anti-Kick" },
     { key = "hb",    label = "Heartbeat farm (insane)" },
+    { key = "vote",  label = "Auto map vote" },
 }
 
 local main = Instance.new("Frame")
