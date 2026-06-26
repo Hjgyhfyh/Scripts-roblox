@@ -234,28 +234,37 @@ local onStrengthCaptured
 local function setStrengthRemote(remote)
     local wasEmpty = (R.strength == nil)
     R.strength = remote
+    hookActive = false
     if wasEmpty and onStrengthCaptured then pcall(onStrengthCaptured) end
 end
 
-do
-    if hookmetamethod and getnamecallmethod then
-        local function wrap(f) return (newcclosure and newcclosure(f)) or f end
-        local oldNamecall
-        oldNamecall = hookmetamethod(game, "__namecall", wrap(function(self, ...)
-            if hookActive then
-                pcall(function(...)
-                    if getnamecallmethod() == "InvokeServer" and self.ClassName == "RemoteFunction" then
-                        local a1, a2 = ...
-                        if type(a1) == "number" and a2 == GIVE_KEY then
-                            setStrengthRemote(self)
-                        end
-                    end
-                end, ...)
+local function installStrengthHook()
+    if not (hookmetamethod and getnamecallmethod) then return end
+    local function wrap(f) return (newcclosure and newcclosure(f)) or f end
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", wrap(function(self, ...)
+        if hookActive then
+            if R.strength then
+                hookActive = false
+            elseif getnamecallmethod() == "InvokeServer" then
+                local a1, a2 = ...
+                if type(a1) == "number" and a2 == GIVE_KEY then
+                    local ok, cls = pcall(function() return self.ClassName end)
+                    if ok and cls == "RemoteFunction" then setStrengthRemote(self) end
+                end
             end
-            return oldNamecall(self, ...)
-        end))
-    end
+        end
+        return oldNamecall(self, ...)
+    end))
 end
+
+task.spawn(function()
+    for _ = 1, 12 do
+        if R.strength then return end
+        task.wait(0.5)
+    end
+    if not R.strength then installStrengthHook() end
+end)
 
 local STRENGTH_CALL_BUDGET = 4000000
 
