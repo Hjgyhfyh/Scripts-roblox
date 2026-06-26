@@ -77,14 +77,29 @@ end
 ----------------------------------------------------------------------
 -- Game bindings
 ----------------------------------------------------------------------
-local function optreq(path)
-    local ok, m = pcall(require, path)
+local function optreq(inst)
+    if typeof(inst) ~= "Instance" then return nil end
+    local ok, m = pcall(require, inst)
     return ok and m or nil
 end
 
-local Items   = optreq(workspace.Lib.Items.TGSItems)
-local ItemCat = optreq(workspace.Lib.Items.ItemCategoryEnum)
-local PetSys  = optreq(workspace.Lib.PetSystem.TGSPetSystem)
+local function findPath(root, ...)
+    local node = root
+    for _, seg in ipairs({ ... }) do
+        if typeof(node) ~= "Instance" then return nil end
+        node = node:FindFirstChild(seg)
+        if not node then return nil end
+    end
+    return node
+end
+
+local Items, ItemCat, PetSys
+local function bindModules()
+    Items   = Items   or optreq(findPath(workspace, "Lib", "Items", "TGSItems"))
+    ItemCat = ItemCat or optreq(findPath(workspace, "Lib", "Items", "ItemCategoryEnum"))
+    PetSys  = PetSys  or optreq(findPath(workspace, "Lib", "PetSystem", "TGSPetSystem"))
+end
+bindModules()
 
 local CURRENCY_TARGET = "Currency_Knivsta"   -- 3 Knivsta = 1 Energy
 local RATIO           = 3
