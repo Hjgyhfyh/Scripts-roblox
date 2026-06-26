@@ -160,7 +160,7 @@ end
 ----------------------------------------------------------------------
 -- Energy delivery (mint Knivsta via sign-bypass, then convert)
 ----------------------------------------------------------------------
-local State = { busy = false }
+local State = { busy = false, alive = true }
 
 local function ensureKnivsta(cv, needKnivsta)
     if (readKnivsta() or 0) >= needKnivsta then return end
@@ -226,13 +226,28 @@ do
     if r then setStrengthRemote(r) end
 end
 
--- The server grants strength as long as PrimaryPart.Anchored is true, so we
--- never drive the game's workout state machine (which is what was leaving the
--- dumbbell/idle pose stuck). We PRESERVE the original anchor state: if you are
--- already working out we change nothing — no flicker, the workout keeps going;
--- if you are not, we briefly anchor, grant, then restore exactly as it was, so
--- you are never kicked out of a workout and can keep lifting normally.
-local function giveStrength(target)
+-- The server grants strength only while PrimaryPart.Anchored is true, so we
+-- never drive the game's workout state machine (that desync left the dumbbell
+-- pose stuck). We PRESERVE the original anchor state: already working out →
+-- nothing changes, the workout keeps going; otherwise we briefly anchor, grant,
+-- then restore exactly as it was.
+--
+-- The server also SUMS the cost of every strength level it grants, looping once
+-- per requested workout-count; a single huge count makes it loop millions of
+-- times and freezes/pings the server. So we cap each call to a short cost-loop
+-- (its length scales with rebirth) and deliver the requested total across
+-- cooldown-spaced calls — the server never blocks long, and progress is live.
+local STRENGTH_CALL_BUDGET = 150000
+
+local function readRebirth()
+    if Items and ItemCat then
+        local ok, v = pcall(Items.GetItemInfo, LocalPlayer, ItemCat.Stat, "Rebirth")
+        if ok and type(v) == "number" then return v end
+    end
+    return 0
+end
+
+local function giveStrength(target, onProgress)
     local remote = StrengthRemote
     if not remote then return false, 0, true end
     local char = LocalPlayer.Character
@@ -242,19 +257,33 @@ local function giveStrength(target)
         root.Anchored = true
         task.wait(0.12)
     end
-    local function fire()
-        local ok, r = pcall(function() return remote:InvokeServer(target, GIVE_KEY) end)
-        if ok then return r end
-        return nil
+
+    local affordIters = math.max(1, math.min(math.floor(readRebirth() * 0.01), 50000))
+    local perCall = math.max(1, math.floor(STRENGTH_CALL_BUDGET / affordIters))
+
+    local remaining = math.max(1, math.floor(target))
+    local delivered = 0
+    local cd = 0.7
+    local fails = 0
+    while remaining > 0 and State.alive do
+        local chunk = math.min(remaining, perCall)
+        local ok, res = pcall(function() return remote:InvokeServer(chunk, GIVE_KEY) end)
+        if ok and res == true then
+            delivered = delivered + chunk
+            remaining = remaining - chunk
+            fails = 0
+            if onProgress then pcall(onProgress, delivered) end
+            task.wait(cd)
+        else
+            fails = fails + 1
+            if fails >= 6 then break end
+            cd = math.min(cd + 0.12, 1.2)
+            task.wait(cd)
+        end
     end
-    local res = fire()
-    if res == false or res == nil then
-        task.wait(0.2)
-        res = fire()
-    end
+
     if root and not wasAnchored then root.Anchored = false end
-    local success = res == true
-    return success, success and target or 0
+    return delivered > 0, delivered
 end
 
 ----------------------------------------------------------------------
@@ -361,7 +390,9 @@ local function runTask(box, btn, label, unit, worker)
     btn.Text = "Выдаю..."
     setStatus("Выдаю " .. fmt(target) .. " " .. unit .. "...", ACCENT)
     task.spawn(function()
-        local ok, given, needCapture = worker(target)
+        local ok, given, needCapture = worker(target, function(done)
+            setStatus("Выдаю " .. unit .. "… " .. fmt(done) .. " / " .. fmt(target), ACCENT)
+        end)
         if ok then
             setStatus("Готово: +" .. fmt(given) .. " " .. unit .. " ✅", GOOD)
         elseif needCapture then
