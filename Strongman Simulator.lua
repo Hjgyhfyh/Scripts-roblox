@@ -9,6 +9,71 @@ local connections = {}
 local function track(c) connections[#connections + 1] = c; return c end
 
 ----------------------------------------------------------------------
+-- Hashed-remote resolver (executor-agnostic, zero dependencies)
+-- Every networked remote is named MD5(friendlyName .. JobId) and stored
+-- flat in ReplicatedStorage. We compute that name with a built-in MD5,
+-- so resolution needs no require / hookmetamethod / getnamecallmethod
+-- and works on the weakest injectors exactly like on the strongest.
+----------------------------------------------------------------------
+local function md5(msg)
+    local K = {
+        0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,
+        0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,
+        0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,
+        0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,
+        0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,
+        0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,
+        0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,
+        0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391,
+    }
+    local S = {
+        7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+        5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+        4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+        6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21,
+    }
+    local band,bor,bxor,bnot,lrotate = bit32.band,bit32.bor,bit32.bxor,bit32.bnot,bit32.lrotate
+    local a0,b0,c0,d0 = 0x67452301,0xefcdab89,0x98badcfe,0x10325476
+    local bitLen = #msg * 8
+    msg = msg .. "\128"
+    while (#msg % 64) ~= 56 do msg = msg .. "\0" end
+    local function w32le(n) return string.char(n%256, math.floor(n/256)%256, math.floor(n/65536)%256, math.floor(n/16777216)%256) end
+    msg = msg .. w32le(bitLen % 0x100000000) .. w32le(math.floor(bitLen / 0x100000000) % 0x100000000)
+    for chunk = 1, #msg, 64 do
+        local M = {}
+        for j = 0, 15 do
+            local p = chunk + j*4
+            local b1,b2,b3,b4 = string.byte(msg, p, p+3)
+            M[j] = b1 + b2*256 + b3*65536 + b4*16777216
+        end
+        local A,B,C,D = a0,b0,c0,d0
+        for i = 0, 63 do
+            local F,g
+            if i < 16 then F = bor(band(B,C), band(bnot(B),D)); g = i
+            elseif i < 32 then F = bor(band(D,B), band(bnot(D),C)); g = (5*i+1)%16
+            elseif i < 48 then F = bxor(bxor(B,C),D); g = (3*i+5)%16
+            else F = bxor(C, bor(B, bnot(D))); g = (7*i)%16 end
+            F = (F + A + K[i+1] + M[g]) % 0x100000000
+            A = D; D = C; C = B
+            B = (B + lrotate(F, S[i+1])) % 0x100000000
+        end
+        a0=(a0+A)%0x100000000; b0=(b0+B)%0x100000000; c0=(c0+C)%0x100000000; d0=(d0+D)%0x100000000
+    end
+    local function hexle(n)
+        local s = ""
+        for i = 0, 3 do s = s .. string.format("%02x", math.floor(n/(256^i))%256) end
+        return s
+    end
+    return hexle(a0)..hexle(b0)..hexle(c0)..hexle(d0)
+end
+
+local function resolveRemote(friendly)
+    local jid = game.JobId
+    local name = md5(friendly .. (jid == "" and "00000000-0000-0000-0000-000000000000" or jid))
+    return ReplicatedStorage:FindFirstChild(name) or ReplicatedStorage:WaitForChild(name, 8)
+end
+
+----------------------------------------------------------------------
 -- Game bindings
 ----------------------------------------------------------------------
 local TGSMisc do
@@ -28,11 +93,13 @@ local RATIO           = 3
 local GIVE_KEY        = "Default"
 
 local function getConverter()
+    local r = resolveRemote("CurrencyConverter_ExchangeCurrencyFund")
+    if r then return r end
     if TGSMisc and TGSMisc.RemoteFunction then
-        local ok, r = pcall(TGSMisc.RemoteFunction, "CurrencyConverter_ExchangeCurrencyFund")
-        if ok and r then return r end
+        local ok, r2 = pcall(TGSMisc.RemoteFunction, "CurrencyConverter_ExchangeCurrencyFund")
+        if ok and typeof(r2) == "Instance" then return r2 end
     end
-    return ReplicatedStorage:FindFirstChild("CurrencyConverter_ExchangeCurrencyFund")
+    return nil
 end
 
 local function readCurrency(key)
@@ -113,25 +180,13 @@ local function giveEnergy(target)
 end
 
 ----------------------------------------------------------------------
--- Strength delivery — remote name is randomized per session, so it is
--- resolved live instead of hard-coded: scan for the hashed RemoteFunction
--- and learn it from the game's own calls via a namecall hook.
+-- Strength delivery — the remote name is salted with the JobId per
+-- session, so it is computed from MD5(name .. JobId) at startup. A
+-- namecall hook stays as an optional self-healing fallback.
 ----------------------------------------------------------------------
 local StrengthRemote
 local hookActive = true
 local onStrengthCaptured            -- assigned by the GUI once it exists
-
-local function isHashedName(name)
-    return type(name) == "string" and #name >= 24 and name:match("^%x+$") ~= nil
-end
-
-local WorkoutModule
-local function getWorkoutModule()
-    if WorkoutModule ~= nil then return WorkoutModule or nil end
-    local ok, m = pcall(function() return require(workspace.Lib.StrongmanGame.StrongmanWorkout) end)
-    WorkoutModule = (ok and m) or false
-    return WorkoutModule or nil
-end
 
 local function setStrengthRemote(remote)
     local wasEmpty = (StrengthRemote == nil)
@@ -163,23 +218,42 @@ do
     end
 end
 
+-- Primary path: resolve the training remote directly by its hashed name,
+-- so it is ready the instant the GUI opens on any executor. The namecall
+-- hook above stays as a self-healing fallback if the name ever differs.
+do
+    local r = resolveRemote("StrongMan_UpgradeStrength")
+    if r then setStrengthRemote(r) end
+end
+
+-- The server grants strength as long as PrimaryPart.Anchored is true, so we
+-- never drive the game's workout state machine (which is what was leaving the
+-- dumbbell/idle pose stuck). We PRESERVE the original anchor state: if you are
+-- already working out we change nothing — no flicker, the workout keeps going;
+-- if you are not, we briefly anchor, grant, then restore exactly as it was, so
+-- you are never kicked out of a workout and can keep lifting normally.
 local function giveStrength(target)
     local remote = StrengthRemote
     if not remote then return false, 0, true end
     local char = LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.Anchored = true end
-    local swm = getWorkoutModule()
-    if swm and swm.SetIsWorkingOut then
-        pcall(swm.SetIsWorkingOut, LocalPlayer, true)
+    local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
+    local wasAnchored = root and root.Anchored
+    if root and not wasAnchored then
+        root.Anchored = true
+        task.wait(0.12)
     end
-    task.wait(0.25)
-    local ok, res = pcall(function() return remote:InvokeServer(target, GIVE_KEY) end)
-    if hrp then hrp.Anchored = false end
-    if swm and swm.SetIsWorkingOut then
-        pcall(swm.SetIsWorkingOut, LocalPlayer, false)
+    local function fire()
+        local ok, r = pcall(function() return remote:InvokeServer(target, GIVE_KEY) end)
+        if ok then return r end
+        return nil
     end
-    local success = ok and res ~= false
+    local res = fire()
+    if res == false or res == nil then
+        task.wait(0.2)
+        res = fire()
+    end
+    if root and not wasAnchored then root.Anchored = false end
+    local success = res == true
     return success, success and target or 0
 end
 
@@ -358,10 +432,12 @@ makeRow(166, "Сколько выдать силы?", "How much strength to give
     "Выдать силу", STR, "силы", giveStrength, "1111111")
 
 onStrengthCaptured = function()
-    setStatus("✅ Remote силы пойман — теперь можно выдавать", GOOD)
+    setStatus("✅ Remote силы готов — можно выдавать", GOOD)
 end
 
-if not StrengthRemote then
+if StrengthRemote then
+    setStatus("Готов к выдаче", MUTED)
+else
     setStatus("Для силы: покачайся 1 раз, чтобы поймать remote", MUTED)
 end
 
