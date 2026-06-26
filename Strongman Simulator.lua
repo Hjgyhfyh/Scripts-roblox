@@ -755,13 +755,15 @@ local function addTab(name, color)
     page.ScrollBarThickness = 3
     page.ScrollBarImageColor3 = color
     page.CanvasSize = UDim2.new()
-    page.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
     page.Visible = false
     page.Parent = contentHolder
     local l = Instance.new("UIListLayout", page)
     l.Padding = UDim.new(0, 8)
     l.SortOrder = Enum.SortOrder.LayoutOrder
     pad(page, 2, 8, 2, 8)
+    track(l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 12)
+    end))
 
     tabs[name] = { btn = btn, page = page, color = color }
     track(btn.MouseButton1Click:Connect(function() selectTab(name) end))
