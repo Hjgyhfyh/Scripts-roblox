@@ -1337,6 +1337,7 @@ local function makeInput(parent, labelKey, default, placeholderKey)
 	pad(box, 0, 0, 12, 12)
 	local strk = stroke(P.stroke, 1, 0.5)
 	strk.Parent = box
+	box.Parent = wrap
 	if placeholderKey then register(box, "PlaceholderText", placeholderKey) end
 	track(box:GetPropertyChangedSignal("Text"):Connect(function()
 		if #box.Text > 18 then box.Text = string.sub(box.Text, 1, 18) end
