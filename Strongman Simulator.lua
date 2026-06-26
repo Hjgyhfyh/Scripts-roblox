@@ -297,8 +297,49 @@ local function giveStrength(target, onProgress)
         end
     end
 
-    if root and not wasAnchored then root.Anchored = false end
+    if root and not wasWorkingOut then
+        setServerWorkout(false)
+        root.Anchored = false
+    end
     return delivered > 0, delivered
+end
+
+-- "Обычно": the whole amount in ONE call. Fast, but the server runs its entire
+-- cost-loop at once, so the game briefly freezes/pings — that is the trade-off
+-- the user chose. Bounded so a careless huge number can't hang the server for
+-- good (worst-case ~a few seconds, then it recovers).
+local FAST_MAX_ITERS = 250000000
+
+local function giveStrengthFast(target)
+    local remote = StrengthRemote
+    if not remote then return false, 0, true end
+    local char = LocalPlayer.Character
+    local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
+    local wasWorkingOut = root and root.Anchored
+    if root and not wasWorkingOut then
+        root.Anchored = true
+        setServerWorkout(true)
+        task.wait(0.25)
+    end
+
+    local affordIters = math.max(1, math.min(math.floor(readRebirth() * 0.01), 50000))
+    local count = math.min(math.max(1, math.floor(target)),
+        math.max(1, math.floor(FAST_MAX_ITERS / affordIters)))
+
+    local function fire()
+        local ok, r = pcall(function() return remote:InvokeServer(count, GIVE_KEY) end)
+        if ok then return r end
+        return nil
+    end
+    local res = fire()
+    if res ~= true then task.wait(0.25); res = fire() end
+
+    if root and not wasWorkingOut then
+        setServerWorkout(false)
+        root.Anchored = false
+    end
+    local success = res == true
+    return success, success and count or 0
 end
 
 ----------------------------------------------------------------------
