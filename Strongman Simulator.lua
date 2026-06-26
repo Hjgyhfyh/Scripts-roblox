@@ -618,6 +618,20 @@ local function resolveParent()
 	return LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 end
 
+local function resetEnergy()
+	if not R.conv then return false end
+	local start = readEnergy()
+	if start == nil then return false end
+	for _ = 1, 5 do
+		local e = readEnergy()
+		if not e or e ~= e or e == math.huge or e <= 1 then break end
+		pcall(function() R.conv:InvokeServer("Currency_Default", e) end)
+		task.wait(0.35)
+	end
+	local fin = readEnergy() or 0
+	return fin <= 1 or (start > 1 and fin < start * 0.5)
+end
+
 local W, H = 382, 486
 
 local P = {
@@ -723,7 +737,7 @@ local binders = {}
 
 local L = {
 	en = {
-		title = "Control Panel", subtitle = "Quality-of-life toolkit",
+		title = "Telegram: @sigmatik323", subtitle = "Discord @godlimaster",
 		tab_gain = "Gain", tab_boosts = "Boosts", tab_pets = "Pets", tab_teleport = "Teleport",
 		sec_energy = "Energy", sec_strength = "Strength", sec_rebirth = "Rebirth",
 		sec_actions = "Quick actions", sec_egg = "Egg selection", sec_hatch = "Hatching",
@@ -734,7 +748,7 @@ local L = {
 		btn_give_energy = "Give energy", btn_safe = "Safe", btn_fast = "Fast",
 		btn_rebirth = "Rebirth now", tgl_autoreb = "Auto-rebirth",
 		btn_codes = "Redeem all codes", btn_season = "Claim season pets",
-		btn_power = "Max power upgrade", btn_rewards = "Claim all rewards",
+		btn_power = "Reset energy", btn_rewards = "Claim all rewards",
 		tgl_autohatch = "Auto-hatch", btn_equip = "Equip best",
 		btn_combine = "Combine dupes", btn_sell = "Sell Common", btn_teleport = "Teleport",
 		empty_tp = "No destinations available",
@@ -745,13 +759,13 @@ local L = {
 		st_autoreb_on = "Auto-rebirth enabled", st_autoreb_off = "Auto-rebirth disabled",
 		st_autohatch_on = "Auto-hatch enabled", st_autohatch_off = "Auto-hatch disabled",
 		st_codes_done = "All codes redeemed", st_season_done = "Season pets claimed",
-		st_power_done = "Power upgraded to max", st_rewards_done = "Rewards claimed",
+		st_power_done = "Energy reset to zero", st_rewards_done = "Rewards claimed",
 		st_equipped = "Best pets equipped", st_combined = "Duplicates combined", st_sold = "Common pets sold",
 		st_tp_done = "Teleported to %s", st_tp_none = "No destination selected", st_captured = "Strength source ready",
 		tip_close = "Close & unload", tip_hide = "Hide / show (Right Ctrl)", tip_lang = "Switch language",
 	},
 	ru = {
-		title = "Панель управления", subtitle = "Панель быстрых действий",
+		title = "Telegram: @sigmatik323", subtitle = "Discord @godlimaster",
 		tab_gain = "Ресурсы", tab_boosts = "Бусты", tab_pets = "Питомцы", tab_teleport = "Телепорт",
 		sec_energy = "Энергия", sec_strength = "Сила", sec_rebirth = "Перерождение",
 		sec_actions = "Быстрые действия", sec_egg = "Выбор яйца", sec_hatch = "Вылупление",
@@ -762,7 +776,7 @@ local L = {
 		btn_give_energy = "Выдать энергию", btn_safe = "Безопасно", btn_fast = "Быстро",
 		btn_rebirth = "Переродиться", tgl_autoreb = "Авто-перерождение",
 		btn_codes = "Активировать коды", btn_season = "Сезонные питомцы",
-		btn_power = "Макс. улучшение силы", btn_rewards = "Забрать награды",
+		btn_power = "Обнулить энергию", btn_rewards = "Забрать награды",
 		tgl_autohatch = "Авто-вылупление", btn_equip = "Надеть лучших",
 		btn_combine = "Объединить дубли", btn_sell = "Продать обычных", btn_teleport = "Телепортироваться",
 		empty_tp = "Нет доступных точек",
@@ -773,7 +787,7 @@ local L = {
 		st_autoreb_on = "Авто-перерождение включено", st_autoreb_off = "Авто-перерождение выключено",
 		st_autohatch_on = "Авто-вылупление включено", st_autohatch_off = "Авто-вылупление выключено",
 		st_codes_done = "Все коды активированы", st_season_done = "Сезонные питомцы получены",
-		st_power_done = "Сила прокачана до максимума", st_rewards_done = "Награды получены",
+		st_power_done = "Энергия обнулена", st_rewards_done = "Награды получены",
 		st_equipped = "Лучшие питомцы надеты", st_combined = "Дубликаты объединены", st_sold = "Обычные питомцы проданы",
 		st_tp_done = "Телепортация: %s", st_tp_none = "Точка не выбрана", st_captured = "Источник силы готов",
 		tip_close = "Закрыть и выгрузить", tip_hide = "Скрыть / показать (Right Ctrl)", tip_lang = "Сменить язык",
@@ -809,7 +823,7 @@ end
 local setStatus, st, busyGuard, setLang, unload, switchTab, setShownToggle, refreshAreas
 local moveIndicator, setActiveVisual
 local statusLabel, statusDot, statusBase
-local scale, window, shadow, glow, content
+local scale, window, content, mini, miniScale
 local pillHi, enLbl, ruLbl
 local tabButtons = {}
 local pages = {}
@@ -843,33 +857,41 @@ scale = new("UIScale", { Scale = 0.6 })
 scale.Parent = holder
 holder.Parent = gui
 
-glow = new("ImageLabel", {
-	BackgroundTransparency = 1,
-	Image = "rbxassetid://1316045217",
-	ImageColor3 = Color3.fromRGB(255, 255, 255),
-	ImageTransparency = 1,
-	ScaleType = Enum.ScaleType.Slice,
-	SliceCenter = Rect.new(10, 10, 118, 118),
-	Size = UDim2.new(1, 94, 1, 100),
-	Position = UDim2.new(0, -47, 0, -44),
-	ZIndex = 0,
+mini = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(196, 46),
+	BackgroundColor3 = P.card,
+	AutoButtonColor = false,
+	Text = "",
+	Visible = false,
+	ZIndex = 2,
 })
-local glowGrad = brandGradient(20)
-glowGrad.Parent = glow
-glow.Parent = holder
-
-shadow = new("ImageLabel", {
-	BackgroundTransparency = 1,
-	Image = "rbxassetid://1316045217",
-	ImageColor3 = Color3.fromRGB(0, 0, 0),
-	ImageTransparency = 1,
-	ScaleType = Enum.ScaleType.Slice,
-	SliceCenter = Rect.new(10, 10, 118, 118),
-	Size = UDim2.new(1, 46, 1, 56),
-	Position = UDim2.new(0, -23, 0, -14),
-	ZIndex = 0,
-})
-shadow.Parent = holder
+corner(14).Parent = mini
+do
+	local ms = stroke(P.acc, 1.4, 0.1)
+	brandGradient(20).Parent = ms
+	ms.Parent = mini
+	local mg = gradient(Color3.fromRGB(30, 32, 50), P.card, 90)
+	mg.Parent = mini
+	local ml = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		Text = "tg @sigmatik323",
+		TextColor3 = P.txt,
+		ZIndex = 3,
+	})
+	brandGradient(12).Parent = ml
+	ml.Parent = mini
+end
+miniScale = new("UIScale", { Scale = 1 })
+miniScale.Parent = mini
+mini.Parent = gui
+track(mini.Activated:Connect(function() if setShownToggle then setShownToggle() end end))
+track(mini.MouseEnter:Connect(function() tw(miniScale, T.fast, { Scale = 1.05 }) end))
+track(mini.MouseLeave:Connect(function() tw(miniScale, T.fast, { Scale = 1 }) end))
 
 window = new("Frame", {
 	BackgroundColor3 = P.bg,
@@ -890,10 +912,10 @@ header.Parent = window
 
 local titleLbl = new("TextLabel", {
 	BackgroundTransparency = 1,
-	Position = UDim2.new(0, 16, 0, 9),
-	Size = UDim2.new(0, 210, 0, 22),
+	Position = UDim2.new(0, 16, 0, 10),
+	Size = UDim2.new(0, 210, 0, 20),
 	Font = Enum.Font.GothamBold,
-	TextSize = 18,
+	TextSize = 16,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = P.txt,
 	Text = "",
@@ -916,21 +938,6 @@ local subLbl = new("TextLabel", {
 })
 register(subLbl, "Text", "subtitle")
 subLbl.Parent = header
-
-local handleLbl = new("TextLabel", {
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -14, 0, 41),
-	Size = UDim2.new(0, 150, 0, 12),
-	Font = Enum.Font.GothamMedium,
-	TextSize = 11,
-	TextTransparency = 0.32,
-	TextXAlignment = Enum.TextXAlignment.Right,
-	TextColor3 = P.dim,
-	Text = "@sigmatik323",
-	ZIndex = 3,
-})
-handleLbl.Parent = header
 
 local divider = new("Frame", {
 	BackgroundColor3 = P.stroke,
@@ -1753,7 +1760,13 @@ do
 	end
 	makeButton(c, "btn_codes", true, function() boost("codes", redeemCodes, "st_codes_done") end)
 	makeButton(c, "btn_season", false, function() boost("season", claimAllSeasonPets, "st_season_done") end)
-	makeButton(c, "btn_power", false, function() boost("power", maxPower, "st_power_done") end)
+	makeButton(c, "btn_power", false, function()
+		busyGuard("resetenergy", function()
+			st("st_working", P.work)
+			local ok = resetEnergy()
+			st(ok and "st_power_done" or "st_error", ok and P.ok or P.err)
+		end)
+	end)
 	makeButton(c, "btn_rewards", true, function() boost("rewards", claimRewards, "st_rewards_done") end)
 end
 
@@ -1929,6 +1942,7 @@ track(hideBtn.MouseLeave:Connect(function()
 	tw(hideBtn, T.fast, { BackgroundColor3 = P.card2 })
 	tw(hideGlyph, T.fast, { BackgroundColor3 = P.dim })
 end))
+track(hideBtn.Activated:Connect(function() setShownToggle() end))
 
 do
 	local dragging, dragStart, startPos = false, nil, nil
@@ -1955,19 +1969,22 @@ end
 local function setHidden(h)
 	hidden = h
 	if h then
+		mini.Position = holder.Position
 		tw(scale, T.med, { Scale = 0 })
 		tw(window, T.med, { BackgroundTransparency = 1 })
-		tw(shadow, T.med, { ImageTransparency = 1 })
-		tw(glow, T.med, { ImageTransparency = 1 })
-		task.delay(0.26, function()
+		task.delay(0.24, function()
 			if hidden then holder.Visible = false end
 		end)
+		mini.Visible = true
+		miniScale.Scale = 0.7
+		tw(miniScale, T.spring, { Scale = 1 })
 	else
+		holder.Position = mini.Position
+		mini.Visible = false
 		holder.Visible = true
+		scale.Scale = 0.7
 		tw(scale, T.spring, { Scale = 1 })
 		tw(window, T.med, { BackgroundTransparency = 0 })
-		tw(shadow, T.slow, { ImageTransparency = 0.4 })
-		tw(glow, T.slow, { ImageTransparency = 0.62 })
 	end
 end
 setShownToggle = function() setHidden(not hidden) end
@@ -1990,7 +2007,6 @@ onStrengthCaptured = function()
 	st("st_captured", P.ok)
 end
 
-sway(glowGrad, 6.5, { Rotation = 70 })
 sway(indGrad, 5.5, { Rotation = 48 })
 
 setActiveVisual(1)
@@ -2001,8 +2017,6 @@ holder.Visible = true
 scale.Scale = 0.6
 tw(scale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 tw(window, T.med, { BackgroundTransparency = 0 })
-tw(shadow, T.slow, { ImageTransparency = 0.4 })
-tw(glow, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 0.62 })
 
 unload = function()
 	State.alive = false
@@ -2011,8 +2025,7 @@ unload = function()
 	pcall(function()
 		tw(scale, T.med, { Scale = 0.6 })
 		tw(window, T.med, { BackgroundTransparency = 1 })
-		tw(shadow, T.med, { ImageTransparency = 1 })
-		tw(glow, T.med, { ImageTransparency = 1 })
+		if mini then mini.Visible = false end
 	end)
 	task.delay(0.26, function()
 		for _, c in ipairs(connections) do
