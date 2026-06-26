@@ -264,15 +264,18 @@ local function giveStrength(target, onProgress)
     local remaining = math.max(1, math.floor(target))
     local delivered = 0
     local cd = 0.7
-    local fails = 0
+    local fails, calls = 0, 0
+    local MAX_CALLS = 30
     while remaining > 0 and State.alive do
         local chunk = math.min(remaining, perCall)
         local ok, res = pcall(function() return remote:InvokeServer(chunk, GIVE_KEY) end)
         if ok and res == true then
             delivered = delivered + chunk
             remaining = remaining - chunk
+            calls = calls + 1
             fails = 0
             if onProgress then pcall(onProgress, delivered) end
+            if calls >= MAX_CALLS then break end
             task.wait(cd)
         else
             fails = fails + 1
@@ -477,6 +480,7 @@ end
 ----------------------------------------------------------------------
 local function unload()
     hookActive = false
+    State.alive = false
     for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
     table.clear(connections)
     if gui then gui:Destroy() end
