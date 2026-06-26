@@ -611,617 +611,1415 @@ end
 -- GUI
 ----------------------------------------------------------------------
 local function resolveParent()
-    if gethui then
-        local ok, h = pcall(gethui)
-        if ok and h then return h end
-    end
-    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
-    if ok and cg then return cg end
-    return LocalPlayer:WaitForChild("PlayerGui")
+	local ok, h = pcall(function() return gethui() end)
+	if ok and typeof(h) == "Instance" then return h end
+	local ok2, cg = pcall(function() return game:GetService("CoreGui") end)
+	if ok2 and cg then return cg end
+	return LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local BG     = Color3.fromRGB(12, 16, 28)
-local PANEL  = Color3.fromRGB(20, 26, 42)
-local ACCENT = Color3.fromRGB(34, 197, 94)
-local STR    = Color3.fromRGB(249, 168, 64)
-local VIO    = Color3.fromRGB(150, 120, 255)
-local CYAN   = Color3.fromRGB(80, 200, 255)
-local RED     = Color3.fromRGB(224, 108, 96)
-local GOOD   = Color3.fromRGB(120, 255, 160)
-local WARN   = Color3.fromRGB(255, 190, 90)
-local BAD    = Color3.fromRGB(255, 110, 110)
-local MUTED  = Color3.fromRGB(150, 160, 185)
-local TXT    = Color3.fromRGB(235, 240, 250)
+local W, H = 382, 486
 
-local function corner(o, r) local c = Instance.new("UICorner", o); c.CornerRadius = UDim.new(0, r or 10); return c end
-local function pad(o, l, r, t, b)
-    local p = Instance.new("UIPadding", o)
-    p.PaddingLeft = UDim.new(0, l or 0); p.PaddingRight = UDim.new(0, r or 0)
-    p.PaddingTop = UDim.new(0, t or 0); p.PaddingBottom = UDim.new(0, b or 0)
-    return p
+local P = {
+	bg = Color3.fromRGB(16, 17, 27),
+	panel = Color3.fromRGB(20, 22, 34),
+	card = Color3.fromRGB(26, 28, 42),
+	card2 = Color3.fromRGB(34, 37, 54),
+	card3 = Color3.fromRGB(45, 49, 72),
+	stroke = Color3.fromRGB(60, 65, 98),
+	txt = Color3.fromRGB(236, 238, 250),
+	dim = Color3.fromRGB(151, 157, 188),
+	acc = Color3.fromRGB(138, 99, 246),
+	acc2 = Color3.fromRGB(99, 108, 246),
+	acc3 = Color3.fromRGB(62, 210, 236),
+	accTxt = Color3.fromRGB(255, 255, 255),
+	ok = Color3.fromRGB(84, 214, 148),
+	err = Color3.fromRGB(244, 98, 112),
+	work = Color3.fromRGB(240, 190, 96),
+}
+
+local T = {
+	fast = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	med = TweenInfo.new(0.26, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+	slow = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	spring = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	back = TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	backFast = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+}
+
+local brandSeq = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, P.acc),
+	ColorSequenceKeypoint.new(0.5, P.acc2),
+	ColorSequenceKeypoint.new(1, P.acc3),
+})
+
+local function new(class, props)
+	local inst = Instance.new(class)
+	if props then
+		for k, v in pairs(props) do
+			inst[k] = v
+		end
+	end
+	return inst
 end
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "StrongmanGiveGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 2147483000
+local function tw(inst, info, goal)
+	local t = TweenService:Create(inst, info, goal)
+	t:Play()
+	return t
+end
+
+local function sway(inst, period, goal)
+	local info = TweenInfo.new(period, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+	local t = TweenService:Create(inst, info, goal)
+	t:Play()
+	return t
+end
+
+local function corner(r)
+	return new("UICorner", { CornerRadius = UDim.new(0, r) })
+end
+
+local function stroke(color, thick, trans)
+	return new("UIStroke", { Color = color or P.stroke, Thickness = thick or 1, Transparency = trans or 0 })
+end
+
+local function gradient(c1, c2, rot)
+	return new("UIGradient", { Color = ColorSequence.new(c1, c2), Rotation = rot or 0 })
+end
+
+local function brandGradient(rot)
+	return new("UIGradient", { Color = brandSeq, Rotation = rot or 0 })
+end
+
+local function pad(parent, t, b, l, r)
+	local p = new("UIPadding", {
+		PaddingTop = UDim.new(0, t),
+		PaddingBottom = UDim.new(0, b or t),
+		PaddingLeft = UDim.new(0, l or t),
+		PaddingRight = UDim.new(0, r or l or t),
+	})
+	p.Parent = parent
+	return p
+end
+
+local orderMap = setmetatable({}, { __mode = "k" })
+local function nextOrder(parent)
+	local n = (orderMap[parent] or 0) + 1
+	orderMap[parent] = n
+	return n
+end
+
+local EGGS = {"29Superhero","28Bank","27Prison","26Football","25Magic","24Robo","23Mineshaft","22Sewer","21Kitchen","20Asian","19Princess","18Treasury","17Apartment","16WildWest","15DeepSea","14Winter","13Retro","12Dino","11Tropical","10Science","9Candyland","8Space","7Disco","6Steampunk","5Medieval","4Farm","3Arcade","2Food","1Training","LobbyShop"}
+
+local function prettyEgg(s)
+	local r = string.gsub(s, "^%d+", "")
+	r = string.gsub(r, "(%l)(%u)", "%1 %2")
+	return r
+end
+
+local LANG = "en"
+local binders = {}
+
+local L = {
+	en = {
+		title = "Control Panel", subtitle = "Quality-of-life toolkit",
+		tab_gain = "Gain", tab_boosts = "Boosts", tab_pets = "Pets", tab_teleport = "Teleport",
+		sec_energy = "Energy", sec_strength = "Strength", sec_rebirth = "Rebirth",
+		sec_actions = "Quick actions", sec_egg = "Egg selection", sec_hatch = "Hatching",
+		sec_manage = "Manage pets", sec_dest = "Destination",
+		l_energy = "Energy amount", l_strength = "Strength amount", l_rate = "Hatch rate per second",
+		l_egg = "Egg", l_area = "Area",
+		ph_amount = "Amount, e.g. 1m", ph_strength = "Amount, e.g. 1111111",
+		btn_give_energy = "Give energy", btn_safe = "Safe", btn_fast = "Fast",
+		btn_rebirth = "Rebirth now", tgl_autoreb = "Auto-rebirth",
+		btn_codes = "Redeem all codes", btn_season = "Claim season pets",
+		btn_power = "Max power upgrade", btn_rewards = "Claim all rewards",
+		tgl_autohatch = "Auto-hatch", btn_equip = "Equip best",
+		btn_combine = "Combine dupes", btn_sell = "Sell Common", btn_teleport = "Teleport",
+		empty_tp = "No destinations available",
+		st_ready = "Ready when you are", st_working = "Working...", st_done = "Done",
+		st_error = "Something went wrong", st_busy = "Already running...", st_invalid = "Enter a valid amount",
+		st_energy = "Energy sent: %s", st_str_live = "Delivering: %s", st_str_done = "Strength: %s",
+		st_reb_done = "Rebirths: %s",
+		st_autoreb_on = "Auto-rebirth enabled", st_autoreb_off = "Auto-rebirth disabled",
+		st_autohatch_on = "Auto-hatch enabled", st_autohatch_off = "Auto-hatch disabled",
+		st_codes_done = "All codes redeemed", st_season_done = "Season pets claimed",
+		st_power_done = "Power upgraded to max", st_rewards_done = "Rewards claimed",
+		st_equipped = "Best pets equipped", st_combined = "Duplicates combined", st_sold = "Common pets sold",
+		st_tp_done = "Teleported to %s", st_tp_none = "No destination selected", st_captured = "Strength source ready",
+		tip_close = "Close & unload", tip_hide = "Hide / show (Right Ctrl)", tip_lang = "Switch language",
+	},
+	ru = {
+		title = "Панель управления", subtitle = "Панель быстрых действий",
+		tab_gain = "Ресурсы", tab_boosts = "Бусты", tab_pets = "Питомцы", tab_teleport = "Телепорт",
+		sec_energy = "Энергия", sec_strength = "Сила", sec_rebirth = "Перерождение",
+		sec_actions = "Быстрые действия", sec_egg = "Выбор яйца", sec_hatch = "Вылупление",
+		sec_manage = "Питомцы", sec_dest = "Локация",
+		l_energy = "Количество энергии", l_strength = "Количество силы", l_rate = "Вылуплений в секунду",
+		l_egg = "Яйцо", l_area = "Локация",
+		ph_amount = "Кол-во, напр. 1m", ph_strength = "Кол-во, напр. 1111111",
+		btn_give_energy = "Выдать энергию", btn_safe = "Безопасно", btn_fast = "Быстро",
+		btn_rebirth = "Переродиться", tgl_autoreb = "Авто-перерождение",
+		btn_codes = "Активировать коды", btn_season = "Сезонные питомцы",
+		btn_power = "Макс. улучшение силы", btn_rewards = "Забрать награды",
+		tgl_autohatch = "Авто-вылупление", btn_equip = "Надеть лучших",
+		btn_combine = "Объединить дубли", btn_sell = "Продать обычных", btn_teleport = "Телепортироваться",
+		empty_tp = "Нет доступных точек",
+		st_ready = "Готово к работе", st_working = "Выполняется...", st_done = "Готово",
+		st_error = "Что-то пошло не так", st_busy = "Уже выполняется...", st_invalid = "Введите корректное значение",
+		st_energy = "Выдано энергии: %s", st_str_live = "Доставка: %s", st_str_done = "Сила: %s",
+		st_reb_done = "Перерождений: %s",
+		st_autoreb_on = "Авто-перерождение включено", st_autoreb_off = "Авто-перерождение выключено",
+		st_autohatch_on = "Авто-вылупление включено", st_autohatch_off = "Авто-вылупление выключено",
+		st_codes_done = "Все коды активированы", st_season_done = "Сезонные питомцы получены",
+		st_power_done = "Сила прокачана до максимума", st_rewards_done = "Награды получены",
+		st_equipped = "Лучшие питомцы надеты", st_combined = "Дубликаты объединены", st_sold = "Обычные питомцы проданы",
+		st_tp_done = "Телепортация: %s", st_tp_none = "Точка не выбрана", st_captured = "Источник силы готов",
+		tip_close = "Закрыть и выгрузить", tip_hide = "Скрыть / показать (Right Ctrl)", tip_lang = "Сменить язык",
+	},
+}
+
+local function tr(key, ...)
+	local pack = L[LANG] or L.en
+	local s = pack[key]
+	if s == nil then s = L.en[key] end
+	if s == nil then return key end
+	if select("#", ...) > 0 then
+		local ok, res = pcall(string.format, s, ...)
+		if ok then return res end
+	end
+	return s
+end
+
+local function bind(fn)
+	binders[#binders + 1] = fn
+	pcall(fn)
+	return fn
+end
+
+local function register(inst, prop, key, ...)
+	local args = { ... }
+	bind(function()
+		inst[prop] = tr(key, table.unpack(args))
+	end)
+	return inst
+end
+
+local setStatus, st, busyGuard, setLang, unload, switchTab, setShownToggle, refreshAreas
+local moveIndicator, setActiveVisual
+local statusLabel, statusDot, statusBase
+local scale, window, shadow, glow, content
+local pillHi, enLbl, ruLbl
+local tabButtons = {}
+local pages = {}
+local currentTab = 1
+local indActive = 1
+local hidden = false
+local lastStatus
+local autoRebRunning = false
+local hatchRunning = false
+
+local gui = new("ScreenGui", {
+	Name = "QolPanel_" .. tostring(math.random(1000, 9999)),
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	DisplayOrder = 999999,
+	AutoLocalize = false,
+})
+pcall(function() if syn and syn.protect_gui then syn.protect_gui(gui) end end)
+pcall(function() if protect_gui then protect_gui(gui) end end)
 gui.Parent = resolveParent()
-if protect_gui then pcall(protect_gui, gui) end
-if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
 
-local window = Instance.new("Frame")
-window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(360, 466)
-window.BackgroundColor3 = BG
-window.BorderSizePixel = 0
-window.Parent = gui
-corner(window, 14)
+local holder = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(W, H),
+	BackgroundTransparency = 1,
+	Visible = false,
+})
+scale = new("UIScale", { Scale = 0.6 })
+scale.Parent = holder
+holder.Parent = gui
+
+glow = new("ImageLabel", {
+	BackgroundTransparency = 1,
+	Image = "rbxassetid://1316045217",
+	ImageColor3 = Color3.fromRGB(255, 255, 255),
+	ImageTransparency = 1,
+	ScaleType = Enum.ScaleType.Slice,
+	SliceCenter = Rect.new(10, 10, 118, 118),
+	Size = UDim2.new(1, 94, 1, 100),
+	Position = UDim2.new(0, -47, 0, -44),
+	ZIndex = 0,
+})
+local glowGrad = brandGradient(20)
+glowGrad.Parent = glow
+glow.Parent = holder
+
+shadow = new("ImageLabel", {
+	BackgroundTransparency = 1,
+	Image = "rbxassetid://1316045217",
+	ImageColor3 = Color3.fromRGB(0, 0, 0),
+	ImageTransparency = 1,
+	ScaleType = Enum.ScaleType.Slice,
+	SliceCenter = Rect.new(10, 10, 118, 118),
+	Size = UDim2.new(1, 46, 1, 56),
+	Position = UDim2.new(0, -23, 0, -14),
+	ZIndex = 0,
+})
+shadow.Parent = holder
+
+window = new("Frame", {
+	BackgroundColor3 = P.bg,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Size = UDim2.new(1, 0, 1, 0),
+	ClipsDescendants = true,
+	ZIndex = 1,
+})
+corner(18).Parent = window
+local wStroke = stroke(P.stroke, 1.4, 0.2)
+wStroke.Parent = window
+gradient(Color3.fromRGB(24, 26, 44), P.bg, 90).Parent = window
+window.Parent = holder
+
+local header = new("Frame", { BackgroundTransparency = 1, Active = true, Size = UDim2.new(1, 0, 0, 58), ZIndex = 2 })
+header.Parent = window
+
+local titleLbl = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0, 16, 0, 9),
+	Size = UDim2.new(0, 210, 0, 22),
+	Font = Enum.Font.GothamBold,
+	TextSize = 18,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = P.txt,
+	Text = "",
+	ZIndex = 3,
+})
+brandGradient(18).Parent = titleLbl
+register(titleLbl, "Text", "title")
+titleLbl.Parent = header
+
+local subLbl = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0, 16, 0, 32),
+	Size = UDim2.new(0, 200, 0, 14),
+	Font = Enum.Font.GothamMedium,
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = P.dim,
+	Text = "",
+	ZIndex = 3,
+})
+register(subLbl, "Text", "subtitle")
+subLbl.Parent = header
+
+local handleLbl = new("TextLabel", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -14, 0, 41),
+	Size = UDim2.new(0, 150, 0, 12),
+	Font = Enum.Font.GothamMedium,
+	TextSize = 11,
+	TextTransparency = 0.32,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextColor3 = P.dim,
+	Text = "@sigmatik323",
+	ZIndex = 3,
+})
+handleLbl.Parent = header
+
+local divider = new("Frame", {
+	BackgroundColor3 = P.stroke,
+	BackgroundTransparency = 0.5,
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 14, 0, 57),
+	Size = UDim2.new(1, -28, 0, 1),
+	ZIndex = 2,
+})
+divider.Parent = window
+
+local pill = new("Frame", {
+	BackgroundColor3 = P.card2,
+	BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -78, 0, 12),
+	Size = UDim2.new(0, 64, 0, 26),
+	ZIndex = 3,
+})
+corner(13).Parent = pill
+stroke(P.stroke, 1, 0.45).Parent = pill
+pillHi = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 2, 0, 2),
+	Size = UDim2.new(0.5, -3, 1, -4),
+	ZIndex = 3,
+})
+corner(11).Parent = pillHi
+brandGradient(0).Parent = pillHi
+pillHi.Parent = pill
+enLbl = new("TextButton", {
+	BackgroundTransparency = 1,
+	AutoButtonColor = false,
+	Position = UDim2.new(0, 0, 0, 0),
+	Size = UDim2.new(0.5, 0, 1, 0),
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	Text = "EN",
+	TextColor3 = P.accTxt,
+	ZIndex = 4,
+})
+enLbl.Parent = pill
+ruLbl = new("TextButton", {
+	BackgroundTransparency = 1,
+	AutoButtonColor = false,
+	Position = UDim2.new(0.5, 0, 0, 0),
+	Size = UDim2.new(0.5, 0, 1, 0),
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	Text = "RU",
+	TextColor3 = P.dim,
+	ZIndex = 4,
+})
+ruLbl.Parent = pill
+pill.Parent = header
+
+local hideBtn = new("TextButton", {
+	AutoButtonColor = false,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -44, 0, 12),
+	Size = UDim2.new(0, 26, 0, 26),
+	BackgroundColor3 = P.card2,
+	BorderSizePixel = 0,
+	Text = "",
+	ZIndex = 3,
+})
+corner(8).Parent = hideBtn
+stroke(P.stroke, 1, 0.45).Parent = hideBtn
+local hideGlyph = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(0, 11, 0, 2),
+	BackgroundColor3 = P.dim,
+	BorderSizePixel = 0,
+	ZIndex = 4,
+})
+corner(1).Parent = hideGlyph
+hideGlyph.Parent = hideBtn
+hideBtn.Parent = header
+
+local closeBtn = new("TextButton", {
+	AutoButtonColor = false,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -12, 0, 12),
+	Size = UDim2.new(0, 26, 0, 26),
+	BackgroundColor3 = P.card2,
+	BorderSizePixel = 0,
+	Text = "",
+	ZIndex = 3,
+})
+corner(8).Parent = closeBtn
+local closeStroke = stroke(P.stroke, 1, 0.45)
+closeStroke.Parent = closeBtn
+local xa = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(0, 12, 0, 2),
+	BackgroundColor3 = P.dim,
+	BorderSizePixel = 0,
+	Rotation = 45,
+	ZIndex = 4,
+})
+corner(1).Parent = xa
+xa.Parent = closeBtn
+local xb = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(0, 12, 0, 2),
+	BackgroundColor3 = P.dim,
+	BorderSizePixel = 0,
+	Rotation = -45,
+	ZIndex = 4,
+})
+corner(1).Parent = xb
+xb.Parent = closeBtn
+closeBtn.Parent = header
+
+local tip = new("TextLabel", {
+	BackgroundColor3 = P.card2,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Size = UDim2.new(0, 168, 0, 26),
+	Font = Enum.Font.GothamMedium,
+	TextSize = 12,
+	TextColor3 = P.txt,
+	TextTransparency = 1,
+	Text = "",
+	Visible = false,
+	TextWrapped = true,
+	ZIndex = 60,
+})
+corner(8).Parent = tip
+stroke(P.stroke, 1, 0.3).Parent = tip
+tip.Parent = window
+
+local function attachTip(inst, key)
+	track(inst.MouseEnter:Connect(function()
+		tip.Text = tr(key)
+		local bp, wp = inst.AbsolutePosition, window.AbsolutePosition
+		local x = math.clamp(bp.X - wp.X + inst.AbsoluteSize.X / 2 - 84, 6, W - 174)
+		local y = bp.Y - wp.Y + inst.AbsoluteSize.Y + 6
+		tip.Position = UDim2.new(0, x, 0, y)
+		tip.Visible = true
+		tw(tip, T.fast, { TextTransparency = 0, BackgroundTransparency = 0.05 })
+	end))
+	track(inst.MouseLeave:Connect(function()
+		tw(tip, T.fast, { TextTransparency = 1, BackgroundTransparency = 1 })
+		task.delay(0.18, function()
+			if tip.TextTransparency >= 1 then tip.Visible = false end
+		end)
+	end))
+end
+
+local tabbar = new("Frame", {
+	BackgroundColor3 = P.card,
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 12, 0, 66),
+	Size = UDim2.new(1, -24, 0, 40),
+	ZIndex = 2,
+})
+corner(12).Parent = tabbar
+stroke(P.stroke, 1, 0.5).Parent = tabbar
+tabbar.Parent = window
+
+local indicator = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 3, 0, 4),
+	Size = UDim2.new(0.25, -6, 1, -8),
+	ZIndex = 2,
+})
+corner(9).Parent = indicator
+local indGrad = brandGradient(16)
+indGrad.Parent = indicator
+indicator.Parent = tabbar
+
+local tabKeys = { "tab_gain", "tab_boosts", "tab_pets", "tab_teleport" }
+for i = 1, 4 do
+	local idx = i
+	local b = new("TextButton", {
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Text = "",
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = P.dim,
+		Position = UDim2.new(0.25 * (i - 1), 0, 0, 0),
+		Size = UDim2.new(0.25, 0, 1, 0),
+		ZIndex = 3,
+	})
+	register(b, "Text", tabKeys[i])
+	track(b.Activated:Connect(function() switchTab(idx) end))
+	track(b.MouseEnter:Connect(function()
+		if indActive ~= idx then tw(b, T.fast, { TextColor3 = P.txt }) end
+	end))
+	track(b.MouseLeave:Connect(function()
+		if indActive ~= idx then tw(b, T.fast, { TextColor3 = P.dim }) end
+	end))
+	b.Parent = tabbar
+	tabButtons[i] = b
+end
+
+content = new("Frame", {
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 0, 0, 114),
+	Size = UDim2.new(1, 0, 1, -174),
+	ClipsDescendants = true,
+	ZIndex = 2,
+})
+content.Parent = window
+
+for i = 1, 4 do
+	local pg = new("ScrollingFrame", {
+		Active = true,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.fromScale((i == 1) and 0 or 1, 0),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = P.acc,
+		ScrollBarImageTransparency = 0.35,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		Visible = (i == 1),
+		ZIndex = 2,
+	})
+	local lay = new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center })
+	lay.Parent = pg
+	pad(pg, 12, 14, 12, 12)
+	track(lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		pg.CanvasSize = UDim2.new(0, 0, 0, lay.AbsoluteContentSize.Y + 22)
+	end))
+	pg.Parent = content
+	pages[i] = pg
+end
+
+local statusCard = new("Frame", {
+	BackgroundColor3 = P.card,
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 12, 1, -50),
+	Size = UDim2.new(1, -24, 0, 42),
+	ZIndex = 2,
+})
+corner(11).Parent = statusCard
+stroke(P.stroke, 1, 0.5).Parent = statusCard
+gradient(P.card2, P.card, 90).Parent = statusCard
+statusCard.Parent = window
+
+statusDot = new("Frame", {
+	AnchorPoint = Vector2.new(0, 0.5),
+	BackgroundColor3 = P.dim,
+	BorderSizePixel = 0,
+	Position = UDim2.new(0, 13, 0.5, 0),
+	Size = UDim2.new(0, 8, 0, 8),
+	ZIndex = 3,
+})
+corner(4).Parent = statusDot
+statusDot.Parent = statusCard
+
+statusBase = UDim2.new(0, 28, 0, 0)
+statusLabel = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Position = statusBase,
+	Size = UDim2.new(1, -40, 1, 0),
+	Font = Enum.Font.GothamSemibold,
+	TextSize = 12.5,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Center,
+	TextColor3 = P.txt,
+	Text = "",
+	TextWrapped = true,
+	ZIndex = 3,
+})
+statusLabel.Parent = statusCard
+
+setStatus = function(text, color)
+	if not statusLabel then return end
+	local c = color or P.dim
+	statusLabel.Text = text
+	statusLabel.TextColor3 = c
+	tw(statusDot, T.med, { BackgroundColor3 = c })
+	statusLabel.TextTransparency = 1
+	statusLabel.Position = statusBase + UDim2.fromOffset(0, 5)
+	tw(statusLabel, T.med, { TextTransparency = 0, Position = statusBase })
+end
+
+st = function(key, color, ...)
+	lastStatus = { key = key, color = color, args = { ... } }
+	setStatus(tr(key, ...), color)
+end
+
+busyGuard = function(key, fn)
+	if State.busy[key] then
+		st("st_busy", P.work)
+		return
+	end
+	State.busy[key] = true
+	task.spawn(function()
+		local ok = pcall(fn)
+		State.busy[key] = false
+		if not ok then st("st_error", P.err) end
+	end)
+end
+
+local function report() end
+
+local function ripple(btn)
+	local r = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(0, 0),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0.74,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+	})
+	corner(999).Parent = r
+	r.Parent = btn
+	local s = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.1
+	tw(r, T.slow, { Size = UDim2.fromOffset(s, s), BackgroundTransparency = 1 })
+	task.delay(0.5, function() pcall(function() r:Destroy() end) end)
+end
+
+local function makeButton(parent, key, primary, onClick, sizeOverride)
+	local btn = new("TextButton", {
+		AutoButtonColor = false,
+		BackgroundColor3 = primary and P.acc or P.card2,
+		BorderSizePixel = 0,
+		Size = sizeOverride or UDim2.new(1, 0, 0, 38),
+		Text = "",
+		ClipsDescendants = true,
+	})
+	corner(10).Parent = btn
+	local sc = new("UIScale", { Scale = 1 })
+	sc.Parent = btn
+	if primary then brandGradient(18).Parent = btn end
+	local base = primary and 0.25 or 0.5
+	local strk = stroke(primary and P.acc or P.stroke, 1, base)
+	strk.Parent = btn
+	local lbl = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = primary and P.accTxt or P.txt,
+		Text = "",
+		ZIndex = 3,
+	})
+	register(lbl, "Text", key)
+	lbl.Parent = btn
+	track(btn.MouseEnter:Connect(function()
+		tw(sc, T.fast, { Scale = 1.03 })
+		tw(strk, T.fast, { Transparency = math.max(base - 0.3, 0), Color = primary and P.acc3 or P.acc })
+	end))
+	track(btn.MouseLeave:Connect(function()
+		tw(sc, T.fast, { Scale = 1 })
+		tw(strk, T.fast, { Transparency = base, Color = primary and P.acc or P.stroke })
+	end))
+	track(btn.MouseButton1Down:Connect(function() tw(sc, T.fast, { Scale = 0.96 }) end))
+	track(btn.MouseButton1Up:Connect(function() tw(sc, T.backFast, { Scale = 1.03 }) end))
+	track(btn.Activated:Connect(function()
+		ripple(btn)
+		if onClick then onClick() end
+	end))
+	if parent then
+		btn.LayoutOrder = nextOrder(parent)
+		btn.Parent = parent
+	end
+	return btn
+end
+
+local function makeInput(parent, labelKey, default, placeholderKey)
+	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 56) })
+	local lbl = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 2, 0, 0),
+		Size = UDim2.new(1, -4, 0, 16),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = P.dim,
+		Text = "",
+	})
+	register(lbl, "Text", labelKey)
+	lbl.Parent = wrap
+	local box = new("TextBox", {
+		BackgroundColor3 = P.card2,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0, 20),
+		Size = UDim2.new(1, 0, 0, 36),
+		Font = Enum.Font.GothamSemibold,
+		TextSize = 15,
+		TextColor3 = P.txt,
+		PlaceholderColor3 = P.dim,
+		Text = default or "",
+		ClearTextOnFocus = false,
+		ClipsDescendants = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+	})
+	corner(9).Parent = box
+	pad(box, 0, 0, 12, 12)
+	local strk = stroke(P.stroke, 1, 0.5)
+	strk.Parent = box
+	if placeholderKey then register(box, "PlaceholderText", placeholderKey) end
+	track(box:GetPropertyChangedSignal("Text"):Connect(function()
+		if #box.Text > 18 then box.Text = string.sub(box.Text, 1, 18) end
+	end))
+	track(box.Focused:Connect(function() tw(strk, T.fast, { Transparency = 0, Color = P.acc }) end))
+	track(box.FocusLost:Connect(function() tw(strk, T.fast, { Transparency = 0.5, Color = P.stroke }) end))
+	wrap.LayoutOrder = nextOrder(parent)
+	wrap.Parent = parent
+	return box
+end
+
+local function makeToggle(parent, labelKey, onSet)
+	local row = new("TextButton", { BackgroundTransparency = 1, AutoButtonColor = false, Text = "", Size = UDim2.new(1, 0, 0, 34) })
+	local lbl = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 2, 0, 0),
+		Size = UDim2.new(1, -62, 1, 0),
+		Font = Enum.Font.GothamSemibold,
+		TextSize = 13.5,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = P.txt,
+		Text = "",
+		ZIndex = 3,
+	})
+	register(lbl, "Text", labelKey)
+	lbl.Parent = row
+	local trackf = new("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundColor3 = P.card3,
+		BorderSizePixel = 0,
+		Position = UDim2.new(1, 0, 0.5, 0),
+		Size = UDim2.new(0, 48, 0, 24),
+		ZIndex = 3,
+	})
+	corner(12).Parent = trackf
+	local ts = stroke(P.stroke, 1, 0.5)
+	ts.Parent = trackf
+	trackf.Parent = row
+	local fill = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0),
+		ZIndex = 3,
+	})
+	corner(12).Parent = fill
+	brandGradient(0).Parent = fill
+	fill.Parent = trackf
+	local knob = new("Frame", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = P.txt,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 3, 0.5, 0),
+		Size = UDim2.new(0, 18, 0, 18),
+		ZIndex = 4,
+	})
+	corner(9).Parent = knob
+	knob.Parent = trackf
+	local state = false
+	local function apply(anim)
+		if state then
+			tw(ts, T.fast, { Transparency = 1 })
+			tw(fill, T.fast, { BackgroundTransparency = 0 })
+			tw(knob, anim and T.spring or T.fast, { Position = UDim2.new(1, -21, 0.5, 0), BackgroundColor3 = P.accTxt })
+		else
+			tw(ts, T.fast, { Transparency = 0.5 })
+			tw(fill, T.fast, { BackgroundTransparency = 1 })
+			tw(knob, anim and T.spring or T.fast, { Position = UDim2.new(0, 3, 0.5, 0), BackgroundColor3 = P.txt })
+		end
+	end
+	apply(false)
+	track(row.Activated:Connect(function()
+		state = not state
+		apply(true)
+		if onSet then onSet(state) end
+	end))
+	row.LayoutOrder = nextOrder(parent)
+	row.Parent = parent
+	return { set = function(v) state = v and true or false; apply(true) end, get = function() return state end }
+end
+
+local function smallBtn(parent, w, h)
+	local b = new("TextButton", {
+		BackgroundColor3 = P.card2,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, w, 0, h),
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 3,
+	})
+	corner(8).Parent = b
+	local strk = stroke(P.stroke, 1, 0.5)
+	strk.Parent = b
+	local sc = new("UIScale", { Scale = 1 })
+	sc.Parent = b
+	track(b.MouseEnter:Connect(function() tw(strk, T.fast, { Transparency = 0, Color = P.acc }) end))
+	track(b.MouseLeave:Connect(function() tw(strk, T.fast, { Transparency = 0.5, Color = P.stroke }) end))
+	track(b.MouseButton1Down:Connect(function() tw(sc, T.fast, { Scale = 0.9 }) end))
+	track(b.MouseButton1Up:Connect(function() tw(sc, T.backFast, { Scale = 1 }) end))
+	b.Parent = parent
+	return b
+end
+
+local function glyph(parent, vertical)
+	local g = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0, 11, 0, 2),
+		BackgroundColor3 = P.txt,
+		BorderSizePixel = 0,
+		ZIndex = 4,
+	})
+	corner(1).Parent = g
+	g.Parent = parent
+	if vertical then
+		local v = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(0, 2, 0, 11),
+			BackgroundColor3 = P.txt,
+			BorderSizePixel = 0,
+			ZIndex = 4,
+		})
+		corner(1).Parent = v
+		v.Parent = parent
+	end
+	return g
+end
+
+local function chevron(parent, left)
+	local holderF = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0, 12, 0, 12),
+		BackgroundTransparency = 1,
+		ZIndex = 4,
+	})
+	holderF.Parent = parent
+	local a = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, left and 1 or -1, 0.5, -3),
+		Size = UDim2.new(0, 9, 0, 2),
+		BackgroundColor3 = P.acc3,
+		BorderSizePixel = 0,
+		Rotation = left and -45 or 45,
+		ZIndex = 4,
+	})
+	corner(1).Parent = a
+	a.Parent = holderF
+	local b = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, left and 1 or -1, 0.5, 3),
+		Size = UDim2.new(0, 9, 0, 2),
+		BackgroundColor3 = P.acc3,
+		BorderSizePixel = 0,
+		Rotation = left and 45 or -45,
+		ZIndex = 4,
+	})
+	corner(1).Parent = b
+	b.Parent = holderF
+	return holderF
+end
+
+local function makeStepper(parent, labelKey, minV, maxV, default)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34) })
+	local lbl = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 2, 0, 0),
+		Size = UDim2.new(1, -112, 1, 0),
+		Font = Enum.Font.GothamSemibold,
+		TextSize = 13.5,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = P.txt,
+		Text = "",
+		ZIndex = 3,
+	})
+	register(lbl, "Text", labelKey)
+	lbl.Parent = row
+	local value = math.clamp(default, minV, maxV)
+	local minus = smallBtn(row, 28, 28)
+	minus.Position = UDim2.new(1, -100, 0.5, -14)
+	glyph(minus, false)
+	local plus = smallBtn(row, 28, 28)
+	plus.Position = UDim2.new(1, -28, 0.5, -14)
+	glyph(plus, true)
+	local valBox = new("TextLabel", {
+		BackgroundColor3 = P.card2,
+		BorderSizePixel = 0,
+		Position = UDim2.new(1, -68, 0.5, -14),
+		Size = UDim2.new(0, 38, 0, 28),
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = P.txt,
+		Text = tostring(value),
+		ZIndex = 3,
+	})
+	corner(8).Parent = valBox
+	stroke(P.stroke, 1, 0.5).Parent = valBox
+	valBox.Parent = row
+	local function refresh()
+		valBox.Text = tostring(value)
+		valBox.TextTransparency = 0.55
+		tw(valBox, T.fast, { TextTransparency = 0 })
+	end
+	track(minus.Activated:Connect(function() value = math.clamp(value - 1, minV, maxV) refresh() end))
+	track(plus.Activated:Connect(function() value = math.clamp(value + 1, minV, maxV) refresh() end))
+	row.LayoutOrder = nextOrder(parent)
+	row.Parent = parent
+	return { get = function() return value end }
+end
+
+local function makeSelector(parent, captionKey, getCount, getLabel, emptyKey)
+	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50) })
+	local cap = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 2, 0, 0),
+		Size = UDim2.new(1, -4, 0, 14),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = P.dim,
+		Text = "",
+		ZIndex = 3,
+	})
+	register(cap, "Text", captionKey)
+	cap.Parent = wrap
+	local left = smallBtn(wrap, 32, 30)
+	left.Position = UDim2.new(0, 0, 0, 18)
+	chevron(left, true)
+	local right = smallBtn(wrap, 32, 30)
+	right.Position = UDim2.new(1, -32, 0, 18)
+	chevron(right, false)
+	local center = new("TextLabel", {
+		BackgroundColor3 = P.card2,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 38, 0, 18),
+		Size = UDim2.new(1, -76, 0, 30),
+		Font = Enum.Font.GothamSemibold,
+		TextSize = 13,
+		TextColor3 = P.txt,
+		Text = "",
+		ClipsDescendants = true,
+		TextWrapped = false,
+		ZIndex = 3,
+	})
+	corner(8).Parent = center
+	stroke(P.stroke, 1, 0.5).Parent = center
+	pad(center, 0, 0, 8, 8)
+	center.Parent = wrap
+	local index = 1
+	local function setCenter(t)
+		center.Text = t
+		center.TextTransparency = 0.6
+		tw(center, T.fast, { TextTransparency = 0 })
+	end
+	local function refresh()
+		local n = getCount()
+		if n <= 0 then
+			index = 1
+			setCenter(emptyKey and tr(emptyKey) or "-")
+			return
+		end
+		if index > n then index = n end
+		if index < 1 then index = 1 end
+		setCenter(getLabel(index))
+	end
+	track(left.Activated:Connect(function()
+		local n = getCount()
+		if n <= 0 then return end
+		index = index - 1
+		if index < 1 then index = n end
+		refresh()
+	end))
+	track(right.Activated:Connect(function()
+		local n = getCount()
+		if n <= 0 then return end
+		index = index + 1
+		if index > n then index = 1 end
+		refresh()
+	end))
+	bind(function() refresh() end)
+	wrap.LayoutOrder = nextOrder(parent)
+	wrap.Parent = parent
+	return { getIndex = function() return index end, refresh = refresh }
+end
+
+local function makeCard(parent, titleKey)
+	local card = new("Frame", {
+		BackgroundColor3 = P.card,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 40),
+		ZIndex = 2,
+	})
+	corner(14).Parent = card
+	stroke(P.stroke, 1, 0.5).Parent = card
+	gradient(Color3.fromRGB(30, 32, 50), P.card, 90).Parent = card
+	pad(card, 12, 12, 12, 12)
+	local list = new("UIListLayout", { Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder })
+	list.Parent = card
+	card.LayoutOrder = nextOrder(parent)
+	card.Parent = parent
+	track(list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		card.Size = UDim2.new(1, 0, 0, list.AbsoluteContentSize.Y + 24)
+	end))
+	if titleKey then
+		local t = new("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, 16),
+			Font = Enum.Font.GothamBold,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = P.acc3,
+			Text = "",
+			ZIndex = 3,
+		})
+		register(t, "Text", titleKey)
+		t.LayoutOrder = nextOrder(card)
+		t.Parent = card
+	end
+	return card
+end
+
+local function makeRow(parent, h)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, h or 38) })
+	local l = new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+	})
+	l.Parent = row
+	row.LayoutOrder = nextOrder(parent)
+	row.Parent = parent
+	return row
+end
+
 do
-    local s = Instance.new("UIStroke", window)
-    s.Thickness = 1.5; s.Color = ACCENT; s.Transparency = 0.25
+	local gp = pages[1]
+	local c1 = makeCard(gp, "sec_energy")
+	local energyBox = makeInput(c1, "l_energy", "1m", "ph_amount")
+	makeButton(c1, "btn_give_energy", true, function()
+		busyGuard("energy", function()
+			local target = parseAmount(energyBox.Text)
+			if not target then st("st_invalid", P.err) return end
+			st("st_working", P.work)
+			giveEnergy(target)
+			st("st_energy", P.ok, fmt(target))
+		end)
+	end)
+
+	local c2 = makeCard(gp, "sec_strength")
+	local strengthBox = makeInput(c2, "l_strength", "1111111", "ph_strength")
+	local row = makeRow(c2, 38)
+	makeButton(row, "btn_safe", true, function()
+		busyGuard("strength", function()
+			local target = parseAmount(strengthBox.Text)
+			if not target then st("st_invalid", P.err) return end
+			st("st_working", P.work)
+			local ok = giveStrength(target, function(delivered)
+				st("st_str_live", P.work, fmt(delivered))
+			end)
+			st("st_str_done", ok and P.ok or P.err, fmt(readStrength() or target))
+		end)
+	end, UDim2.new(0.5, -4, 1, 0))
+	makeButton(row, "btn_fast", false, function()
+		busyGuard("strengthfast", function()
+			local target = parseAmount(strengthBox.Text)
+			if not target then st("st_invalid", P.err) return end
+			st("st_working", P.work)
+			local ok, given = giveStrengthFast(target)
+			st("st_str_done", ok and P.ok or P.err, fmt(given or readStrength() or target))
+		end)
+	end, UDim2.new(0.5, -4, 1, 0))
+
+	local c3 = makeCard(gp, "sec_rebirth")
+	makeButton(c3, "btn_rebirth", true, function()
+		busyGuard("rebirth", function()
+			st("st_working", P.work)
+			rebirthCycle(6)
+			st("st_reb_done", P.ok, fmt(readRebirth() or 0))
+		end)
+	end)
+	makeToggle(c3, "tgl_autoreb", function(on)
+		State.autoRebirth = on
+		if on then
+			st("st_autoreb_on", P.ok)
+			if not autoRebRunning then
+				autoRebRunning = true
+				task.spawn(function()
+					while State.autoRebirth and State.alive do
+						pcall(rebirthCycle, 6)
+						task.wait(0.2)
+					end
+					autoRebRunning = false
+				end)
+			end
+		else
+			st("st_autoreb_off", P.dim)
+		end
+	end)
 end
 
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.BackgroundTransparency = 1
-titleBar.Parent = window
-
-local title = Instance.new("TextLabel")
-title.BackgroundTransparency = 1
-title.Position = UDim2.fromOffset(16, 0)
-title.Size = UDim2.new(1, -56, 1, 0)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.TextColor3 = TXT
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Text = "@sigmatik323"
-title.Parent = titleBar
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.AnchorPoint = Vector2.new(1, 0.5)
-closeBtn.Position = UDim2.new(1, -12, 0.5, 0)
-closeBtn.Size = UDim2.fromOffset(26, 26)
-closeBtn.BackgroundColor3 = Color3.fromRGB(40, 22, 28)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.TextColor3 = BAD
-closeBtn.Text = "✕"
-closeBtn.AutoButtonColor = true
-closeBtn.Parent = titleBar
-corner(closeBtn, 8)
-
-local status = Instance.new("TextLabel")
-status.AnchorPoint = Vector2.new(0, 1)
-status.Position = UDim2.new(0, 16, 1, -10)
-status.Size = UDim2.new(1, -32, 0, 30)
-status.BackgroundTransparency = 1
-status.Font = Enum.Font.GothamMedium
-status.TextSize = 13
-status.TextColor3 = MUTED
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.TextWrapped = true
-status.Text = "Готов"
-status.Parent = window
-
-local function setStatus(text, color)
-    status.Text = text
-    status.TextColor3 = color or MUTED
-end
-
-----------------------------------------------------------------------
--- Tabs
-----------------------------------------------------------------------
-local tabBar = Instance.new("Frame")
-tabBar.Position = UDim2.fromOffset(12, 44)
-tabBar.Size = UDim2.new(1, -24, 0, 32)
-tabBar.BackgroundColor3 = PANEL
-tabBar.BorderSizePixel = 0
-tabBar.Parent = window
-corner(tabBar, 9)
 do
-    local l = Instance.new("UIListLayout", tabBar)
-    l.FillDirection = Enum.FillDirection.Horizontal
-    l.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    l.VerticalAlignment = Enum.VerticalAlignment.Center
-    l.Padding = UDim.new(0, 4)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    pad(tabBar, 4, 4, 0, 0)
+	local bp = pages[2]
+	local c = makeCard(bp, "sec_actions")
+	local function boost(key, fn, doneKey)
+		busyGuard(key, function()
+			st("st_working", P.work)
+			fn(report)
+			st(doneKey, P.ok)
+		end)
+	end
+	makeButton(c, "btn_codes", true, function() boost("codes", redeemCodes, "st_codes_done") end)
+	makeButton(c, "btn_season", false, function() boost("season", claimAllSeasonPets, "st_season_done") end)
+	makeButton(c, "btn_power", false, function() boost("power", maxPower, "st_power_done") end)
+	makeButton(c, "btn_rewards", true, function() boost("rewards", claimRewards, "st_rewards_done") end)
 end
 
-local contentHolder = Instance.new("Frame")
-contentHolder.Position = UDim2.fromOffset(12, 84)
-contentHolder.Size = UDim2.new(1, -24, 1, -84 - 46)
-contentHolder.BackgroundTransparency = 1
-contentHolder.Parent = window
-
-local tabs = {}
-local function selectTab(name)
-    for k, t in pairs(tabs) do
-        local on = (k == name)
-        t.page.Visible = on
-        t.btn.BackgroundColor3 = on and t.color or PANEL
-        t.btn.TextColor3 = on and Color3.fromRGB(10, 14, 22) or MUTED
-    end
-end
-
-local function addTab(name, color)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 78, 1, -6)
-    btn.BackgroundColor3 = PANEL
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.TextColor3 = MUTED
-    btn.Text = name
-    btn.AutoButtonColor = false
-    btn.Parent = tabBar
-    corner(btn, 7)
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.fromScale(1, 1)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.ScrollBarImageColor3 = color
-    page.CanvasSize = UDim2.new()
-    page.Visible = false
-    page.Parent = contentHolder
-    local l = Instance.new("UIListLayout", page)
-    l.Padding = UDim.new(0, 8)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    pad(page, 2, 8, 2, 8)
-    track(l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        page.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 12)
-    end))
-
-    tabs[name] = { btn = btn, page = page, color = color }
-    track(btn.MouseButton1Click:Connect(function() selectTab(name) end))
-    return page
-end
-
-----------------------------------------------------------------------
--- Component builders
-----------------------------------------------------------------------
-local function busyGuard(key, fn)
-    if State.busy[key] then return end
-    State.busy[key] = true
-    task.spawn(function()
-        local ok, err = pcall(fn)
-        if not ok then setStatus("Ошибка: " .. tostring(err), BAD) end
-        State.busy[key] = false
-    end)
-end
-
-local function label(parent, ru, en)
-    local p = Instance.new("TextLabel")
-    p.Size = UDim2.new(1, 0, 0, en and 34 or 18)
-    p.BackgroundTransparency = 1
-    p.Font = Enum.Font.GothamSemibold
-    p.TextSize = 13
-    p.TextColor3 = Color3.fromRGB(225, 232, 245)
-    p.TextXAlignment = Enum.TextXAlignment.Left
-    p.TextYAlignment = Enum.TextYAlignment.Top
-    p.RichText = true
-    p.Text = en and (ru .. "\n<font color=\"rgb(150,160,185)\">" .. en .. "</font>") or ru
-    p.Parent = parent
-    return p
-end
-
-local function inputBox(parent, default, placeholder)
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, 0, 0, 36)
-    box.BackgroundColor3 = PANEL
-    box.Font = Enum.Font.GothamMedium
-    box.TextSize = 15
-    box.TextColor3 = TXT
-    box.PlaceholderText = placeholder or "1k · 1000 · 1sx"
-    box.PlaceholderColor3 = MUTED
-    box.Text = default or ""
-    box.ClearTextOnFocus = false
-    box.TextXAlignment = Enum.TextXAlignment.Left
-    box.Parent = parent
-    corner(box, 9)
-    pad(box, 12, 12, 0, 0)
-    local s = Instance.new("UIStroke", box)
-    s.Color = Color3.fromRGB(50, 60, 86); s.Transparency = 0.2
-    return box
-end
-
-local function button(parent, text, color, fn)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 36)
-    btn.BackgroundColor3 = color
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.TextColor3 = Color3.fromRGB(10, 14, 22)
-    btn.Text = text
-    btn.AutoButtonColor = true
-    btn.Parent = parent
-    corner(btn, 9)
-    track(btn.MouseButton1Click:Connect(function() fn(btn) end))
-    return btn
-end
-
-local function dualButton(parent, t1, c1, f1, t2, c2, f2)
-    local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, 0, 0, 36)
-    holder.BackgroundTransparency = 1
-    holder.Parent = parent
-    local l = Instance.new("UIListLayout", holder)
-    l.FillDirection = Enum.FillDirection.Horizontal
-    l.Padding = UDim.new(0, 8)
-    local function half(t, c, f)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.5, -4, 1, 0)
-        b.BackgroundColor3 = c
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 14
-        b.TextColor3 = Color3.fromRGB(10, 14, 22)
-        b.Text = t
-        b.Parent = holder
-        corner(b, 9)
-        track(b.MouseButton1Click:Connect(function() f(b) end))
-        return b
-    end
-    return half(t1, c1, f1), half(t2, c2, f2)
-end
-
-local function toggle(parent, text, color, fn)
-    local row = Instance.new("TextButton")
-    row.Size = UDim2.new(1, 0, 0, 38)
-    row.BackgroundColor3 = PANEL
-    row.AutoButtonColor = false
-    row.Text = ""
-    row.Parent = parent
-    corner(row, 9)
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1
-    lbl.Position = UDim2.fromOffset(12, 0)
-    lbl.Size = UDim2.new(1, -64, 1, 0)
-    lbl.Font = Enum.Font.GothamSemibold
-    lbl.TextSize = 13
-    lbl.TextColor3 = TXT
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Text = text
-    lbl.Parent = row
-    local knob = Instance.new("Frame")
-    knob.AnchorPoint = Vector2.new(1, 0.5)
-    knob.Position = UDim2.new(1, -12, 0.5, 0)
-    knob.Size = UDim2.fromOffset(40, 22)
-    knob.BackgroundColor3 = Color3.fromRGB(45, 52, 74)
-    knob.Parent = row
-    corner(knob, 11)
-    local dot = Instance.new("Frame")
-    dot.AnchorPoint = Vector2.new(0, 0.5)
-    dot.Position = UDim2.new(0, 3, 0.5, 0)
-    dot.Size = UDim2.fromOffset(16, 16)
-    dot.BackgroundColor3 = Color3.fromRGB(200, 205, 220)
-    dot.Parent = knob
-    corner(dot, 8)
-    local on = false
-    local function render()
-        TweenService:Create(knob, TweenInfo.new(0.15), { BackgroundColor3 = on and color or Color3.fromRGB(45, 52, 74) }):Play()
-        TweenService:Create(dot, TweenInfo.new(0.15), { Position = on and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0) }):Play()
-    end
-    track(row.MouseButton1Click:Connect(function()
-        on = not on
-        render()
-        fn(on)
-    end))
-    return function(v) on = v; render() end
-end
-
-local function cycle(parent, getItems, getIndex, setIndex)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 38)
-    row.BackgroundColor3 = PANEL
-    row.Parent = parent
-    corner(row, 9)
-    local left = Instance.new("TextButton")
-    left.Size = UDim2.fromOffset(34, 38)
-    left.BackgroundTransparency = 1
-    left.Font = Enum.Font.GothamBold
-    left.TextSize = 18
-    left.TextColor3 = MUTED
-    left.Text = "‹"
-    left.Parent = row
-    local right = Instance.new("TextButton")
-    right.AnchorPoint = Vector2.new(1, 0)
-    right.Position = UDim2.fromScale(1, 0)
-    right.Size = UDim2.fromOffset(34, 38)
-    right.BackgroundTransparency = 1
-    right.Font = Enum.Font.GothamBold
-    right.TextSize = 18
-    right.TextColor3 = MUTED
-    right.Text = "›"
-    right.Parent = row
-    local lbl = Instance.new("TextLabel")
-    lbl.Position = UDim2.fromOffset(34, 0)
-    lbl.Size = UDim2.new(1, -68, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 13
-    lbl.TextColor3 = TXT
-    lbl.Text = ""
-    lbl.Parent = row
-    local function render()
-        local items = getItems()
-        local i = getIndex()
-        lbl.Text = items[i] and tostring(items[i].label or items[i]) or "—"
-    end
-    track(left.MouseButton1Click:Connect(function()
-        local items = getItems()
-        if #items == 0 then return end
-        setIndex(((getIndex() - 2) % #items) + 1); render()
-    end))
-    track(right.MouseButton1Click:Connect(function()
-        local items = getItems()
-        if #items == 0 then return end
-        setIndex((getIndex() % #items) + 1); render()
-    end))
-    render()
-    return render
-end
-
-----------------------------------------------------------------------
--- Tab: ГЕЙН (energy / strength / rebirth)
-----------------------------------------------------------------------
 do
-    local page = addTab("ГЕЙН", ACCENT)
+	local pp = pages[3]
+	local c1 = makeCard(pp, "sec_egg")
+	local eggSel = makeSelector(c1, "l_egg", function() return #EGGS end, function(i) return prettyEgg(EGGS[i]) end)
 
-    label(page, "Сколько выдать энергии?", "How much energy")
-    local energyBox = inputBox(page, "1m")
-    button(page, "Выдать энергию", ACCENT, function(b)
-        busyGuard("energy", function()
-            local target = parseAmount(energyBox.Text)
-            if not target then setStatus("Не понял число: 1k · 1000 · 1sx", WARN); return end
-            b.Text = "Выдаю…"; setStatus("Энергия: " .. fmt(target) .. "…", ACCENT)
-            local ok = giveEnergy(target)
-            setStatus(ok and ("Энергия +" .. fmt(target) .. " ✅") or "Энергия: не вышло", ok and GOOD or BAD)
-            b.Text = "Выдать энергию"
-        end)
-    end)
+	local c2 = makeCard(pp, "sec_hatch")
+	local rateApi = makeStepper(c2, "l_rate", 1, 20, 4)
+	makeToggle(c2, "tgl_autohatch", function(on)
+		State.autoHatch = on
+		if on then
+			st("st_autohatch_on", P.ok)
+			if not hatchRunning then
+				hatchRunning = true
+				task.spawn(function()
+					pcall(function()
+						hatchLoop(function() return EGGS[eggSel.getIndex()] end, function() return rateApi.get() end)
+					end)
+					hatchRunning = false
+				end)
+			end
+		else
+			st("st_autohatch_off", P.dim)
+		end
+	end)
 
-    label(page, "Сколько выдать силы?", "How much strength")
-    local strBox = inputBox(page, "1111111")
-    dualButton(page,
-        "Safe", STR, function(b)
-            busyGuard("strength", function()
-                local target = parseAmount(strBox.Text)
-                if not target then setStatus("Не понял число", WARN); return end
-                b.Text = "…"; setStatus("Сила: " .. fmt(target) .. "…", STR)
-                local ok, given, need = giveStrength(target, function(d)
-                    setStatus("Сила… " .. fmt(d) .. " / " .. fmt(target), STR)
-                end)
-                if ok then setStatus("Сила +" .. fmt(given) .. " ✅", GOOD)
-                elseif need then setStatus("Покачайся 1 раз — ловлю remote", WARN)
-                else setStatus("Сила: remote не найден", BAD) end
-                b.Text = "Safe"
-            end)
-        end,
-        "Обычно", RED, function(b)
-            busyGuard("strength", function()
-                local target = parseAmount(strBox.Text)
-                if not target then setStatus("Не понял число", WARN); return end
-                b.Text = "…"; setStatus("Сила (быстро): " .. fmt(target) .. "…", STR)
-                local ok, given = giveStrengthFast(target)
-                setStatus(ok and ("Сила +" .. fmt(given) .. " ✅") or "Сила: не вышло", ok and GOOD or BAD)
-                b.Text = "Обычно"
-            end)
-        end
-    )
-
-    label(page, "Ребёрты", "Сила сбрасывается, +10% энергии за ребёрт")
-    button(page, "Ребёрт сейчас", VIO, function(b)
-        busyGuard("rebirth", function()
-            b.Text = "Качаю + ребёрчу…"; setStatus("Ребёрт: качаю силу…", VIO)
-            rebirthCycle(6)
-            setStatus("Ребёртов: " .. fmt(readRebirth() or 0) .. " ✅", GOOD)
-            b.Text = "Ребёрт сейчас"
-        end)
-    end)
-    toggle(page, "Авто-ребёрт", VIO, function(on)
-        State.autoRebirth = on
-        if on then
-            setStatus("Авто-ребёрт включён", VIO)
-            task.spawn(function()
-                while State.autoRebirth and State.alive do
-                    rebirthCycle(6)
-                end
-            end)
-        else
-            setStatus("Авто-ребёрт выключен", MUTED)
-        end
-    end)
+	local c3 = makeCard(pp, "sec_manage")
+	makeButton(c3, "btn_equip", true, function()
+		busyGuard("equip", function()
+			st("st_working", P.work)
+			equipBestPets()
+			st("st_equipped", P.ok)
+		end)
+	end)
+	local row = makeRow(c3, 38)
+	makeButton(row, "btn_combine", false, function()
+		busyGuard("combine", function()
+			st("st_working", P.work)
+			combineDups()
+			st("st_combined", P.ok)
+		end)
+	end, UDim2.new(0.5, -4, 1, 0))
+	makeButton(row, "btn_sell", false, function()
+		busyGuard("sell", function()
+			st("st_working", P.work)
+			sellJunk(1)
+			st("st_sold", P.ok)
+		end)
+	end, UDim2.new(0.5, -4, 1, 0))
 end
 
-----------------------------------------------------------------------
--- Tab: БУСТЫ (codes / season pets / power / rewards)
-----------------------------------------------------------------------
+local areas = {}
+local tpSel
+
 do
-    local page = addTab("БУСТЫ", CYAN)
-
-    label(page, "Промокоды", "Перебор всех известных кодов")
-    button(page, "Активировать все коды", CYAN, function(b)
-        busyGuard("codes", function()
-            b.Text = "Ввожу…"
-            redeemCodes(function(t, isErr, done) setStatus(t, isErr and BAD or (done and GOOD or CYAN)) end)
-            b.Text = "Активировать все коды"
-        end)
-    end)
-
-    label(page, "Сезонные питомцы", "Забрать всех (без условий) + надеть лучшего")
-    button(page, "Забрать всех сезон-петов", VIO, function(b)
-        busyGuard("seasonpets", function()
-            b.Text = "Забираю…"
-            claimAllSeasonPets(function(t, isErr, done) setStatus(t, isErr and BAD or (done and GOOD or VIO)) end)
-            b.Text = "Забрать всех сезон-петов"
-        end)
-    end)
-
-    label(page, "Прокачка силы", "Power Upgrade до максимума")
-    button(page, "Прокачать силу (макс)", STR, function(b)
-        busyGuard("power", function()
-            b.Text = "Качаю…"
-            maxPower(function(t, isErr, done) setStatus(t, isErr and WARN or (done and GOOD or STR)) end)
-            b.Text = "Прокачать силу (макс)"
-        end)
-    end)
-
-    label(page, "Награды", "Трейлер · сессия · комьюнити · группа")
-    button(page, "Собрать все награды", ACCENT, function(b)
-        busyGuard("rewards", function()
-            b.Text = "Собираю…"; setStatus("Награды: собираю…", ACCENT)
-            claimRewards(function(t, isErr, done) setStatus(t, isErr and BAD or (done and GOOD or ACCENT)) end)
-            b.Text = "Собрать все награды"
-        end)
-    end)
+	local tpp = pages[4]
+	local c = makeCard(tpp, "sec_dest")
+	tpSel = makeSelector(c, "l_area",
+		function() return #areas end,
+		function(i)
+			local a = areas[i]
+			if not a then return "-" end
+			return tostring(a.name) .. "  (" .. fmt(a.req) .. ")"
+		end,
+		"empty_tp")
+	makeButton(c, "btn_teleport", true, function()
+		if #areas == 0 then
+			st("st_tp_none", P.err)
+			return
+		end
+		busyGuard("teleport", function()
+			local a = areas[tpSel.getIndex()]
+			if not a or not a.part then
+				st("st_tp_none", P.err)
+				return
+			end
+			teleportTo(a.part)
+			st("st_tp_done", P.ok, tostring(a.name))
+		end)
+	end)
 end
 
-----------------------------------------------------------------------
--- Tab: ПЕТЫ (hatch / equip / sell / combine)
-----------------------------------------------------------------------
-do
-    local page = addTab("ПЕТЫ", VIO)
+refreshAreas = function()
+	local ok, res = pcall(gatherTeleports)
+	if ok and type(res) == "table" then
+		areas = res
+	else
+		areas = {}
+	end
+	if tpSel then tpSel.refresh() end
+end
+refreshAreas()
 
-    local EGGS = {
-        "29Superhero","28Bank","27Prison","26Football","25Magic","24Robo","23Mineshaft",
-        "22Sewer","21Kitchen","20Asian","19Princess","18Treasury","17Apartment","16WildWest",
-        "15DeepSea","14Winter","13Retro","12Dino","11Tropical","10Science","9Candyland",
-        "8Space","7Disco","6Steampunk","5Medieval","4Farm","3Arcade","2Food","1Training","LobbyShop",
-    }
-    local eggIndex = 1
-    local rate = 4
-
-    label(page, "Яйцо для авто-вылупления", "Энергия бесконечная — хватит на любое")
-    cycle(page, function() return EGGS end, function() return eggIndex end, function(i) eggIndex = i end)
-
-    label(page, "Вылуплений в секунду", nil)
-    local rateBox = inputBox(page, "4", "4")
-    track(rateBox.FocusLost:Connect(function()
-        rate = math.clamp(tonumber(rateBox.Text) or 4, 1, 20)
-        rateBox.Text = tostring(rate)
-    end))
-
-    toggle(page, "Авто-вылупление (+слияние/продажа)", VIO, function(on)
-        State.autoHatch = on
-        if on then
-            setStatus("Авто-вылупление: " .. EGGS[eggIndex], VIO)
-            task.spawn(function()
-                hatchLoop(function() return EGGS[eggIndex] end, function() return rate end)
-            end)
-        else
-            setStatus("Авто-вылупление выключено", MUTED)
-        end
-    end)
-
-    button(page, "Надеть лучших петов", ACCENT, function(b)
-        busyGuard("equipbest", function()
-            b.Text = "Надеваю…"; equipBestPets()
-            setStatus("Лучшие петы надеты ✅", GOOD); b.Text = "Надеть лучших петов"
-        end)
-    end)
-    dualButton(page,
-        "Слить дубли", CYAN, function(b)
-            busyGuard("combine", function()
-                b.Text = "Сливаю…"; combineDups()
-                setStatus("Дубли слиты ✅", GOOD); b.Text = "Слить дубли"
-            end)
-        end,
-        "Продать Common", RED, function(b)
-            busyGuard("selljunk", function()
-                b.Text = "Продаю…"; sellJunk(1)
-                setStatus("Common проданы ✅", GOOD); b.Text = "Продать Common"
-            end)
-        end
-    )
+setActiveVisual = function(i)
+	indActive = i
+	for j, b in ipairs(tabButtons) do
+		tw(b, T.fast, { TextColor3 = (j == i) and P.accTxt or P.dim })
+	end
 end
 
-----------------------------------------------------------------------
--- Tab: ТП (teleport to areas)
-----------------------------------------------------------------------
-do
-    local page = addTab("ТП", CYAN)
-    local areas = gatherTeleports()
-    local areaIndex = 1
-
-    label(page, "Зона", "Сила обходит порог — телепорт куда угодно")
-    cycle(page,
-        function()
-            local out = {}
-            for i, a in ipairs(areas) do out[i] = { label = a.name .. "  (" .. fmt(a.req) .. ")" } end
-            return out
-        end,
-        function() return areaIndex end,
-        function(i) areaIndex = i end
-    )
-    button(page, "Телепорт", CYAN, function()
-        local a = areas[areaIndex]
-        if a then teleportTo(a.part); setStatus("ТП → " .. a.name, CYAN) end
-    end)
-
-    if #areas == 0 then
-        label(page, "Телепортеры не найдены", "Зайди в игру и попробуй снова")
-    end
+moveIndicator = function(i)
+	tw(indicator, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(0.25, 4, 1, -8) })
+	task.delay(0.15, function()
+		if indActive == i then
+			tw(indicator, T.back, { Size = UDim2.new(0.25, -6, 1, -8) })
+		end
+	end)
+	tw(indicator, TweenInfo.new(0.36, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.25 * (i - 1), 3, 0, 4) })
 end
 
-selectTab("ГЕЙН")
-
-onStrengthCaptured = function() setStatus("✅ Remote силы готов", GOOD) end
-setStatus("Готов · энергия/сила/ребёрт/петы/коды", MUTED)
-
-----------------------------------------------------------------------
--- Drag
-----------------------------------------------------------------------
-do
-    local dragging, dragStart, startPos
-    track(titleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = window.Position
-        end
-    end))
-    track(UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch) then
-            local d = input.Position - dragStart
-            window.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y)
-        end
-    end))
-    track(UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end))
+switchTab = function(i)
+	if not pages[i] or i == currentTab then return end
+	local dir = (i > currentTab) and 1 or -1
+	local old = currentTab
+	local outP, inP = pages[old], pages[i]
+	inP.Position = UDim2.fromScale(dir, 0)
+	inP.Visible = true
+	tw(inP, T.slow, { Position = UDim2.fromScale(0, 0) })
+	tw(outP, T.slow, { Position = UDim2.fromScale(-dir, 0) })
+	task.delay(0.34, function()
+		if currentTab ~= old then outP.Visible = false end
+	end)
+	currentTab = i
+	moveIndicator(i)
+	setActiveVisual(i)
+	if i == 4 then refreshAreas() end
 end
 
-----------------------------------------------------------------------
--- Anti-AFK
-----------------------------------------------------------------------
-track(LocalPlayer.Idled:Connect(function()
-    pcall(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
+setLang = function(lng)
+	if lng == LANG then return end
+	LANG = lng
+	for _, fn in ipairs(binders) do pcall(fn) end
+	local right = (lng == "ru")
+	tw(pillHi, T.med, { Position = right and UDim2.new(0.5, 1, 0, 2) or UDim2.new(0, 2, 0, 2) })
+	tw(enLbl, T.fast, { TextColor3 = right and P.dim or P.accTxt })
+	tw(ruLbl, T.fast, { TextColor3 = right and P.accTxt or P.dim })
+	if not hidden then
+		scale.Scale = 0.985
+		tw(scale, T.spring, { Scale = 1 })
+	end
+	if lastStatus then
+		setStatus(tr(lastStatus.key, table.unpack(lastStatus.args)), lastStatus.color)
+	end
+end
+
+attachTip(closeBtn, "tip_close")
+attachTip(hideBtn, "tip_hide")
+attachTip(enLbl, "tip_lang")
+attachTip(ruLbl, "tip_lang")
+
+track(enLbl.Activated:Connect(function() setLang("en") end))
+track(ruLbl.Activated:Connect(function() setLang("ru") end))
+
+track(closeBtn.MouseEnter:Connect(function()
+	tw(closeBtn, T.fast, { BackgroundColor3 = P.err })
+	tw(closeStroke, T.fast, { Transparency = 0.1, Color = P.err })
+	tw(xa, T.fast, { BackgroundColor3 = P.accTxt })
+	tw(xb, T.fast, { BackgroundColor3 = P.accTxt })
+end))
+track(closeBtn.MouseLeave:Connect(function()
+	tw(closeBtn, T.fast, { BackgroundColor3 = P.card2 })
+	tw(closeStroke, T.fast, { Transparency = 0.45, Color = P.stroke })
+	tw(xa, T.fast, { BackgroundColor3 = P.dim })
+	tw(xb, T.fast, { BackgroundColor3 = P.dim })
+end))
+track(hideBtn.MouseEnter:Connect(function()
+	tw(hideBtn, T.fast, { BackgroundColor3 = P.card3 })
+	tw(hideGlyph, T.fast, { BackgroundColor3 = P.txt })
+end))
+track(hideBtn.MouseLeave:Connect(function()
+	tw(hideBtn, T.fast, { BackgroundColor3 = P.card2 })
+	tw(hideGlyph, T.fast, { BackgroundColor3 = P.dim })
 end))
 
-----------------------------------------------------------------------
--- Unload
-----------------------------------------------------------------------
-local function unload()
-    hookActive = false
-    State.alive = false
-    State.autoRebirth = false
-    State.autoHatch = false
-    for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
-    table.clear(connections)
-    if gui then gui:Destroy() end
+do
+	local dragging, dragStart, startPos = false, nil, nil
+	track(header.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = holder.Position
+		end
+	end))
+	track(UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			holder.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end))
+	track(UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end))
 end
-track(closeBtn.MouseButton1Click:Connect(unload))
+
+local function setHidden(h)
+	hidden = h
+	if h then
+		tw(scale, T.med, { Scale = 0 })
+		tw(window, T.med, { BackgroundTransparency = 1 })
+		tw(shadow, T.med, { ImageTransparency = 1 })
+		tw(glow, T.med, { ImageTransparency = 1 })
+		task.delay(0.26, function()
+			if hidden then holder.Visible = false end
+		end)
+	else
+		holder.Visible = true
+		tw(scale, T.spring, { Scale = 1 })
+		tw(window, T.med, { BackgroundTransparency = 0 })
+		tw(shadow, T.slow, { ImageTransparency = 0.4 })
+		tw(glow, T.slow, { ImageTransparency = 0.62 })
+	end
+end
+setShownToggle = function() setHidden(not hidden) end
+
+track(UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.RightControl then
+		setShownToggle()
+	end
+end))
+
+track(LocalPlayer.Idled:Connect(function()
+	pcall(function()
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new())
+	end)
+end))
+
+onStrengthCaptured = function()
+	st("st_captured", P.ok)
+end
+
+sway(glowGrad, 6.5, { Rotation = 70 })
+sway(indGrad, 5.5, { Rotation = 48 })
+
+setActiveVisual(1)
+moveIndicator(1)
+st("st_ready", P.dim)
+
+holder.Visible = true
+scale.Scale = 0.6
+tw(scale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+tw(window, T.med, { BackgroundTransparency = 0 })
+tw(shadow, T.slow, { ImageTransparency = 0.4 })
+tw(glow, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 0.62 })
+
+unload = function()
+	State.alive = false
+	State.autoRebirth = false
+	State.autoHatch = false
+	pcall(function()
+		tw(scale, T.med, { Scale = 0.6 })
+		tw(window, T.med, { BackgroundTransparency = 1 })
+		tw(shadow, T.med, { ImageTransparency = 1 })
+		tw(glow, T.med, { ImageTransparency = 1 })
+	end)
+	task.delay(0.26, function()
+		for _, c in ipairs(connections) do
+			pcall(function() c:Disconnect() end)
+		end
+		table.clear(connections)
+		pcall(function() gui:Destroy() end)
+	end)
+end
+
+track(closeBtn.Activated:Connect(function() unload() end))
