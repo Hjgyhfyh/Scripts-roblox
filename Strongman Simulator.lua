@@ -461,7 +461,8 @@ local function runTask(box, btn, label, unit, worker)
     end)
 end
 
-local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker, defaultText)
+local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker, defaultText,
+                       extraLabel, extraColor, extraWorker)
     local p = Instance.new("TextLabel")
     p.Position = UDim2.fromOffset(16, yPrompt)
     p.Size = UDim2.new(1, -32, 0, 34)
