@@ -497,20 +497,34 @@ local function makeRow(yPrompt, ru, en, btnLabel, btnColor, unit, worker, defaul
     bs.Color = Color3.fromRGB(50, 60, 86)
     bs.Transparency = 0.2
 
-    local btn = Instance.new("TextButton")
-    btn.Position = UDim2.fromOffset(16, yPrompt + 80)
-    btn.Size = UDim2.new(1, -32, 0, 36)
-    btn.BackgroundColor3 = btnColor
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 15
-    btn.TextColor3 = Color3.fromRGB(8, 16, 12)
-    btn.Text = btnLabel
-    btn.AutoButtonColor = true
-    btn.Parent = window
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    local function addButton(x, size, label, color, wk)
+        local btn = Instance.new("TextButton")
+        btn.Position = UDim2.fromOffset(x, yPrompt + 80)
+        btn.Size = size
+        btn.BackgroundColor3 = color
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 15
+        btn.TextColor3 = Color3.fromRGB(8, 16, 12)
+        btn.Text = label
+        btn.AutoButtonColor = true
+        btn.Parent = window
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+        track(btn.MouseButton1Click:Connect(function() runTask(box, btn, label, unit, wk) end))
+        return btn
+    end
 
-    track(btn.MouseButton1Click:Connect(function() runTask(box, btn, btnLabel, unit, worker) end))
-    track(box.FocusLost:Connect(function(enter) if enter then runTask(box, btn, btnLabel, unit, worker) end end))
+    local primaryBtn
+    if extraWorker then
+        local half = 145   -- (330 window - 32 margins - 8 gap) / 2
+        primaryBtn = addButton(16, UDim2.fromOffset(half, 36), btnLabel, btnColor, worker)
+        addButton(16 + half + 8, UDim2.fromOffset(half, 36), extraLabel, extraColor, extraWorker)
+    else
+        primaryBtn = addButton(16, UDim2.new(1, -32, 0, 36), btnLabel, btnColor, worker)
+    end
+
+    track(box.FocusLost:Connect(function(enter)
+        if enter then runTask(box, primaryBtn, btnLabel, unit, worker) end
+    end))
 end
 
 makeRow(46, "Сколько выдать энергии?", "How much energy to give?",
