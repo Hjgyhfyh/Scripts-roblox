@@ -128,6 +128,13 @@ local function bind()
     R.daily     = R.daily     or ReplicatedStorage:FindFirstChild("RepeatableRewards_Claim")
 end
 task.spawn(bind)
+task.spawn(function()
+    for _ = 1, 12 do
+        bindModules()
+        if Items and ItemCat and PetSys then break end
+        task.wait(0.75)
+    end
+end)
 
 ----------------------------------------------------------------------
 -- Stat readers
@@ -389,7 +396,7 @@ local SEASON_PETS = {
 }
 
 local function equipBestSeasonPet()
-    local folder = workspace.Lib.Seasons:FindFirstChild("SeasonPetSettings")
+    local folder = findPath(workspace, "Lib", "Seasons", "SeasonPetSettings")
     if not folder then return end
     local best, bestScore = nil, -1
     for _, n in ipairs(SEASON_PETS) do
