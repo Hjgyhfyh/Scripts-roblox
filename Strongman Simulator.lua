@@ -225,21 +225,21 @@ end
 do
     local r = resolveRemote("StrongMan_UpgradeStrength")
     if r then setStrengthRemote(r) end
+    WorkoutSetRemote = resolveRemote("StrongmanWorkout_SetIsWorkingOut")
 end
 
--- The server grants strength only while PrimaryPart.Anchored is true, so we
--- never drive the game's workout state machine (that desync left the dumbbell
--- pose stuck). We PRESERVE the original anchor state: already working out →
--- nothing changes, the workout keeps going; otherwise we briefly anchor, grant,
--- then restore exactly as it was.
+-- Strength is granted only while the server's OWN copy of our character is
+-- anchored — and that copy is anchored by the server only when it receives the
+-- workout event, not from a client-side Anchored write. See giveStrength for how
+-- that is driven without ever interrupting an already-running workout.
 --
 -- The server also SUMS the cost of every strength level it grants, looping once
--- per requested workout-count, and once more per rebirth tier; a single huge
--- count makes it loop tens of millions of times and freezes/pings the server.
--- We cap each call to a measured no-freeze budget of cost-loop iterations (the
--- inner loop scales with rebirth, so we divide it out) and deliver the full
--- requested total across cooldown-spaced calls — the server never blocks long,
--- and progress is shown live. ~4M iterations/call measured at well under 100ms.
+-- per requested workout-count and once per rebirth tier; a single huge count
+-- makes it loop tens of millions of times and freezes/pings the server. We cap
+-- each call to a measured no-freeze budget of cost-loop iterations (the inner
+-- loop scales with rebirth, so we divide it out) and deliver the full requested
+-- total across cooldown-spaced calls — the server never blocks long, progress is
+-- shown live. ~4M iterations/call measured at well under 100ms.
 local STRENGTH_CALL_BUDGET = 4000000
 
 local function readRebirth()
@@ -250,15 +250,24 @@ local function readRebirth()
     return 0
 end
 
+local function setServerWorkout(state)
+    if WorkoutSetRemote then pcall(function() WorkoutSetRemote:FireServer(state) end) end
+end
+
 local function giveStrength(target, onProgress)
     local remote = StrengthRemote
     if not remote then return false, 0, true end
     local char = LocalPlayer.Character
     local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
-    local wasAnchored = root and root.Anchored
-    if root and not wasAnchored then
+
+    -- Enter the workout only if not already in one: anchor locally and tell the
+    -- server (which anchors its copy, the thing UpgradeStrength actually checks).
+    -- If already working out we change nothing, so an active session is never cut.
+    local wasWorkingOut = root and root.Anchored
+    if root and not wasWorkingOut then
         root.Anchored = true
-        task.wait(0.12)
+        setServerWorkout(true)
+        task.wait(0.25)
     end
 
     local affordIters = math.max(1, math.min(math.floor(readRebirth() * 0.01), 50000))
