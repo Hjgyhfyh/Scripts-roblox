@@ -918,10 +918,12 @@ local function cycle(parent, getItems, getIndex, setIndex)
     end
     track(left.MouseButton1Click:Connect(function()
         local items = getItems()
+        if #items == 0 then return end
         setIndex(((getIndex() - 2) % #items) + 1); render()
     end))
     track(right.MouseButton1Click:Connect(function()
         local items = getItems()
+        if #items == 0 then return end
         setIndex((getIndex() % #items) + 1); render()
     end))
     render()
@@ -1133,7 +1135,7 @@ end
 selectTab("ГЕЙН")
 
 onStrengthCaptured = function() setStatus("✅ Remote силы готов", GOOD) end
-if R.strength then setStatus("Готов", MUTED) else setStatus("Для силы: качнись 1 раз", MUTED) end
+setStatus("Готов · энергия/сила/ребёрт/петы/коды", MUTED)
 
 ----------------------------------------------------------------------
 -- Drag
