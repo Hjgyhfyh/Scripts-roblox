@@ -382,6 +382,7 @@ local PROMO_CODES = {
     "speedygains2000","time4gains","happyvalentinespump",
     "shazam!furyofthegods","shazam!","learnthe","strongman","season1",
     "1500likes","5000likes","10000likes","10000","25k","10m","100m","400m",
+    "strongmansim","update","release","like","sub",
 }
 
 local function redeemCodes(report)
