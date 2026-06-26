@@ -126,7 +126,7 @@ end
 local function readEnergy()   return readItem(ItemCat and ItemCat.Currency, "Default") end
 local function readKnivsta()  return readItem(ItemCat and ItemCat.Currency, "Knivsta") end
 local function readStrength() return readItem(ItemCat and ItemCat.Stat, "Default") end
-local function readRebirth()  return readItem(ItemCat and ItemCat.Stat, "Default") and readItem(ItemCat and ItemCat.Stat, "Rebirth") or (readItem(ItemCat and ItemCat.Stat, "Rebirth")) end
+local function readRebirth()  return readItem(ItemCat and ItemCat.Stat, "Rebirth") end
 
 ----------------------------------------------------------------------
 -- Amount parsing: 1k · 1000 · 1.5m · 1sx · 1sp · 2kk · 1 000 000
