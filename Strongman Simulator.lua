@@ -185,6 +185,7 @@ end
 -- namecall hook stays as an optional self-healing fallback.
 ----------------------------------------------------------------------
 local StrengthRemote
+local WorkoutSetRemote               -- server event that anchors our server-side copy
 local hookActive = true
 local onStrengthCaptured            -- assigned by the GUI once it exists
 
