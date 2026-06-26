@@ -233,11 +233,13 @@ end
 -- then restore exactly as it was.
 --
 -- The server also SUMS the cost of every strength level it grants, looping once
--- per requested workout-count; a single huge count makes it loop millions of
--- times and freezes/pings the server. So we cap each call to a short cost-loop
--- (its length scales with rebirth) and deliver the requested total across
--- cooldown-spaced calls — the server never blocks long, and progress is live.
-local STRENGTH_CALL_BUDGET = 150000
+-- per requested workout-count, and once more per rebirth tier; a single huge
+-- count makes it loop tens of millions of times and freezes/pings the server.
+-- We cap each call to a measured no-freeze budget of cost-loop iterations (the
+-- inner loop scales with rebirth, so we divide it out) and deliver the full
+-- requested total across cooldown-spaced calls — the server never blocks long,
+-- and progress is shown live. ~4M iterations/call measured at well under 100ms.
+local STRENGTH_CALL_BUDGET = 4000000
 
 local function readRebirth()
     if Items and ItemCat then
