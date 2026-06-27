@@ -1344,6 +1344,7 @@ addToggle("Покупка нубиков (зоны)", "NoobBuy", "Экспери
 sectionLabel("Сбор и клейм")
 addToggle("Конвертеры / обмен", "Converters", "ПКМ — выбрать", "conv", CONV_NAMES)
 addToggle("Открытие сундуков", "OpenChests", "Chest / GoldenChest при наличии")
+addToggle("Тайкун: продажа дропов", "TycoonSell", "Мгновенно: апгрейд + продажа дропов")
 addToggle("Авто-экип лучшего", "EquipBest", "ПКМ — статы", "equip", EQUIP_STATS)
 addToggle("Клейм квестов", "ClaimQuests", "Daily / Weekly + гильдия")
 addToggle("Бусты фоллоу/группа", "Boosts", "Активация бустов")
