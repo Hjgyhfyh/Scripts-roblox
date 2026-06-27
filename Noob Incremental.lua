@@ -1364,6 +1364,7 @@ addToggle("Экспедиции", "Expeditions", "ПКМ — сложности"
 sectionLabel("Зоны / позиция")
 addToggle("Фарм рун", "RuneFarm", "ПКМ — зоны (двигает персонажа)", "runezones", RUNE_ZONES)
 addToggle("Покупка нубиков (зоны)", "NoobBuy", "Эксперим.: вход в зону, может не сработать")
+addToggle("Тайкун: покупка построек", "TycoonBuy", "Дропперы + апгрейдеры (двигает перса)")
 
 sectionLabel("Сбор и клейм")
 addToggle("Конвертеры / обмен", "Converters", "ПКМ — выбрать", "conv", CONV_NAMES)
