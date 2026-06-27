@@ -62,6 +62,7 @@ local Config = {
 	NoobBuy = false,
 	Converters = true,
 	OpenChests = true,
+	TycoonBuy = true,
 	EquipBest = true,
 	ClaimQuests = true,
 	Boosts = true,
@@ -766,6 +767,66 @@ spawnLoop(function()
 			end
 		end
 		task.wait(1.5)
+	end
+end)
+
+spawnLoop(function()
+	local function buttonsFolder()
+		local gc = workspace:FindFirstChild("__GAME_CONTENT")
+		local t = gc and gc:FindFirstChild("Tycoon")
+		return t and t:FindFirstChild("Buttons")
+	end
+	local function priceOf(name)
+		if not TycoonMod then return nil end
+		local def = (TycoonMod.Droppers and TycoonMod.Droppers[name])
+			or (TycoonMod.Upgraders and TycoonMod.Upgraders[name])
+			or (TycoonMod.Decorations and TycoonMod.Decorations[name])
+		return def and num(def.Price)
+	end
+	while running do
+		if Config.TycoonBuy and not positionalBusy then
+			local data = readData()
+			local g = data and getGameAutomation(data)
+			local skip = Config.SkipGameAuto and g and g.actions and g.actions.Tycoon
+			local btns = buttonsFolder()
+			if not skip and btns and data then
+				local cash = balanceOf(data, "Cash")
+				for _, btn in ipairs(btns:GetChildren()) do
+					if not running or not Config.TycoonBuy then break end
+					local price = priceOf(btn.Name)
+					local part = btn:FindFirstChild("BuyingButtonPart", true)
+					if part and price and cash >= price then
+						local hrp = getHRP()
+						if hrp then
+							positionalBusy = true
+							local saved = hrp.CFrame
+							local target = part.CFrame + Vector3.new(0, 3, 0)
+							local conn = RunService.Heartbeat:Connect(function()
+								local h = getHRP()
+								if h then
+									h.CFrame = target
+									h.AssemblyLinearVelocity = Vector3.zero
+								end
+							end)
+							local t0 = os.clock()
+							while running and Config.TycoonBuy and (os.clock() - t0) < 3 do
+								task.wait(0.3)
+								if btn.Parent == nil then break end
+							end
+							conn:Disconnect()
+							local h = getHRP()
+							if h then
+								h.AssemblyLinearVelocity = Vector3.zero
+								h.CFrame = saved
+							end
+							positionalBusy = false
+						end
+						break
+					end
+				end
+			end
+		end
+		task.wait(1)
 	end
 end)
 
