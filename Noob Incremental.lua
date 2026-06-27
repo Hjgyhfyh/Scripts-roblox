@@ -62,6 +62,7 @@ local Config = {
 	NoobBuy = false,
 	Converters = true,
 	OpenChests = true,
+	TycoonSell = true,
 	TycoonBuy = true,
 	EquipBest = true,
 	ClaimQuests = true,
