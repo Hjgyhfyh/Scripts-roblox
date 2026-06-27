@@ -231,6 +231,7 @@ end
 
 local function giveEnergy(target)
     if not R.conv then return false, 0 end
+    if target > SAFE_MAX then target = SAFE_MAX end
     local needKnivsta = target * RATIO
     ensureKnivsta(needKnivsta)
     local ok = pcall(function() R.conv:InvokeServer(CURRENCY_TARGET, needKnivsta) end)
@@ -634,18 +635,10 @@ local function resolveParent()
 	return LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local function resetEnergy()
+local function maxEnergy()
 	if not R.conv then return false end
-	local start = readEnergy()
-	if start == nil then return false end
-	for _ = 1, 5 do
-		local e = readEnergy()
-		if not e or e ~= e or e == math.huge or e <= 1 then break end
-		pcall(function() R.conv:InvokeServer("Currency_Default", e) end)
-		task.wait(0.35)
-	end
-	local fin = readEnergy() or 0
-	return fin <= 1 or (start > 1 and fin < start * 0.5)
+	giveEnergy(SAFE_MAX)
+	return true
 end
 
 local W, H = 382, 486
