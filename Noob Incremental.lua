@@ -31,6 +31,7 @@ local Prestiges = safeRequire(Modules:FindFirstChild("Prestiges"))
 local Realms = safeRequire(Modules:FindFirstChild("Realms"))
 local Tiers = safeRequire(Modules:FindFirstChild("Tiers"))
 local UpgradeTreesContainer = Modules:FindFirstChild("UpgradeTrees")
+local FrameworkClient = safeRequire(ReplicatedStorage:FindFirstChild("Framework") and ReplicatedStorage.Framework:FindFirstChild("Client"))
 
 local NOOB_NAMES = {
 	"Starter", "Archer", "Cooker", "Farmer", "Soldier", "Fisherman",
