@@ -294,6 +294,48 @@ end
 -- ============ table binding ============
 local userTable, userBalls, userBarrier, userPockets, userBounds, userCue, userComm, userPocketsX
 local cachedStick = nil  -- findCueStick result cache; invalidated on table rebind
+local userCushions = {}  -- exact reflective cushion segments read from Table.TableCloth
+
+-- ====== EXACT cushion model — the real bounce surface ======
+-- The invisible "Barrier" rectangle sits ~1 stud OUTSIDE the real cushions, so a
+-- bounce off it lands a full stud too far out. The actual collidable cushions are
+-- the waist-high "TableCloth" wall parts under the table. Each long rail is split
+-- in two by its middle pocket, and all six segments stop short of the pockets — so
+-- they are modelled as six finite reflective segments, leaving the pocket mouths as
+-- real gaps a ball rolls THROUGH instead of phantom-bouncing off. A ball CENTRE
+-- reflects off the inner face pulled inward by one radius.
+local function buildCushions(tbl, cx, cz)
+	local segs = {}
+	local xMin, xMax = -math.huge, math.huge
+	local zMin, zMax = -math.huge, math.huge
+	local R = C.BALL_R
+	for _,c in ipairs(tbl:GetDescendants()) do
+		if c:IsA("BasePart") and c.Name == "TableCloth" then
+			local sx, sy, sz = c.Size.X, c.Size.Y, c.Size.Z
+			if sy >= 0.5 and sy <= 2.5 then
+				if sx < 0.35 and sz > 2 then          -- vertical wall → reflects X
+					local toC  = (c.Position.X < cx) and 1 or -1
+					local plane = c.Position.X + toC * (sx*0.5 + R)
+					segs[#segs+1] = { axis="x", plane=plane, n=Vector3.new(toC,0,0),
+						lo = c.Position.Z - sz*0.5, hi = c.Position.Z + sz*0.5 }
+					if toC > 0 then xMin = math.max(xMin, plane) else xMax = math.min(xMax, plane) end
+				elseif sz < 0.35 and sx > 2 then      -- horizontal wall → reflects Z
+					local toC  = (c.Position.Z < cz) and 1 or -1
+					local plane = c.Position.Z + toC * (sz*0.5 + R)
+					segs[#segs+1] = { axis="z", plane=plane, n=Vector3.new(0,0,toC),
+						lo = c.Position.X - sx*0.5, hi = c.Position.X + sx*0.5 }
+					if toC > 0 then zMin = math.max(zMin, plane) else zMax = math.min(zMax, plane) end
+				end
+			end
+		end
+	end
+	if #segs < 4 then return nil, nil end
+	local bounds = nil
+	if xMin > -math.huge and xMax < math.huge and zMin > -math.huge and zMax < math.huge then
+		bounds = { xMin = xMin, xMax = xMax, zMin = zMin, zMax = zMax }
+	end
+	return segs, bounds
+end
 
 -- EXACT cushion bounds straight from the Barrier rail geometry. The Barrier is
 -- four axis-aligned box parts (the cushions). A ball-CENTRE reflects when it is
@@ -365,6 +407,11 @@ local function bindTable(tbl)
 		for _,p in ipairs(userPockets) do sx=sx+p.X; sz=sz+p.Z; n=n+1 end
 		if n>0 then cx,cz = sx/n, sz/n end
 	end
+	-- Prefer the EXACT segmented TableCloth cushions; keep the rail rectangle as a
+	-- fallback for both the bounce surface and the tighter playfield bounds.
+	local segs, segBounds = buildCushions(tbl, cx, cz)
+	userCushions = segs or {}
+	if segBounds then userBounds = segBounds end
 	for _,p in ipairs(userPockets) do
 		local throat = Vector3.new(cx-p.X, 0, cz-p.Z)
 		throat = (throat.Magnitude > 1e-3) and throat.Unit or Vector3.new(0,0,1)
