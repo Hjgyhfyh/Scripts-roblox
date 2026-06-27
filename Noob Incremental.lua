@@ -61,6 +61,7 @@ local Config = {
 	NoobBuy = false,
 	Converters = true,
 	OpenChests = true,
+	TycoonSell = true,
 	EquipBest = true,
 	ClaimQuests = true,
 	Boosts = true,
@@ -765,6 +766,43 @@ spawnLoop(function()
 			end
 		end
 		task.wait(1.5)
+	end
+end)
+
+spawnLoop(function()
+	local ctrl = FrameworkClient and type(FrameworkClient.GetController) == "function" and FrameworkClient.GetController("Ctrl_TycoonDrops")
+	while running do
+		if not ctrl and FrameworkClient and type(FrameworkClient.GetController) == "function" then
+			ctrl = FrameworkClient.GetController("Ctrl_TycoonDrops")
+		end
+		if Config.TycoonSell and ctrl and type(ctrl.ActiveDrops) == "table" then
+			local data = readData()
+			local g = data and getGameAutomation(data)
+			local skip = Config.SkipGameAuto and g and g.actions and g.actions.Tycoon
+			if not skip then
+				local ups = {}
+				local ty = data and data.FEATURES and data.FEATURES.TYCOON
+				if type(ty) == "table" then
+					for k, v in pairs(ty) do
+						if type(k) == "string" and string.sub(k, 1, 9) == "Upgrader_" and tostring(v) == "true" then
+							ups[#ups + 1] = k
+						end
+					end
+				end
+				for id, drop in pairs(ctrl.ActiveDrops) do
+					if not running or not Config.TycoonSell then break end
+					if type(drop) == "table" then
+						local applied = drop.AppliedUpgraders or {}
+						for _, up in ipairs(ups) do
+							if not applied[up] then fire("TycoonDropUpgrade", id, up) end
+						end
+						fire("TycoonDropSell", id)
+						pcall(function() ctrl:_DestroyVisual(id) end)
+					end
+				end
+			end
+		end
+		task.wait(0.4)
 	end
 end)
 
