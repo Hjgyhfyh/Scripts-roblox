@@ -757,7 +757,7 @@ local L = {
 		btn_give_energy = "Give energy", btn_safe = "Safe", btn_fast = "Fast",
 		btn_rebirth = "Rebirth now", tgl_autoreb = "Auto-rebirth",
 		btn_codes = "Redeem all codes", btn_season = "Claim season pets",
-		btn_power = "Reset energy", btn_rewards = "Claim all rewards",
+		btn_power = "Max energy", btn_rewards = "Claim all rewards",
 		tgl_autohatch = "Auto-hatch", btn_equip = "Equip best",
 		btn_combine = "Combine dupes", btn_sell = "Sell Common", btn_teleport = "Teleport",
 		empty_tp = "No destinations available",
@@ -785,7 +785,7 @@ local L = {
 		btn_give_energy = "Выдать энергию", btn_safe = "Безопасно", btn_fast = "Быстро",
 		btn_rebirth = "Переродиться", tgl_autoreb = "Авто-перерождение",
 		btn_codes = "Активировать коды", btn_season = "Сезонные питомцы",
-		btn_power = "Обнулить энергию", btn_rewards = "Забрать награды",
+		btn_power = "Макс. энергии", btn_rewards = "Забрать награды",
 		tgl_autohatch = "Авто-вылупление", btn_equip = "Надеть лучших",
 		btn_combine = "Объединить дубли", btn_sell = "Продать обычных", btn_teleport = "Телепортироваться",
 		empty_tp = "Нет доступных точек",
@@ -1770,10 +1770,10 @@ do
 	makeButton(c, "btn_codes", true, function() boost("codes", redeemCodes, "st_codes_done") end)
 	makeButton(c, "btn_season", false, function() boost("season", claimAllSeasonPets, "st_season_done") end)
 	makeButton(c, "btn_power", false, function()
-		busyGuard("resetenergy", function()
+		busyGuard("maxenergy", function()
 			st("st_working", P.work)
-			local ok = resetEnergy()
-			st(ok and "st_power_done" or "st_error", ok and P.ok or P.err)
+			maxEnergy()
+			st("st_energy", P.ok, fmt(SAFE_MAX))
 		end)
 	end)
 	makeButton(c, "btn_rewards", true, function() boost("rewards", claimRewards, "st_rewards_done") end)
