@@ -756,6 +756,36 @@ end
 
 -- ============ ray casters ============
 local function castCushion(pos, dir, maxDist)
+	-- Preferred: exact segmented cushions (each a finite reflective face with a gap
+	-- at every pocket). A ball only bounces if its contact point lands on a real
+	-- cushion segment; in a pocket gap it passes through toward the pocket.
+	if userCushions and #userCushions > 0 then
+		local bT, bN, bP = math.huge, nil, nil
+		for _,s in ipairs(userCushions) do
+			if s.axis == "x" then
+				local dx = dir.X
+				if dx * s.n.X < -1e-9 then               -- moving INTO this face
+					local t = (s.plane - pos.X) / dx
+					if t > 1e-4 and t <= maxDist and t < bT then
+						local zc = pos.Z + dir.Z * t
+						if zc >= s.lo and zc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
+					end
+				end
+			else
+				local dz = dir.Z
+				if dz * s.n.Z < -1e-9 then
+					local t = (s.plane - pos.Z) / dz
+					if t > 1e-4 and t <= maxDist and t < bT then
+						local xc = pos.X + dir.X * t
+						if xc >= s.lo and xc <= s.hi then bT = t; bN = s.n; bP = pos + dir*t end
+					end
+				end
+			end
+		end
+		if bT < math.huge then return bT, bN, bP end
+		return nil
+	end
+	-- Fallback: single rectangle (Barrier/pocket-derived bounds).
 	if not userBounds then return nil end
 	local b = userBounds
 	local bT, bN = math.huge, nil
