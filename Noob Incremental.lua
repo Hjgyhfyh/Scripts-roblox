@@ -769,57 +769,6 @@ spawnLoop(function()
 	end
 end)
 
-spawnLoop(function()
-	local ctrl = FrameworkClient and type(FrameworkClient.GetController) == "function" and FrameworkClient.GetController("Ctrl_TycoonDrops")
-	local function findPart(model, name)
-		return model and model:FindFirstChild(name, true)
-	end
-	local function tycoonObjects()
-		local gc = workspace:FindFirstChild("__GAME_CONTENT")
-		local t = gc and gc:FindFirstChild("Tycoon")
-		return t and t:FindFirstChild("Objects")
-	end
-	while running do
-		if not ctrl and FrameworkClient and type(FrameworkClient.GetController) == "function" then
-			ctrl = FrameworkClient.GetController("Ctrl_TycoonDrops")
-		end
-		if Config.TycoonSell and ctrl and type(ctrl.ActiveDrops) == "table" then
-			local data = readData()
-			local g = data and getGameAutomation(data)
-			local skip = Config.SkipGameAuto and g and g.actions and g.actions.Tycoon
-			local objects = tycoonObjects()
-			local sellTP = objects and findPart(objects:FindFirstChild("Conveyor"), "SellTouchPart")
-			if not skip and objects and sellTP then
-				local ups = {}
-				local ty = data and data.FEATURES and data.FEATURES.TYCOON
-				if type(ty) == "table" then
-					for k, v in pairs(ty) do
-						if type(k) == "string" and string.sub(k, 1, 9) == "Upgrader_" and tostring(v) == "true" then
-							ups[#ups + 1] = k
-						end
-					end
-				end
-				for _, drop in pairs(ctrl.ActiveDrops) do
-					if not running or not Config.TycoonSell then break end
-					if type(drop) == "table" and drop.Hitbox and drop.Hitbox.Parent then
-						local applied = drop.AppliedUpgraders or {}
-						local target = sellTP
-						for _, up in ipairs(ups) do
-							if not applied[up] then
-								local utp = findPart(objects:FindFirstChild(up), "UpgraderTouchPart")
-								if utp then target = utp break end
-							end
-						end
-						drop.Hitbox.CFrame = target.CFrame
-						drop.Hitbox.AssemblyLinearVelocity = Vector3.zero
-					end
-				end
-			end
-		end
-		task.wait(0.15)
-	end
-end)
-
 local EXPED_GATE = {
 	Easy = function() return P("EasyExpedition") end,
 	Medium = function() return P("MediumExpedition") end,
