@@ -14,8 +14,6 @@ local Net = require(Shared:WaitForChild("Net"))
 local NetFolder = ReplicatedStorage:WaitForChild("__Net")
 local GetPlayerData = NetFolder:FindFirstChild("GetPlayerData")
 
-local MAX_RATE = 400
-
 local NOOB_NAMES = {
 	"Starter", "Archer", "Cooker", "Farmer", "Soldier", "Fisherman",
 	"Explorer", "Knight", "Magician", "Hacker 1", "Hacker 2", "Hacker 3", "Hacker 4",
@@ -43,12 +41,12 @@ local UPGRADE_ORDER = { "Oof", "Rebirth", "Fire", "Blaze", "Cash", "Bread", "Coi
 local CONVERTERS = { "DepositWood", "DepositWheat", "WoodRankUp", "ExchangeAllMinerals", "ExchangeAllAnimalProducts" }
 
 local RATES = {
-	NoobUpgrade = 60,
-	UpgradeSweep = 90,
-	UITree = 30,
-	LabTree = 30,
+	NoobUpgrade = 80,
+	UpgradeSweep = 80,
+	UITree = 50,
+	LabTree = 50,
 	Converters = 5,
-	MergeFactories = 5,
+	MergeFactories = 6,
 }
 
 local Config = {
@@ -78,34 +76,25 @@ local function spawnLoop(fn)
 	return t
 end
 
-local allowance = MAX_RATE
-local lastRefill = os.clock()
-local function activeRate()
-	local r = 0
-	for key, value in RATES do
-		if Config[key] then r += value end
-	end
-	if r < 1 then r = 1 end
-	return r
-end
-
-local function waitToken()
-	while running do
-		local r = math.clamp(activeRate(), 1, MAX_RATE)
-		local now = os.clock()
-		allowance = math.min(r, allowance + (now - lastRefill) * r)
-		lastRefill = now
-		if allowance >= 1 then
-			allowance -= 1
-			return true
+local function makeLimiter(rate)
+	local allowance = rate
+	local last = os.clock()
+	return function()
+		while running do
+			local now = os.clock()
+			allowance = math.min(rate, allowance + (now - last) * rate)
+			last = now
+			if allowance >= 1 then
+				allowance -= 1
+				return true
+			end
+			task.wait((1 - allowance) / rate)
 		end
-		task.wait((1 - allowance) / r)
+		return false
 	end
-	return false
 end
 
-local function fire(...)
-	if not running or not waitToken() then return false end
+local function send(...)
 	return pcall(Net.Fire, ...)
 end
 
@@ -125,19 +114,21 @@ local function readData()
 	return nil
 end
 
+local noobGate = makeLimiter(RATES.NoobUpgrade)
 spawnLoop(function()
 	while running do
 		if Config.NoobUpgrade then
 			for _, name in NOOB_NAMES do
 				if not running or not Config.NoobUpgrade then break end
-				fire("UpgradeNoob", name)
-				task.wait()
+				if noobGate() then send("UpgradeNoob", name) end
 			end
+		else
+			task.wait(0.2)
 		end
-		task.wait(0.1)
 	end
 end)
 
+local sweepGate = makeLimiter(RATES.UpgradeSweep)
 spawnLoop(function()
 	while running do
 		if Config.UpgradeSweep then
@@ -147,12 +138,13 @@ spawnLoop(function()
 				if keys then
 					for _, key in keys do
 						if not running or not Config.UpgradeSweep then break end
-						fire("UpgradeUpgradeMax", cat, key)
+						if sweepGate() then send("UpgradeUpgradeMax", cat, key) end
 					end
 				end
 			end
+		else
+			task.wait(0.2)
 		end
-		task.wait(0.2)
 	end
 end)
 
@@ -178,24 +170,26 @@ end
 local UI_TREE_NODES = loadTreeNodes("UIUpgradeTree")
 local LAB_TREE_NODES = loadTreeNodes("LabUIUpgradeTree")
 
-local function sweepTree(action, nodeList, enabledKey)
+local function sweepTree(action, nodeList, enabledKey, rate)
+	local gate = makeLimiter(rate)
 	spawnLoop(function()
 		while running do
 			if Config[enabledKey] and #nodeList > 0 then
 				for _, node in nodeList do
 					if not running or not Config[enabledKey] then break end
-					fire(action, node)
-					task.wait()
+					if gate() then send(action, node) end
 				end
+			else
+				task.wait(0.3)
 			end
-			task.wait(0.3)
 		end
 	end)
 end
 
-sweepTree("BuyUITreeNode", UI_TREE_NODES, "UITree")
-sweepTree("BuyLabUITreeNode", LAB_TREE_NODES, "LabTree")
+sweepTree("BuyUITreeNode", UI_TREE_NODES, "UITree", RATES.UITree)
+sweepTree("BuyLabUITreeNode", LAB_TREE_NODES, "LabTree", RATES.LabTree)
 
+local mergeGate = makeLimiter(RATES.MergeFactories)
 spawnLoop(function()
 	while running do
 		if Config.MergeFactories then
@@ -207,9 +201,8 @@ spawnLoop(function()
 					local v = factories[tier] or factories[tostring(tier)]
 					if type(v) == "table" then v = v.Value or v[1] end
 					local count = tonumber(v) or 0
-					if count >= 5 then
-						fire("MergeFactory", tier - 1, true)
-						task.wait(0.1)
+					if count >= 5 and mergeGate() then
+						send("MergeFactory", tier - 1, true)
 					end
 				end
 			end
@@ -218,12 +211,13 @@ spawnLoop(function()
 	end
 end)
 
+local convertGate = makeLimiter(RATES.Converters)
 spawnLoop(function()
 	while running do
 		if Config.Converters then
 			for _, action in CONVERTERS do
 				if not running or not Config.Converters then break end
-				fire(action)
+				if convertGate() then send(action) end
 			end
 		end
 		task.wait(2)
@@ -234,7 +228,7 @@ local auraToggled = false
 spawnLoop(function()
 	while running do
 		if Config.AuraAuto and not auraToggled then
-			if fire("ToggleAuraAuto") then auraToggled = true end
+			if send("ToggleAuraAuto") then auraToggled = true end
 		end
 		task.wait(1)
 	end
@@ -251,7 +245,7 @@ spawnLoop(function()
 					if type(set) == "table" then
 						for questName, info in set do
 							if type(info) == "table" and info.Claimed ~= true then
-								fire("ClaimQuest", period, questName)
+								send("ClaimQuest", period, questName)
 							end
 						end
 					end
