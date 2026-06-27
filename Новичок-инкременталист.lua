@@ -2,7 +2,6 @@ if _G.__NoobIncUnload then pcall(_G.__NoobIncUnload) end
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
@@ -12,8 +11,8 @@ local LocalPlayer = Players.LocalPlayer
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 
-local MainRemote = ReplicatedStorage:WaitForChild("__Net"):WaitForChild("MainRemote")
-local GetPlayerData = ReplicatedStorage.__Net:FindFirstChild("GetPlayerData")
+local NetFolder = ReplicatedStorage:WaitForChild("__Net")
+local GetPlayerData = NetFolder:FindFirstChild("GetPlayerData")
 
 local MAX_RATE = 400
 
