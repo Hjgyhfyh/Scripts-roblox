@@ -429,8 +429,8 @@ local function bindTable(tbl)
 	userComm = gd:WaitForChild("Communication")
 	_G.__POOL_COMM = userComm   -- let the shoot-remote hook recognise our table's remote
 	if userBounds then
-		print(string.format("[Pred v12] Bound table (%s). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
-			railB and "rails" or "pockets",
+		print(string.format("[Pred] Bound table via %s (%d cushion segs). Bounds x[%.2f..%.2f] z[%.2f..%.2f]",
+			(#userCushions > 0) and "TableCloth" or (railB and "rails" or "pockets"), #userCushions,
 			userBounds.xMin, userBounds.xMax, userBounds.zMin, userBounds.zMax))
 	end
 end
