@@ -274,7 +274,7 @@ track(LocalPlayer.Idled:Connect(function()
 		VirtualUser:CaptureController()
 		VirtualUser:ClickButton2(Vector2.new())
 	end)
-end)
+end))
 
 local THEME = {
 	bg = Color3.fromRGB(12, 12, 20),
