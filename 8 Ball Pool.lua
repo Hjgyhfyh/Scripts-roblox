@@ -100,6 +100,11 @@ local C = {
 	FILTER_NON_POCKETED = false,
 	CUSHION_TANG_KEEP = 0.78,
 	CUE_TANG_KEEP     = 0.96,
+	-- Match the game's own drawn guideline EXACTLY: the struck ball leaves on the
+	-- pure line of centres and the cue ball deflects on the exact 90° tangent
+	-- (verified against the decompiled GuidelinesRunner). Set false to fall back to
+	-- the self-learned mass-split + cut-throw model.
+	GUIDELINE_EXACT = true,
 	POCKET = { ENABLED = true, CONE_CORNER = math.rad(80), CONE_SIDE = math.rad(52),
 	           SIDE_R_FACTOR = 0.85, SPEED_SOFT = 16, SPEED_PEN = 0.010,
 	           MIN_R_FACTOR = 0.6, ANGLE_MIN_SPEED = 7 },
@@ -134,7 +139,7 @@ local function ballColor(ball)
 end
 
 -- ============ calibration model (persisted to disk) ============
-local CAL_FILE = "sigmatik_pool_predictor_cal.json"
+local CAL_FILE = "sigmatik_8ballpool_cal.json"
 
 -- v0(power)   = powA*power + powB        (initial cue speed, studs/sec)
 -- K(power)    = kA + kB*power            (speed lost per stud travelled)
