@@ -954,22 +954,31 @@ local function simulate(ball, pos, dir, speed, depth, snap, isCue, segs, pT, ctx
 		local rawTang = dir - cl*along
 		local tangDir = (rawTang.Magnitude > 1e-4) and rawTang.Unit or Vector3.zero
 		local objDir = cl
-		local th = throwAngle(along)
-		if th > 1e-4 and tangDir.Magnitude > 0.5 then
-			local rot = cl*math.cos(th) + tangDir*math.sin(th)
-			if rot.Magnitude > 1e-4 then objDir = rot.Unit end
+		if not PHYS.exactDeflect then
+			local th = throwAngle(along)
+			if th > 1e-4 and tangDir.Magnitude > 0.5 then
+				local rot = cl*math.cos(th) + tangDir*math.sin(th)
+				if rot.Magnitude > 1e-4 then objDir = rot.Unit end
+			end
 		end
 		local savedBall = snap[e.ball]
 		snap[e.ball] = objPos + cl*0.02
 		if vb_after > PHYS.minSpeed then
 			simulate(e.ball, objPos, objDir, vb_after, depth+1, snap, false, segs, pT, ctx, finals)
 		elseif finals then finals[e.ball] = objPos end
-		local cueNewSp = math.sqrt(va_after*va_after + va_tang*va_tang)
-		if cueNewSp > PHYS.minSpeed then
-			local cueNewDir = cl*va_after + tangDir*va_tang
-			if cueNewDir.Magnitude > 1e-4 then
-				simulate(ball, e.p, cueNewDir.Unit, cueNewSp, depth+1, snap, isCue, segs, pT, ctx, finals)
-			elseif finals then finals[ball] = e.p end
+		-- Cue deflection. EXACT mode: the striker leaves on the pure 90° tangent the
+		-- game's own guideline draws (no line-of-centres fold-in). Learned mode: the
+		-- mass-split model keeps a small along-centres component scaled by (1-ballRest).
+		local cueNewSp, cueNewDir
+		if PHYS.exactDeflect then
+			cueNewSp  = va_tang
+			cueNewDir = tangDir
+		else
+			cueNewSp  = math.sqrt(va_after*va_after + va_tang*va_tang)
+			cueNewDir = cl*va_after + tangDir*va_tang
+		end
+		if cueNewSp > PHYS.minSpeed and cueNewDir.Magnitude > 1e-4 then
+			simulate(ball, e.p, cueNewDir.Unit, cueNewSp, depth+1, snap, isCue, segs, pT, ctx, finals)
 		elseif finals then finals[ball] = e.p end
 		snap[e.ball] = savedBall
 	end
