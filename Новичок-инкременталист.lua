@@ -124,32 +124,9 @@ local function readData()
 	return nil
 end
 
-local function getLevel(data, cat, key)
-	if not data then return 0 end
-	local up = data.UPGRADES
-	if type(up) ~= "table" then return 0 end
-	local c = up[cat]
-	if type(c) ~= "table" then return 0 end
-	local v = c[key]
-	if type(v) == "table" then v = v.Value or v[1] end
-	return tonumber(v) or 0
-end
-
-local function featureCount(data, path)
-	if not data or type(data.FEATURES) ~= "table" then return 0 end
-	local node = data.FEATURES
-	for _, seg in path do
-		if type(node) ~= "table" then return 0 end
-		node = node[seg]
-	end
-	if type(node) == "table" then node = node.Value or node[1] end
-	return tonumber(node) or 0
-end
-
 spawnLoop(function()
 	while running do
 		if Config.UpgradeSweep then
-			local data = readData()
 			for _, cat in UPGRADE_ORDER do
 				if not running or not Config.UpgradeSweep then break end
 				local keys = UPGRADE_KEYS[cat]
@@ -167,22 +144,38 @@ spawnLoop(function()
 	end
 end)
 
-local function sweepTree(action, counterKey, treeField, enabledKey)
+local function loadTreeNodes(moduleName)
+	local list = {}
+	local modules = ReplicatedStorage.Shared:FindFirstChild("Modules")
+	local mod = modules and modules:FindFirstChild(moduleName)
+	if not mod then return list end
+	local ok, m = pcall(require, mod)
+	if not ok or type(m) ~= "table" or type(m.Nodes) ~= "table" then return list end
+	for nodeName in m.Nodes do
+		if type(nodeName) == "string" then
+			if nodeName == "TheStart" then
+				table.insert(list, 1, nodeName)
+			else
+				table.insert(list, nodeName)
+			end
+		end
+	end
+	return list
+end
+
+local UI_TREE_NODES = loadTreeNodes("UIUpgradeTree")
+local LAB_TREE_NODES = loadTreeNodes("LabUIUpgradeTree")
+
+local function sweepTree(action, counterKey, nodeList, enabledKey)
 	spawnLoop(function()
 		while running do
-			if Config[enabledKey] then
-				local data = readData()
-				local nodes = data and data[treeField]
-				if type(nodes) == "table" then
-					for node, lvl in nodes do
-						if not running or not Config[enabledKey] then break end
-						if type(node) == "string" and tonumber(lvl) ~= nil then
-							if fire(action, node) then
-								Counters[counterKey] += 1
-							end
-							task.wait()
-						end
+			if Config[enabledKey] and #nodeList > 0 then
+				for _, node in nodeList do
+					if not running or not Config[enabledKey] then break end
+					if fire(action, node) then
+						Counters[counterKey] += 1
 					end
+					task.wait()
 				end
 			end
 			task.wait(0.3)
@@ -190,8 +183,8 @@ local function sweepTree(action, counterKey, treeField, enabledKey)
 	end)
 end
 
-sweepTree("BuyUITreeNode", "tree", "UI_UPGRADE_TREE", "UITree")
-sweepTree("BuyLabUITreeNode", "lab", "LAB_UI_UPGRADE_TREE", "LabTree")
+sweepTree("BuyUITreeNode", "tree", UI_TREE_NODES, "UITree")
+sweepTree("BuyLabUITreeNode", "lab", LAB_TREE_NODES, "LabTree")
 
 spawnLoop(function()
 	while running do
