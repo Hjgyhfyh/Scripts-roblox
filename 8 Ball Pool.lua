@@ -1,19 +1,21 @@
--- ====== 8 Ball Pool Trajectory Predictor v12 — Self-Calibrating ======
--- v12: power scale corrected to the game's true 1..21; cushion bounds read
--- exactly from the Barrier rail geometry; head-on contact no longer inflates K.
--- The predictor records, for every shot, what it PREDICTED (where each ball
--- would go) versus what REALLY happened, taking the actual aim angle and power
--- into account. After each shot it measures the error and tunes its physics
--- model (initial speed per power, damping, cushion bounce, ball transfer,
--- pocket capture radius) toward perfect accuracy.
+-- ============================ 8 BALL POOL — SUITE ============================
+-- One script, three tools for the Roblox game "8 Ball Pool" (1v1 Pool):
 --
--- Calibration is saved to disk and is automatically reloaded after a Roblox
--- restart, so the model keeps getting better across sessions.
+--   1) Self-calibrating Trajectory Predictor — full physics overlay (cue + object
+--      guidelines, cushion bounces off the REAL segmented cushions, ball transfer
+--      on the exact 90° rule, pocket capture, scratch warnings), best-shot solver,
+--      auto-aim, humanized auto-fire, ball-in-hand finder, ranked shot list, and a
+--      self-learning loop that tunes the model from every shot and saves to disk.
+--   2) Cue Library — equip ANY cue from a searchable grid (RightShift / 🎱 button).
+--   3) Smooth Opponent Cue — interpolates the opponent's cue between sparse server
+--      updates and re-broadcasts ours, so both cues move at ~60 Hz.
 --
--- Hotkeys: B=BestShot  V=AutoAim  F=AutoFire  C=Calibration HUD  X=reset calibration
--- Cleanup: _G.__POOL_PREDICTOR.cleanup()
+-- Built-in anti-AFK. Predictor hotkeys: B=BestShot  V=AutoAim  F=AutoFire
+-- G=BallInHand  [ ]=cycle shot  , .=aim-nudge  /=reset-aim  K=CalDetail  C=HUD
+-- H=Legend  X=reset calibration.  Full unload: _G.__EIGHTBALL_SUITE.unload()
 
 -- ============ cleanup any previous instance ============
+if _G.__EIGHTBALL_SUITE then pcall(_G.__EIGHTBALL_SUITE.unload) end
 if _G.__POOL_PREDICTOR then pcall(_G.__POOL_PREDICTOR.cleanup) end
 if _G.__POOL_LOG then for _,c in ipairs(_G.__POOL_LOG.conns or {}) do pcall(function() c:Disconnect() end) end _G.__POOL_LOG=nil end
 if _G.__POOL_REC then pcall(function() _G.__POOL_REC.conn:Disconnect() end) _G.__POOL_REC=nil end
