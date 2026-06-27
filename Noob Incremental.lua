@@ -772,6 +772,47 @@ spawnLoop(function()
 end)
 
 spawnLoop(function()
+	local ctrl = FrameworkClient and type(FrameworkClient.GetController) == "function" and FrameworkClient.GetController("Ctrl_TycoonDrops")
+	local sold = {}
+	while running do
+		if not ctrl and FrameworkClient and type(FrameworkClient.GetController) == "function" then
+			ctrl = FrameworkClient.GetController("Ctrl_TycoonDrops")
+		end
+		if Config.TycoonSell and ctrl and type(ctrl.ActiveDrops) == "table" then
+			local data = readData()
+			local g = data and getGameAutomation(data)
+			local skip = Config.SkipGameAuto and g and g.actions and g.actions.Tycoon
+			if not skip then
+				local ups = {}
+				local ty = data and data.FEATURES and data.FEATURES.TYCOON
+				if type(ty) == "table" then
+					for k, v in pairs(ty) do
+						if type(k) == "string" and string.sub(k, 1, 9) == "Upgrader_" and tostring(v) == "true" then
+							ups[#ups + 1] = k
+						end
+					end
+				end
+				for id, drop in pairs(ctrl.ActiveDrops) do
+					if not running or not Config.TycoonSell then break end
+					if type(drop) == "table" and not sold[id] then
+						local applied = drop.AppliedUpgraders or {}
+						for _, up in ipairs(ups) do
+							if not applied[up] then fire("TycoonDropUpgrade", id, up) end
+						end
+						fire("TycoonDropSell", id)
+						sold[id] = true
+					end
+				end
+				for sid in pairs(sold) do
+					if ctrl.ActiveDrops[sid] == nil then sold[sid] = nil end
+				end
+			end
+		end
+		task.wait(0.3)
+	end
+end)
+
+spawnLoop(function()
 	local function buttonsFolder()
 		local gc = workspace:FindFirstChild("__GAME_CONTENT")
 		local t = gc and gc:FindFirstChild("Tycoon")
