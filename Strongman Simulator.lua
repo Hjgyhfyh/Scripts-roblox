@@ -165,18 +165,34 @@ local SUFFIX = {
     thousand = 1e3, million = 1e6, billion = 1e9, trillion = 1e12,
 }
 
+-- Hard ceiling for energy. The converter mints energy through Knivsta at a
+-- 1:3 ratio, so the server transiently holds 3x the requested energy. Past
+-- maxDouble/3 that intermediate value overflows to inf, which then corrupts
+-- the save (DataStore cannot store inf/nan). We cap a hair below that edge:
+-- 5.9e307 * 3 = 1.77e308, safely under maxDouble (1.7977e308).
+local SAFE_MAX = 5.9e307
+
 local function parseAmount(input)
     if type(input) ~= "string" then return nil end
     local s = input:lower():gsub("%s+", ""):gsub(",", ""):gsub("_", "")
     if s == "" then return nil end
-    local num, suf = s:match("^(%d*%.?%d+)([a-z]*)$")
-    if not num then return nil end
-    local mult = SUFFIX[suf]
-    if not mult then return nil end
-    local n = tonumber(num)
-    if not n then return nil end
-    local total = n * mult
-    if total <= 0 then return nil end
+    if s == "max" or s == "макс" or s == "inf" or s == "∞" then return SAFE_MAX end
+    local total
+    local mant, exp = s:match("^(%d*%.?%d+)e([%+%-]?%d+)$")
+    if mant then
+        total = tonumber(mant .. "e" .. exp)
+    else
+        local num, suf = s:match("^(%d*%.?%d+)([a-z]*)$")
+        if not num then return nil end
+        local mult = SUFFIX[suf]
+        if not mult then return nil end
+        local n = tonumber(num)
+        if not n then return nil end
+        total = n * mult
+    end
+    if not total or total ~= total or total <= 0 then return nil end
+    if total > SAFE_MAX then total = SAFE_MAX end
+    if total >= 1e15 then return total end
     return math.floor(total + 0.5)
 end
 
