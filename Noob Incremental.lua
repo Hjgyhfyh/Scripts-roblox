@@ -771,7 +771,14 @@ end)
 
 spawnLoop(function()
 	local ctrl = FrameworkClient and type(FrameworkClient.GetController) == "function" and FrameworkClient.GetController("Ctrl_TycoonDrops")
-	local seen = {}
+	local function findPart(model, name)
+		return model and model:FindFirstChild(name, true)
+	end
+	local function tycoonObjects()
+		local gc = workspace:FindFirstChild("__GAME_CONTENT")
+		local t = gc and gc:FindFirstChild("Tycoon")
+		return t and t:FindFirstChild("Objects")
+	end
 	while running do
 		if not ctrl and FrameworkClient and type(FrameworkClient.GetController) == "function" then
 			ctrl = FrameworkClient.GetController("Ctrl_TycoonDrops")
@@ -780,7 +787,9 @@ spawnLoop(function()
 			local data = readData()
 			local g = data and getGameAutomation(data)
 			local skip = Config.SkipGameAuto and g and g.actions and g.actions.Tycoon
-			if not skip then
+			local objects = tycoonObjects()
+			local sellTP = objects and findPart(objects:FindFirstChild("Conveyor"), "SellTouchPart")
+			if not skip and objects and sellTP then
 				local ups = {}
 				local ty = data and data.FEATURES and data.FEATURES.TYCOON
 				if type(ty) == "table" then
@@ -790,28 +799,24 @@ spawnLoop(function()
 						end
 					end
 				end
-				local now = os.clock()
-				for id, drop in pairs(ctrl.ActiveDrops) do
+				for _, drop in pairs(ctrl.ActiveDrops) do
 					if not running or not Config.TycoonSell then break end
-					if type(drop) == "table" then
-						if not seen[id] then seen[id] = now end
-						if now - seen[id] >= 0.6 then
-							local applied = drop.AppliedUpgraders or {}
-							for _, up in ipairs(ups) do
-								if not applied[up] then fire("TycoonDropUpgrade", id, up) end
+					if type(drop) == "table" and drop.Hitbox and drop.Hitbox.Parent then
+						local applied = drop.AppliedUpgraders or {}
+						local target = sellTP
+						for _, up in ipairs(ups) do
+							if not applied[up] then
+								local utp = findPart(objects:FindFirstChild(up), "UpgraderTouchPart")
+								if utp then target = utp break end
 							end
-							fire("TycoonDropSell", id)
-							pcall(function() ctrl:_DestroyVisual(id) end)
-							seen[id] = nil
 						end
+						drop.Hitbox.CFrame = target.CFrame
+						drop.Hitbox.AssemblyLinearVelocity = Vector3.zero
 					end
-				end
-				for sid in pairs(seen) do
-					if ctrl.ActiveDrops[sid] == nil then seen[sid] = nil end
 				end
 			end
 		end
-		task.wait(0.3)
+		task.wait(0.15)
 	end
 end)
 
