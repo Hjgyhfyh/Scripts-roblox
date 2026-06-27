@@ -16,6 +16,11 @@ local GetPlayerData = NetFolder:FindFirstChild("GetPlayerData")
 
 local MAX_RATE = 400
 
+local NOOB_NAMES = {
+	"Starter", "Archer", "Cooker", "Farmer", "Soldier", "Fisherman",
+	"Explorer", "Knight", "Magician", "Hacker 1", "Hacker 2", "Hacker 3", "Hacker 4",
+}
+
 local UPGRADE_KEYS = {
 	Oof = { "MoreOof", "FasterNoobs", "MoreRebirth", "MoreOofBonus", "EvenMoreOof", "MoreWalkSpeed", "MoreCash", "MoreOofRealm2", "MoreWalkSpeedRealm2" },
 	Cash = { "MoreCash", "FasterDropper", "MoreRuneLuck", "MoreMutationLuck", "MoreTierLuck", "MoreTierBulk", "MoreMutationLuck2" },
@@ -35,30 +40,27 @@ local UPGRADE_KEYS = {
 
 local UPGRADE_ORDER = { "Oof", "Rebirth", "Fire", "Blaze", "Cash", "Bread", "Coin", "Gem", "Water", "Wood", "Ice", "Planks", "HackPoints", "Goals" }
 
-local CONVERTERS = {
-	{ key = "DepositWood", action = "DepositWood" },
-	{ key = "DepositWheat", action = "DepositWheat" },
-	{ key = "WoodRankUp", action = "WoodRankUp" },
-	{ key = "ExchangeMinerals", action = "ExchangeAllMinerals" },
-	{ key = "ExchangeAnimals", action = "ExchangeAllAnimalProducts" },
+local CONVERTERS = { "DepositWood", "DepositWheat", "WoodRankUp", "ExchangeAllMinerals", "ExchangeAllAnimalProducts" }
+
+local RATES = {
+	NoobUpgrade = 60,
+	UpgradeSweep = 90,
+	UITree = 30,
+	LabTree = 30,
+	Converters = 5,
+	MergeFactories = 5,
 }
 
 local Config = {
+	NoobUpgrade = true,
 	UpgradeSweep = true,
 	UITree = true,
+	Converters = true,
 	LabTree = false,
 	MergeFactories = false,
-	Converters = true,
 	AuraAuto = false,
 	ClaimQuests = false,
-
-	SweepRate = 120,
-	TreeRate = 24,
-	ConvertRate = 4,
-	MergeMinCount = 5,
 }
-
-local Counters = { sweep = 0, tree = 0, lab = 0, merge = 0, convert = 0, aura = 0, quest = 0 }
 
 local running = true
 local connections = {}
@@ -80,10 +82,9 @@ local allowance = MAX_RATE
 local lastRefill = os.clock()
 local function activeRate()
 	local r = 0
-	if Config.UpgradeSweep then r += Config.SweepRate end
-	if Config.UITree then r += Config.TreeRate end
-	if Config.LabTree then r += Config.TreeRate end
-	if Config.Converters then r += Config.ConvertRate end
+	for key, value in RATES do
+		if Config[key] then r += value end
+	end
 	if r < 1 then r = 1 end
 	return r
 end
@@ -126,6 +127,19 @@ end
 
 spawnLoop(function()
 	while running do
+		if Config.NoobUpgrade then
+			for _, name in NOOB_NAMES do
+				if not running or not Config.NoobUpgrade then break end
+				fire("UpgradeNoob", name)
+				task.wait()
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+spawnLoop(function()
+	while running do
 		if Config.UpgradeSweep then
 			for _, cat in UPGRADE_ORDER do
 				if not running or not Config.UpgradeSweep then break end
@@ -133,9 +147,7 @@ spawnLoop(function()
 				if keys then
 					for _, key in keys do
 						if not running or not Config.UpgradeSweep then break end
-						if fire("UpgradeUpgradeMax", cat, key) then
-							Counters.sweep += 1
-						end
+						fire("UpgradeUpgradeMax", cat, key)
 					end
 				end
 			end
@@ -166,15 +178,13 @@ end
 local UI_TREE_NODES = loadTreeNodes("UIUpgradeTree")
 local LAB_TREE_NODES = loadTreeNodes("LabUIUpgradeTree")
 
-local function sweepTree(action, counterKey, nodeList, enabledKey)
+local function sweepTree(action, nodeList, enabledKey)
 	spawnLoop(function()
 		while running do
 			if Config[enabledKey] and #nodeList > 0 then
 				for _, node in nodeList do
 					if not running or not Config[enabledKey] then break end
-					if fire(action, node) then
-						Counters[counterKey] += 1
-					end
+					fire(action, node)
 					task.wait()
 				end
 			end
@@ -183,8 +193,8 @@ local function sweepTree(action, counterKey, nodeList, enabledKey)
 	end)
 end
 
-sweepTree("BuyUITreeNode", "tree", UI_TREE_NODES, "UITree")
-sweepTree("BuyLabUITreeNode", "lab", LAB_TREE_NODES, "LabTree")
+sweepTree("BuyUITreeNode", UI_TREE_NODES, "UITree")
+sweepTree("BuyLabUITreeNode", LAB_TREE_NODES, "LabTree")
 
 spawnLoop(function()
 	while running do
@@ -197,10 +207,8 @@ spawnLoop(function()
 					local v = factories[tier] or factories[tostring(tier)]
 					if type(v) == "table" then v = v.Value or v[1] end
 					local count = tonumber(v) or 0
-					if count >= math.max(5, Config.MergeMinCount) then
-						if fire("MergeFactory", tier - 1, true) then
-							Counters.merge += 1
-						end
+					if count >= 5 then
+						fire("MergeFactory", tier - 1, true)
 						task.wait(0.1)
 					end
 				end
@@ -213,11 +221,9 @@ end)
 spawnLoop(function()
 	while running do
 		if Config.Converters then
-			for _, conv in CONVERTERS do
+			for _, action in CONVERTERS do
 				if not running or not Config.Converters then break end
-				if fire(conv.action) then
-					Counters.convert += 1
-				end
+				fire(action)
 			end
 		end
 		task.wait(2)
@@ -228,10 +234,7 @@ local auraToggled = false
 spawnLoop(function()
 	while running do
 		if Config.AuraAuto and not auraToggled then
-			if fire("ToggleAuraAuto") then
-				auraToggled = true
-				Counters.aura += 1
-			end
+			if fire("ToggleAuraAuto") then auraToggled = true end
 		end
 		task.wait(1)
 	end
@@ -248,9 +251,7 @@ spawnLoop(function()
 					if type(set) == "table" then
 						for questName, info in set do
 							if type(info) == "table" and info.Claimed ~= true then
-								if fire("ClaimQuest", period, questName) then
-									Counters.quest += 1
-								end
+								fire("ClaimQuest", period, questName)
 							end
 						end
 					end
@@ -280,7 +281,6 @@ local THEME = {
 	on = Color3.fromRGB(43, 209, 126),
 	off = Color3.fromRGB(58, 60, 80),
 	bad = Color3.fromRGB(242, 85, 90),
-	gold = Color3.fromRGB(255, 209, 102),
 	violet = Color3.fromRGB(139, 108, 255),
 	cyan = Color3.fromRGB(86, 192, 255),
 }
@@ -335,9 +335,9 @@ if not screenGui.Parent then
 	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local WIN_W, WIN_H = 332, 540
+local WIN_W, WIN_H = 300, 472
 local HEADER_H = 52
-local FOOTER_H = 116
+local FOOTER_H = 50
 
 local shadow = Instance.new("ImageLabel")
 shadow.BackgroundTransparency = 1
@@ -538,64 +538,17 @@ local function makeToggle(labelText, key, desc)
 	end))
 end
 
-local function makeRate(labelText, key)
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 40)
-	row.BackgroundColor3 = THEME.card
-	row.BorderSizePixel = 0
-	row.LayoutOrder = nextOrder()
-	row.Parent = body
-	corner(row, 10)
-	stroke(row, THEME.line, 1, 0.35)
+sectionLabel("Автофарм")
+makeToggle("Прокачка нубиков", "NoobUpgrade", "Главный доход Oof (UpgradeNoob)")
+makeToggle("Апгрейды (Max)", "UpgradeSweep", "Все валюты × все апгрейды")
+makeToggle("Prism дерево", "UITree", "Скупка узлов за Prism")
+makeToggle("Lab дерево", "LabTree", "Узлы за HackPoints")
+makeToggle("Слияние фабрик", "MergeFactories", "Только при 5+ в тире (необратимо)")
 
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.fromOffset(12, 0)
-	label.Size = UDim2.new(1, -92, 1, 0)
-	label.Font = Enum.Font.GothamMedium
-	label.Text = labelText
-	label.TextColor3 = THEME.text
-	label.TextSize = 13
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = row
-
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.fromOffset(64, 26)
-	box.Position = UDim2.new(1, -76, 0.5, -13)
-	box.BackgroundColor3 = THEME.well
-	box.Font = Enum.Font.Code
-	box.Text = tostring(Config[key])
-	box.TextColor3 = THEME.cyan
-	box.TextSize = 13
-	box.ClearTextOnFocus = false
-	box.Parent = row
-	corner(box, 7)
-	stroke(box, THEME.line, 1, 0.2)
-
-	track(box.FocusLost:Connect(function()
-		local v = tonumber(box.Text)
-		if v then
-			Config[key] = math.clamp(math.floor(v), 1, MAX_RATE)
-		end
-		box.Text = tostring(Config[key])
-	end))
-end
-
-sectionLabel("Автофарм апгрейдов")
-makeToggle("Upgrade Sweep (Max)", "UpgradeSweep", "Все валюты x все апгрейды")
-makeToggle("Prism Tree (UI)", "UITree", "Скупка узлов за Prism")
-makeToggle("Lab Tree (HackPoints)", "LabTree", "Узлы за HackPoints")
-makeToggle("Merge Factories", "MergeFactories", "Только при 5+ в тире")
-
-sectionLabel("Конвертеры и сбор")
-makeToggle("Converters / Exchange", "Converters", "Wood / Wheat / Minerals / Products")
-makeToggle("Auto Aura Roll", "AuraAuto", "Серверный авто-ролл (тратит dice)")
-makeToggle("Claim Quests", "ClaimQuests", "Daily / Weekly награды")
-
-sectionLabel("Лимит запросов (в секунду)")
-makeRate("Sweep rate", "SweepRate")
-makeRate("Tree rate", "TreeRate")
-makeRate("Convert rate", "ConvertRate")
+sectionLabel("Сбор и обмен")
+makeToggle("Конвертеры / обмен", "Converters", "Wood / Wheat / минералы / продукты")
+makeToggle("Авто-ауры", "AuraAuto", "Серверный авто-ролл (тратит dice)")
+makeToggle("Сбор квестов", "ClaimQuests", "Daily / Weekly награды")
 
 local footer = Instance.new("Frame")
 footer.Size = UDim2.new(1, 0, 0, FOOTER_H)
@@ -619,23 +572,9 @@ footerLine.BackgroundTransparency = 0.4
 footerLine.BorderSizePixel = 0
 footerLine.Parent = footer
 
-local statsLabel = Instance.new("TextLabel")
-statsLabel.BackgroundTransparency = 1
-statsLabel.Position = UDim2.fromOffset(14, 12)
-statsLabel.Size = UDim2.new(1, -28, 0, 60)
-statsLabel.Font = Enum.Font.Code
-statsLabel.Text = ""
-statsLabel.TextColor3 = THEME.dim
-statsLabel.TextSize = 11
-statsLabel.TextXAlignment = Enum.TextXAlignment.Left
-statsLabel.TextYAlignment = Enum.TextYAlignment.Top
-statsLabel.RichText = true
-statsLabel.LineHeight = 1.25
-statsLabel.Parent = footer
-
 local unloadBtn = Instance.new("TextButton")
 unloadBtn.Size = UDim2.new(1, -28, 0, 30)
-unloadBtn.Position = UDim2.new(0, 14, 1, -40)
+unloadBtn.Position = UDim2.new(0, 14, 0.5, -13)
 unloadBtn.BackgroundColor3 = Color3.fromRGB(40, 24, 30)
 unloadBtn.Font = Enum.Font.GothamBold
 unloadBtn.Text = "ВЫГРУЗИТЬ"
@@ -645,35 +584,6 @@ unloadBtn.AutoButtonColor = true
 unloadBtn.Parent = footer
 corner(unloadBtn, 9)
 stroke(unloadBtn, THEME.bad, 1, 0.5)
-
-local function fmtRate()
-	return string.format("%d", activeRate())
-end
-
-spawnLoop(function()
-	while running do
-		pcall(function()
-			local data = readData()
-			local oofMul = "?"
-			local prism = "?"
-			if data and type(data.CURRENCIES) == "table" then
-				local oof = data.CURRENCIES.Oof
-				if type(oof) == "table" and oof.TotalMultiplier then
-					oofMul = tostring(oof.TotalMultiplier)
-				end
-				local pr = data.CURRENCIES.Prism
-				if type(pr) == "table" and type(pr.Amount) == "table" then
-					prism = tostring(pr.Amount[1])
-				end
-			end
-			statsLabel.Text = string.format(
-				"<font color='#8B6CFF'>OofMul</font> %s   <font color='#8B6CFF'>Prism</font> %s\n<font color='#56C0FF'>Up</font> %d  <font color='#56C0FF'>Tree</font> %d  <font color='#56C0FF'>Merge</font> %d  <font color='#56C0FF'>Conv</font> %d\n<font color='#2BD17E'>rate</font> %s/s  <font color='#6B6E80'>limit 400</font>",
-				oofMul, prism, Counters.sweep, Counters.tree, Counters.merge, Counters.convert, fmtRate()
-			)
-		end)
-		task.wait(0.6)
-	end
-end)
 
 local collapsed = false
 track(minBtn.MouseButton1Click:Connect(function()
