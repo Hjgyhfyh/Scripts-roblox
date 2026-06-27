@@ -72,6 +72,7 @@ local Config = {
 	SkipGameAuto = true,
 	AutoPrestige = false,
 	AutoAwaken = false,
+	AutoTycoonReset = false,
 	noobs = {},
 	cats = {},
 	conv = {},
@@ -1031,6 +1032,24 @@ spawnLoop(function()
 				local d2 = readData(true)
 				local after = tonumber(d2 and d2.FEATURES and d2.FEATURES.TIER and d2.FEATURES.TIER.Awakening) or before
 				if after <= before then task.wait(3) end
+			end
+		end
+		task.wait(1)
+	end
+end)
+
+spawnLoop(function()
+	while running do
+		if Config.AutoTycoonReset and ConvertsMod and type(ConvertsMod.Tycoon) == "table" then
+			local data = readData()
+			local req = ConvertsMod.Tycoon.requirement
+			if data and type(req) == "table" then
+				local rc = tonumber(data.FEATURES and data.FEATURES.TycoonResetCount) or 0
+				local need = req[tostring(rc + 1)]
+				if rc < 5 and need ~= nil and afford(data, "Cash", need) then
+					fire("Tycoon")
+					task.wait(2)
+				end
 			end
 		end
 		task.wait(1)
