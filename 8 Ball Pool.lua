@@ -153,14 +153,14 @@ local CAL_FILE = "sigmatik_8ballpool_cal.json"
 -- under the OLD linear v-vs-d model (incompatible parameters).
 -- Schema 3: power is now the game's true 1..21 scale (was 1..18), so any cal
 -- persisted under schema 2 has the wrong powA/K and must be wiped on load.
-local CAL_SCHEMA = 4
+local CAL_SCHEMA = 5
 local DEFAULT_CAL = {
 	schema = CAL_SCHEMA,
 	powA = 2.20, powB = 0.0,
 	kA   = 40.0, kB   = 0.0,
 	cushionRest = 0.90,
-	ballRest    = 0.92,
-	throwGain = 0.04,
+	ballRest    = 1.00,
+	throwGain = 0.0,
 	pocketR     = 0.50, pocketLow = 0.20, pocketHigh = 1.10,
 	-- regression accumulators: v0 vs power
 	vN=0, vSx=0, vSy=0, vSxx=0, vSxy=0,
@@ -271,8 +271,9 @@ sanityCheckCal()
 -- approximated as v² = v0² - 2K·d (kinematics under a constant force).
 local PHYS = {
 	ballR = C.BALL_R, maxDepth = C.MAX_DEPTH, minSpeed = C.MIN_SPEED,
-	K = 40.0, cushionRest = 0.9, ballRest = 0.92, pocketR = 0.5,
-	throwGain = 0.04, cushionTangKeep = 0.78, cueTangKeep = 0.96,
+	K = 40.0, cushionRest = 0.9, ballRest = 1.0, pocketR = 0.5,
+	throwGain = 0.0, cushionTangKeep = 0.78, cueTangKeep = 0.96,
+	exactDeflect = true,
 }
 -- set PHYS for a given shot power, return predicted initial speed v0
 local function shotPhysics(power)
@@ -286,6 +287,7 @@ local function shotPhysics(power)
 	PHYS.throwGain       = CAL.throwGain or 0
 	PHYS.cushionTangKeep = C.CUSHION_TANG_KEEP
 	PHYS.cueTangKeep     = C.CUE_TANG_KEEP
+	PHYS.exactDeflect    = C.GUIDELINE_EXACT
 	return math.max(0, CAL.powA * power + CAL.powB)
 end
 
