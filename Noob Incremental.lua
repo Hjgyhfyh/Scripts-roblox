@@ -1443,6 +1443,7 @@ addToggle("Не дублировать авто-игры", "SkipGameAuto", "Пр
 sectionLabel("Сброс (опасно)")
 addToggle("Авто-престиж", "AutoPrestige", "Сброс ради множителей по готовности")
 addToggle("Авто-пробуждение тира", "AutoAwaken", "Сброс тира при Tier ≥ порога")
+addToggle("Авто-сброс тайкуна", "AutoTycoonReset", "Reset тайкуна за множитель ×5 (сброс)")
 
 local footer = Instance.new("Frame")
 footer.Size = UDim2.new(1, 0, 0, FOOTER_H)
