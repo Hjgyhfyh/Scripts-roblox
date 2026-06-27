@@ -771,6 +771,7 @@ end)
 
 spawnLoop(function()
 	local ctrl = FrameworkClient and type(FrameworkClient.GetController) == "function" and FrameworkClient.GetController("Ctrl_TycoonDrops")
+	local seen = {}
 	while running do
 		if not ctrl and FrameworkClient and type(FrameworkClient.GetController) == "function" then
 			ctrl = FrameworkClient.GetController("Ctrl_TycoonDrops")
@@ -789,20 +790,28 @@ spawnLoop(function()
 						end
 					end
 				end
+				local now = os.clock()
 				for id, drop in pairs(ctrl.ActiveDrops) do
 					if not running or not Config.TycoonSell then break end
 					if type(drop) == "table" then
-						local applied = drop.AppliedUpgraders or {}
-						for _, up in ipairs(ups) do
-							if not applied[up] then fire("TycoonDropUpgrade", id, up) end
+						if not seen[id] then seen[id] = now end
+						if now - seen[id] >= 0.6 then
+							local applied = drop.AppliedUpgraders or {}
+							for _, up in ipairs(ups) do
+								if not applied[up] then fire("TycoonDropUpgrade", id, up) end
+							end
+							fire("TycoonDropSell", id)
+							pcall(function() ctrl:_DestroyVisual(id) end)
+							seen[id] = nil
 						end
-						fire("TycoonDropSell", id)
-						pcall(function() ctrl:_DestroyVisual(id) end)
 					end
+				end
+				for sid in pairs(seen) do
+					if ctrl.ActiveDrops[sid] == nil then seen[sid] = nil end
 				end
 			end
 		end
-		task.wait(0.4)
+		task.wait(0.3)
 	end
 end)
 
