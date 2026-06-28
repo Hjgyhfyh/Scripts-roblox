@@ -348,7 +348,7 @@ statsLayout.Parent = statsRow
 
 local function makeStat(label)
 	local card = Instance.new("Frame")
-	card.Size = UDim2.new(0, 96, 1, 0)
+	card.Size = UDim2.new(0, 94, 1, 0)
 	card.BackgroundColor3 = palette.panel
 	card.BorderSizePixel = 0
 	card.Parent = statsRow
