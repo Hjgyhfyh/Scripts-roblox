@@ -928,9 +928,9 @@ local function top100Threshold()
 	for _, d in ipairs(board:GetDescendants()) do
 		if d:IsA("TextLabel") then
 			local t = d.Text
-			if t and #t >= 2 and t:sub(1, 1):match("%d") and t:sub(-1):match("%a") then
+			if t and t:match("^%d+%.?%d*%a+$") then
 				local ok, val = pcall(G.fromSuffix, t)
-				if ok and val and not G.isZero(val) then
+				if ok and val and orderOf(val) > 20 then
 					if not minVal or G.lt(val, minVal) then minVal, minStr = val, t end
 				end
 			end
