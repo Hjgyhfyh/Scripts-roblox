@@ -83,6 +83,8 @@ track(lp.Idled:Connect(function()
     end)
 end))
 
+task.spawn(function()
+
 local COL = {
     bg      = Color3.fromRGB(16, 16, 22),
     panel   = Color3.fromRGB(24, 24, 32),
@@ -383,8 +385,10 @@ local function unload()
     for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
     table.clear(conns)
     pcall(function() gui:Destroy() end)
+    if _G.__CGM == SESSION then _G.__CGM = nil end
     _G.__CGM_LOADED = nil
     _G.__CGM_UNLOAD = nil
 end
+SESSION.unload = unload
 _G.__CGM_UNLOAD = unload
 closeBtn.MouseButton1Click:Connect(unload)
