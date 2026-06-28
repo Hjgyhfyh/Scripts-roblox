@@ -192,6 +192,13 @@ loop(0.7, function()
 	end
 end)
 
+loop(3, function()
+	if not S.enableSweep then return end
+	pcall(function()
+		if G.toNumber(C.getAvailableCookedChickens(P)) > 0 then Packets.CookChickens:Fire() end
+	end)
+end)
+
 loop(1.0, function()
 	if not S.enablePrestige then return end
 
