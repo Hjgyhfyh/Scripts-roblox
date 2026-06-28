@@ -520,6 +520,11 @@ spawnLoop(function()
     task.wait(CONFIG.groupCheckEvery)
 end)
 
+spawnLoop(function()
+    StatStacker.step()
+    task.wait(0.25)
+end)
+
 if CONFIG.antiAFK then
     local idleConn = LocalPlayer.Idled:Connect(function()
         pcall(function()
@@ -740,7 +745,8 @@ makeToggle("Авто-сундук", "autoChest", 8)
 makeToggle("Авто-колесо фортуны", "autoWheel", 9)
 makeToggle("Авто-группа", "autoGroup", 10)
 makeToggle("Макс. размер/скорость", "autoMaxSize", 11)
-makeToggle("Анти-AFK", "antiAFK", 12)
+makeToggle("Дюп статов (Stat Stacker)", "statStacker", 12)
+makeToggle("Анти-AFK", "antiAFK", 13)
 
 local logBox = Instance.new("TextLabel")
 logBox.Position = UDim2.new(0, 12, 1, -120)
