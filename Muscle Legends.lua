@@ -47,6 +47,10 @@ local CONFIG = {
     statStacker = false,
     statStackerPet = "",
 
+    holdSizeOne = true,
+    autoStatBug = false,
+    statBugPet = "Orange Hedgehog",
+
     petOpensPerSec = 8,
     rebirthCheckEvery = 5,
     giftCheckEvery = 25,
@@ -829,8 +833,10 @@ unloadBtn.MouseButton1Click:Connect(unload)
 _G.MuscleLegends = {
     config = CONFIG,
     tradeDupe = TradeDupe.run,
+    statStacker = StatStacker,
     sellWeakest = sellWeakest,
     maxSize = applyMaxSize,
+    setStatTarget = function(name) CONFIG.statStackerPet = name or "" end,
     unload = unload,
 }
 
