@@ -84,6 +84,36 @@ local function applyUIBrightness(b)
 	tintFrame.BackgroundTransparency = 1 - opacity
 end
 
+local SAVE_FILE = "Gamma_Settings.json"
+
+local function saveSettings()
+	pcall(function()
+		if not writefile then return end
+		writefile(SAVE_FILE, HttpService:JSONEncode({
+			gamma = State.GammaValue,
+			ui = State.UIValue,
+		}))
+	end)
+end
+
+local function loadSettings()
+	local result = { gamma = 1.00, ui = 0.00 }
+	pcall(function()
+		if isfile and readfile and isfile(SAVE_FILE) then
+			local decoded = HttpService:JSONDecode(readfile(SAVE_FILE))
+			if type(decoded) == "table" then
+				if type(decoded.gamma) == "number" then
+					result.gamma = math.clamp(decoded.gamma, State.GammaMin, State.GammaMax)
+				end
+				if type(decoded.ui) == "number" then
+					result.ui = math.clamp(decoded.ui, State.UIMin, State.UIMax)
+				end
+			end
+		end
+	end)
+	return result
+end
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "GammaUI_" .. tostring(math.random(1000, 9999))
 gui.ResetOnSpawn = false
@@ -214,7 +244,10 @@ local function makeSlider(opts)
 	end))
 	addConn(UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
+			if dragging then
+				dragging = false
+				saveSettings()
+			end
 		end
 	end))
 
@@ -300,9 +333,11 @@ end))
 addConn(reset.MouseButton1Click:Connect(function()
 	gammaSet(1.00)
 	uiSet(0.00)
+	saveSettings()
 end))
 
 addConn(close.MouseButton1Click:Connect(function()
+	saveSettings()
 	State.Unload()
 end))
 
@@ -311,5 +346,6 @@ addConn(LocalPlayer.Idled:Connect(function()
 	VirtualUser:ClickButton2(Vector2.new())
 end))
 
-gammaSet(1.00)
-uiSet(0.00)
+local saved = loadSettings()
+gammaSet(saved.gamma)
+uiSet(saved.ui)
