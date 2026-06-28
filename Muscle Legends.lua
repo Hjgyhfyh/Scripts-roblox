@@ -529,6 +529,17 @@ spawnLoop(function()
     task.wait(0.25)
 end)
 
+spawnLoop(function()
+    if CONFIG.holdSizeOne then
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        local bhs = hum and hum:FindFirstChild("BodyHeightScale")
+        if bhs and math.abs(bhs.Value - 1) > 0.001 then
+            safeInvoke(R.changeSpeedSize, "changeSize", 1)
+        end
+    end
+    task.wait(1.5)
+end)
+
 if CONFIG.antiAFK then
     local idleConn = LocalPlayer.Idled:Connect(function()
         pcall(function()
