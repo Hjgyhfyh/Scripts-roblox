@@ -153,6 +153,7 @@ end
 
 local function ensureLifting()
     if not CONFIG.autoLift then return end
+    if statStackerPrecision then return end
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not (char and hum and hum.Health > 0) then return end
@@ -454,12 +455,17 @@ function StatStacker.step()
     StatStacker.lastPerk = curPerk
     StatStacker.lastLevel = pet.level.Value
     local gap = petThreshold(pet) - pet.exp.Value
+    statStackerPrecision = (gap > 0 and gap <= 13)
     if muscleEvent and gap > 0 and gap <= 28 then
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local w = findWeight()
         if w and hum and w.Parent ~= char then
             pcall(function() hum:EquipTool(w) end)
+        end
+        if statStackerPrecision then
+            local al = LocalPlayer:FindFirstChild("autoLiftEnabled")
+            if al and al.Value ~= false then al.Value = false end
         end
         safeFire(muscleEvent, "rep")
     end
