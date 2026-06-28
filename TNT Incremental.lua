@@ -187,6 +187,8 @@ end)
 
 loop(1.0, function()
 	if not S.enablePrestige then return end
+
+	local didReset = false
 	pcall(function()
 		local nt = PC.Tiers[P.Tier + 1]
 		if nt and G.gte(P.Cash, nt.Price) then
@@ -194,36 +196,53 @@ loop(1.0, function()
 			if nt.Requirements and nt.Requirements.RunesOpened then
 				okReq = G.toNumber(C.getTotalOpenedRunes(P)) >= nt.Requirements.RunesOpened
 			end
-			if okReq then Packets.TierUp:Fire() end
+			if okReq then Packets.TierUp:Fire(); didReset = true end
 		end
 	end)
 
-	local didReset = false
-	pcall(function()
-		if P.Ascension < 1 and P.Tier >= 6 then
-			local na = PC.Ascensions[P.Ascension + 1]
-			if na and G.gte(P.Cash, na.Price) then
-				Packets.Ascend:Fire()
-				didReset = true
-			end
-		end
-	end)
 	if not didReset then
 		pcall(function()
-			local g = C.getRebirthAmt(P)
-			if g then
-				local thresh = G.max(ONE, G.mul(stat("Rebirths"), 0.5))
-				if G.gte(g, thresh) then
-					Packets.Rebirth:Fire()
+			if P.Ascension < 1 and P.Tier >= 6 then
+				local na = PC.Ascensions[P.Ascension + 1]
+				if na and G.gte(P.Cash, na.Price) then
+					Packets.Ascend:Fire()
 					didReset = true
 				end
 			end
 		end)
 	end
-	if not didReset and P.Tier >= 3 then
+
+	local milestone
+	pcall(function()
+		if P.Tier < 6 then
+			local nt = PC.Tiers[P.Tier + 1]
+			if nt then
+				local okReq = (not nt.Requirements) or (not nt.Requirements.RunesOpened) or (G.toNumber(C.getTotalOpenedRunes(P)) >= nt.Requirements.RunesOpened)
+				if okReq then milestone = nt.Price end
+			end
+		elseif P.Ascension < 1 then
+			local na = PC.Ascensions[1]
+			if na then milestone = na.Price end
+		end
+	end)
+	local hoard = false
+	if milestone then
+		pcall(function() hoard = G.gte(G.mul(P.Cash, 1000), milestone) end)
+	end
+
+	if not didReset and not hoard then
+		pcall(function()
+			local g = C.getRebirthAmt(P)
+			if g and G.gte(g, G.max(ONE, stat("Rebirths"))) then
+				Packets.Rebirth:Fire()
+				didReset = true
+			end
+		end)
+	end
+	if not didReset and not hoard and P.Tier >= 3 then
 		pcall(function()
 			local gain = G.mul(G.div(P.Cash, PC.TreeCrystalCost), C.getTreeCrystalMulti(P))
-			if not G.isZero(gain) and G.gte(gain, stat("TreeCrystals")) then
+			if not G.isZero(gain) and G.gte(gain, G.max(ONE, stat("TreeCrystals"))) then
 				Packets.ConvertCrystals:Fire()
 			end
 		end)
