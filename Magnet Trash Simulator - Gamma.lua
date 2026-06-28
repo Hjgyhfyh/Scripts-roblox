@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -12,7 +13,7 @@ end
 local State = {
 	Connections = {},
 	GammaMin = -5.00,
-	GammaMax = 3.00,
+	GammaMax = 5.00,
 	GammaValue = 1.00,
 	UIMin = -5.00,
 	UIMax = 5.00,
