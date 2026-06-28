@@ -52,8 +52,8 @@ local TOP_K = 64
 
 local State = {
 	farm = false, priority = true, autoBuyPaint = true, autoUpgrade = true,
-	autoHire = true, park = true, autoRoll = false, autoRngUp = false,
-	paintRate = 200, stepRate = 180, rollRate = 90,
+	autoHire = true, park = false, autoRoll = false, autoRngUp = false,
+	paintRate = 66, stepRate = 330, rollRate = 90,
 }
 _G.PMK = State
 
@@ -207,9 +207,9 @@ end
 local function farmStep(dt)
 	if not (running and State.farm) then return end
 	if capsDirty then rebuildCaps() resortCaps() end
-	local list = (State.priority and #topCaps > 0) and topCaps or sortedCaps
-	local nAll = #sortedCaps
-	if nAll == 0 then return end
+	local list = (#topCaps > 0) and topCaps or sortedCaps
+	local nList = #list
+	if nList == 0 then return end
 	if State.park and refillCFrame then
 		if not (hrp and hrp.Parent) then local char = lp.Character hrp = char and char:FindFirstChild("HumanoidRootPart") end
 		if hrp then hrp.CFrame = refillCFrame end
@@ -217,18 +217,17 @@ local function farmStep(dt)
 	local pr, sr, rr = State.paintRate, State.stepRate, (State.autoRoll and State.rollRate or 0)
 	local total = pr + sr + rr
 	if total > MAX_TOTAL_RATE then local k = MAX_TOTAL_RATE / total pr, sr, rr = pr * k, sr * k, rr * k end
+	local cd = nList * 6.3
+	if sr > cd then sr = cd end
 	pAcc = pAcc + pr * dt
 	local pc = math.floor(pAcc)
 	if pc > 0 then pAcc = pAcc - pc
-		for _ = 1, pc do local cap = sortedCaps[paintIdx] paintIdx = paintIdx % nAll + 1 if cap and cap.Parent then pcall(R.Paint.FireServer, R.Paint, cap, bestPaint) end end
+		for _ = 1, pc do if paintIdx > nList then paintIdx = 1 end local cap = list[paintIdx] paintIdx = paintIdx % nList + 1 if cap and cap.Parent then pcall(R.Paint.FireServer, R.Paint, cap, bestPaint) end end
 	end
-	local nStep = #list
-	if nStep > 0 then
-		sAcc = sAcc + sr * dt
-		local sc = math.floor(sAcc)
-		if sc > 0 then sAcc = sAcc - sc
-			for _ = 1, sc do if stepIdx > nStep then stepIdx = 1 end local cap = list[stepIdx] stepIdx = stepIdx % nStep + 1 if cap and cap.Parent then pcall(R.Step.FireServer, R.Step, cap) end end
-		end
+	sAcc = sAcc + sr * dt
+	local sc = math.floor(sAcc)
+	if sc > 0 then sAcc = sAcc - sc
+		for _ = 1, sc do if stepIdx > nList then stepIdx = 1 end local cap = list[stepIdx] stepIdx = stepIdx % nList + 1 if cap and cap.Parent then pcall(R.Step.FireServer, R.Step, cap) end end
 	end
 	if State.autoRoll then
 		rAcc = rAcc + rr * dt
