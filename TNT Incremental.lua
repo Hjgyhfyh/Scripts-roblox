@@ -160,26 +160,33 @@ loop(0.7, function()
 	if not S.enableSweep then return end
 	for name in pairs(UPG) do
 		pcall(function()
+			if HEAT[name] then
+				local lvlBuf = P.HeatUpgrades and P.HeatUpgrades[name]
+				local lvlN = lvlBuf and G.toNumber(lvlBuf) or 0
+				local price = UU.getUpgradePrice(name, lvlN)
+				if price and affordBuf(price, "Heat") then Packets.AddHeat:Fire(name) end
+				return
+			end
+			if name == "Smelters" then
+				if (P.Smelters or 0) < 1000 then
+					local price = C.getSmelterPrice(P, P.Smelters)
+					if price and affordBuf(price, "TreeCrystals") then Packets.BuySmelter:Fire(true) end
+				end
+				return
+			end
 			local lvl = C.getUpgLvl(P, name)
 			local cap = C.getUpgLvlCap(P, name)
 			if not (lvl and cap) or lvl >= cap then return end
-			local price = C.getUpgPrice(P, name)
-			if HEAT[name] then
-				if affordBuf(price, "Heat") then Packets.AddHeat:Fire(name) end
-			elseif name == "Smelters" then
-				if affordBuf(price, "TreeCrystals") then Packets.BuySmelter:Fire(true) end
-			else
-				local cat = upgCat[name]
-				local reach = true
-				if cat == "HexagonTree" then
-					reach = C.canReachHexagonUpgrade(P, name)
-				elseif cat == "MiningTree" then
-					reach = C.canReachMiningUpgrade(P, name)
-				end
-				if reach and not C.isUpgradeLocked(P, name) then
-					local cur = upgCur[name] or C.getUpgCurrency(name)
-					if affordBuf(price, cur) then Packets.BuyUpgrade:Fire(name, true) end
-				end
+			local cat = upgCat[name]
+			local reach = true
+			if cat == "HexagonTree" then
+				reach = C.canReachHexagonUpgrade(P, name)
+			elseif cat == "MiningTree" then
+				reach = C.canReachMiningUpgrade(P, name)
+			end
+			if reach and not C.isUpgradeLocked(P, name) then
+				local cur = upgCur[name] or C.getUpgCurrency(name)
+				if affordBuf(C.getUpgPrice(P, name), cur) then Packets.BuyUpgrade:Fire(name, true) end
 			end
 		end)
 	end
