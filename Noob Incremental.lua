@@ -1553,46 +1553,46 @@ end
 
 local function buildCard(parent, cat, key, def)
 	local card = Instance.new("TextButton")
-	card.Size = UDim2.fromOffset(150, 150)
 	card.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
 	card.Text = ""
 	card.AutoButtonColor = false
 	card.Parent = parent
-	corner(card, 12)
+	corner(card, 14)
 	local sk = stroke(card, Color3.fromRGB(43, 43, 61), 3, 0)
 
 	local icon = Instance.new("ImageLabel")
 	icon.BackgroundTransparency = 1
-	icon.Size = UDim2.fromOffset(74, 74)
-	icon.Position = UDim2.new(0.5, -37, 0, 10)
+	icon.Size = UDim2.fromScale(0.55, 0.5)
+	icon.Position = UDim2.fromScale(0.225, 0.06)
 	icon.Image = tostring(def.icon or "")
+	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Parent = card
 
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, -10, 0, 34)
-	title.Position = UDim2.new(0, 5, 0, 88)
+	title.Size = UDim2.fromScale(0.92, 0.22)
+	title.Position = UDim2.fromScale(0.04, 0.57)
 	title.Font = Enum.Font.GothamBold
 	title.Text = tostring(def.title or key)
 	title.TextColor3 = Color3.fromRGB(244, 245, 247)
-	title.TextSize = 18
+	title.TextScaled = true
 	title.TextWrapped = true
 	title.Parent = card
 
 	local badge = Instance.new("TextLabel")
 	badge.BackgroundTransparency = 1
-	badge.Size = UDim2.new(1, 0, 0, 22)
-	badge.Position = UDim2.new(0, 0, 1, -26)
+	badge.Size = UDim2.fromScale(0.92, 0.16)
+	badge.Position = UDim2.fromScale(0.04, 0.81)
 	badge.Font = Enum.Font.GothamBold
-	badge.TextSize = 17
+	badge.TextScaled = true
 	badge.Parent = card
 
 	local function refresh()
 		local on = (Config.upgrades[cat] == nil) or (Config.upgrades[cat][key] ~= false)
-		badge.Text = on and "● АВТО" or "○ ВЫКЛ"
+		badge.Text = on and "● АВТО ВКЛ" or "○ ВЫКЛ"
 		badge.TextColor3 = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(150, 152, 165)
 		sk.Color = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(43, 43, 61)
-		card.BackgroundColor3 = on and Color3.fromRGB(20, 30, 25) or Color3.fromRGB(18, 18, 28)
+		card.BackgroundColor3 = on and Color3.fromRGB(20, 32, 26) or Color3.fromRGB(18, 18, 28)
 	end
 	refresh()
 	track(card.MouseButton1Click:Connect(function()
@@ -1604,42 +1604,77 @@ local function buildCard(parent, cat, key, def)
 	end))
 end
 
+local function buildMasterToggle(sg, cat)
+	for _, c in ipairs(sg:GetChildren()) do pcall(function() c:Destroy() end) end
+	sg.Enabled = true
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.fromScale(1, 1)
+	btn.BackgroundTransparency = 1
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	btn.Parent = sg
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.fromScale(0.96, 0.78)
+	lbl.Position = UDim2.fromScale(0.02, 0.11)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextScaled = true
+	lbl.Parent = btn
+	local function refresh()
+		local on = Config.cats[cat] ~= false
+		lbl.Text = (on and "АВТО ВКЛ  —  " or "АВТО ВЫКЛ  —  ") .. cat
+		lbl.TextColor3 = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(242, 85, 90)
+	end
+	refresh()
+	track(btn.MouseButton1Click:Connect(function()
+		Config.cats[cat] = not (Config.cats[cat] ~= false)
+		refresh()
+		saveConfig()
+	end))
+end
+
 local function makeUpgradeBoard(board, cat)
 	if not (Upgrades and Upgrades.List and Upgrades.List[cat]) then return end
 	local ok, clone = pcall(function() return board:Clone() end)
 	if not ok or not clone then return end
 	cleanClone(clone)
-	pcall(function() clone:PivotTo(board:GetPivot() + Vector3.new(0, 17, 0)) end)
+	pcall(function() clone:PivotTo(board:GetPivot() + Vector3.new(0, 18, 0)) end)
 	clone.Name = "NIAutoTablet"
 	clone.Parent = workspace
 
-	local display = clone:FindFirstChild("Display")
-	local sg = display and display:FindFirstChildWhichIsA("SurfaceGui")
-	if sg then
-		for _, c in ipairs(sg:GetChildren()) do pcall(function() c:Destroy() end) end
+	local big = clone:FindFirstChild("Upgrades")
+	if big and big:IsA("BasePart") then
+		local sg = big:FindFirstChildWhichIsA("SurfaceGui")
+		if not sg then
+			sg = Instance.new("SurfaceGui")
+			sg.Face = Enum.NormalId.Front
+			sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			sg.PixelsPerStud = 50
+			sg.Parent = big
+		else
+			for _, c in ipairs(sg:GetChildren()) do pcall(function() c:Destroy() end) end
+		end
 		sg.Enabled = true
 		local scroll = Instance.new("ScrollingFrame")
 		scroll.Size = UDim2.fromScale(1, 1)
 		scroll.BackgroundTransparency = 1
 		scroll.BorderSizePixel = 0
-		scroll.ScrollBarThickness = 6
+		scroll.ScrollBarThickness = 10
 		scroll.ScrollBarImageColor3 = Color3.fromRGB(139, 108, 255)
-		scroll.ScrollingDirection = Enum.ScrollingDirection.X
 		scroll.CanvasSize = UDim2.new()
 		scroll.Active = true
 		scroll.Parent = sg
 		local p = Instance.new("UIPadding")
-		p.PaddingLeft = UDim.new(0, 10)
-		p.PaddingRight = UDim.new(0, 10)
-		p.PaddingTop = UDim.new(0, 8)
-		p.PaddingBottom = UDim.new(0, 8)
+		p.PaddingLeft = UDim.new(0, 18)
+		p.PaddingRight = UDim.new(0, 18)
+		p.PaddingTop = UDim.new(0, 18)
+		p.PaddingBottom = UDim.new(0, 18)
 		p.Parent = scroll
-		local lay = Instance.new("UIListLayout")
-		lay.FillDirection = Enum.FillDirection.Horizontal
-		lay.Padding = UDim.new(0, 12)
-		lay.SortOrder = Enum.SortOrder.LayoutOrder
-		lay.VerticalAlignment = Enum.VerticalAlignment.Center
-		lay.Parent = scroll
+		local grid = Instance.new("UIGridLayout")
+		grid.CellSize = UDim2.fromOffset(195, 215)
+		grid.CellPadding = UDim2.fromOffset(16, 16)
+		grid.SortOrder = Enum.SortOrder.LayoutOrder
+		grid.Parent = scroll
 		local count = 0
 		for key, def in pairs(Upgrades.List[cat]) do
 			if type(def) == "table" and def.icon then
@@ -1647,8 +1682,16 @@ local function makeUpgradeBoard(board, cat)
 				count += 1
 			end
 		end
-		scroll.CanvasSize = UDim2.fromOffset(count * 162 + 24, 0)
+		local rows = math.ceil(count / 5)
+		scroll.CanvasSize = UDim2.fromOffset(0, rows * (215 + 16) + 40)
 	end
+
+	local disp = clone:FindFirstChild("Display")
+	if disp and disp:IsA("BasePart") then
+		local dsg = disp:FindFirstChildWhichIsA("SurfaceGui")
+		if dsg then buildMasterToggle(dsg, cat) end
+	end
+
 	table.insert(worldClones, clone)
 end
 
