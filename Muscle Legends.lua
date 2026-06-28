@@ -346,13 +346,29 @@ local function doAutoGifts()
     end
 end
 
+local CHEST_NAMES = { "Golden Chest", "Enchanted Chest", "Magma Chest", "Mythical Chest", "Legends Chest", "Jungle Chest" }
+local CHEST_KEYS = { "goldenChest", "enchantedChest", "magmaChest", "mythicalChest", "legendsChest", "jungleChest" }
 local function doAutoChest()
     if not CONFIG.autoChest then return end
-    local before = getGems()
-    safeInvoke(R.chest, "checkChest")
-    safeInvoke(R.chest)
-    if getGems() > before then
-        log("Сундук собран")
+    local before = getGems() + getStat("Strength")
+    for i, name in ipairs(CHEST_NAMES) do
+        local a = safeInvoke(R.chest, name)
+        if a ~= true then
+            local chest = workspace:FindFirstChild(CHEST_KEYS[i])
+            local circle = chest and chest:FindFirstChild("circleInner")
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if circle and hrp then
+                local prev = hrp.CFrame
+                hrp.CFrame = circle.CFrame + Vector3.new(0, 3, 0)
+                task.wait(0.4)
+                hrp.CFrame = prev
+            end
+        end
+        task.wait(0.15)
+    end
+    if (getGems() + getStat("Strength")) > before then
+        log("Сундуки собраны")
     end
 end
 
