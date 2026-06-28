@@ -138,6 +138,7 @@ end
 local Weight, repTimeValue
 local muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
 local lastRep = 0
+local statStackerPrecision = false
 local function findWeight()
     local w = LocalPlayer.Backpack:FindFirstChild("Weight")
     if not w and LocalPlayer.Character then
