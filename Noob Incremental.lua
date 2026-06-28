@@ -1670,9 +1670,15 @@ local function makeUpgradeBoard(board, cat)
 		p.PaddingTop = UDim.new(0, 18)
 		p.PaddingBottom = UDim.new(0, 18)
 		p.Parent = scroll
+		local cols = 4
+		local panelW = big.Size.X * 50
+		local cellW = math.max(120, math.floor((panelW - 36 - (cols - 1) * 16) / cols))
+		local cellH = math.floor(cellW * 0.9)
 		local grid = Instance.new("UIGridLayout")
-		grid.CellSize = UDim2.fromOffset(195, 215)
+		grid.CellSize = UDim2.fromOffset(cellW, cellH)
 		grid.CellPadding = UDim2.fromOffset(16, 16)
+		grid.FillDirectionMaxCells = cols
+		grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = scroll
 		local count = 0
@@ -1682,8 +1688,8 @@ local function makeUpgradeBoard(board, cat)
 				count += 1
 			end
 		end
-		local rows = math.ceil(count / 5)
-		scroll.CanvasSize = UDim2.fromOffset(0, rows * (215 + 16) + 40)
+		local rows = math.ceil(count / cols)
+		scroll.CanvasSize = UDim2.fromOffset(0, rows * (cellH + 16) + 40)
 	end
 
 	local disp = clone:FindFirstChild("Display")
