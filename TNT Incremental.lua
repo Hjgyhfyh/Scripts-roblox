@@ -454,7 +454,7 @@ local function pad(p, v)
 end
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "\0\0TNT" .. tostring(math.random(1000, 9999))
+gui.Name = "UI_" .. tostring(math.random(100000, 999999))
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.IgnoreGuiInset = true
