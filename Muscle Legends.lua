@@ -44,6 +44,9 @@ local CONFIG = {
     autoMaxSize = false,
     antiAFK = true,
 
+    statStacker = false,
+    statStackerPet = "",
+
     petOpensPerSec = 8,
     rebirthCheckEvery = 5,
     giftCheckEvery = 25,
