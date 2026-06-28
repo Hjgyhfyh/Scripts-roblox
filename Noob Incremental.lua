@@ -1527,88 +1527,96 @@ do
 	end))
 end
 
-local worldTablets = {}
-local function makeWorldToggle(adornee, labelText, getOn, toggle)
-	if not adornee then return end
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "NIWorldTablet"
-	bb.Adornee = adornee
-	bb.Size = UDim2.fromOffset(168, 50)
-	bb.StudsOffset = Vector3.new(0, 6, 0)
-	bb.MaxDistance = 160
-	bb.LightInfluence = 0
-	bb.ClipsDescendants = false
-	bb.Parent = screenGui
+local CollectionService = game:GetService("CollectionService")
+local worldClones = {}
 
-	local card = Instance.new("TextButton")
-	card.Size = UDim2.fromScale(1, 1)
-	card.BackgroundColor3 = THEME.panel
-	card.BackgroundTransparency = 0.05
-	card.Text = ""
-	card.AutoButtonColor = false
-	card.Parent = bb
-	corner(card, 10)
-	local sk = stroke(card, THEME.line, 2, 0)
-
-	local accent = Instance.new("Frame")
-	accent.Size = UDim2.new(1, -8, 0, 3)
-	accent.Position = UDim2.fromOffset(4, 4)
-	accent.BorderSizePixel = 0
-	accent.BackgroundColor3 = THEME.violet
-	accent.Parent = card
-	corner(accent, 2)
-	gradient(accent, THEME.violet, THEME.cyan, 0)
-
-	local title = Instance.new("TextLabel")
-	title.BackgroundTransparency = 1
-	title.Position = UDim2.fromOffset(10, 8)
-	title.Size = UDim2.new(1, -20, 0, 18)
-	title.Font = Enum.Font.GothamBold
-	title.Text = labelText
-	title.TextColor3 = THEME.text
-	title.TextSize = 13
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = card
-
-	local st = Instance.new("TextLabel")
-	st.BackgroundTransparency = 1
-	st.Position = UDim2.fromOffset(10, 28)
-	st.Size = UDim2.new(1, -20, 0, 16)
-	st.Font = Enum.Font.GothamBold
-	st.TextSize = 12
-	st.TextXAlignment = Enum.TextXAlignment.Left
-	st.Parent = card
-
-	local function refresh()
-		local on = getOn()
-		st.Text = on and "AUTO  ВКЛ" or "AUTO  ВЫКЛ"
-		st.TextColor3 = on and THEME.on or THEME.faint
-		sk.Color = on and THEME.on or THEME.line
+local function makeCloneToggle(source, height, getOn, toggle)
+	if not source or not source:IsA("Model") then return end
+	if not (source.PrimaryPart or source:FindFirstChildWhichIsA("BasePart")) then return end
+	local ok, clone = pcall(function() return source:Clone() end)
+	if not ok or not clone then return end
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("ClickDetector") or d:IsA("Script") or d:IsA("LocalScript")
+			or d:IsA("ParticleEmitter") or d:IsA("ProximityPrompt") or d:IsA("Sound")
+			or d:IsA("ObjectValue") or d:IsA("Beam") or d:IsA("Trail") then
+			pcall(function() d:Destroy() end)
+		end
 	end
-	refresh()
-	track(card.MouseButton1Click:Connect(function()
+	for _, d in ipairs(clone:GetDescendants()) do
+		pcall(function() for _, tg in ipairs(CollectionService:GetTags(d)) do CollectionService:RemoveTag(d, tg) end end)
+	end
+	pcall(function() for _, tg in ipairs(CollectionService:GetTags(clone)) do CollectionService:RemoveTag(clone, tg) end end)
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = true
+			d.CanTouch = false
+		end
+	end
+	pcall(function() clone:PivotTo(source:GetPivot() + Vector3.new(0, height, 0)) end)
+	clone.Name = "NIAutoTablet"
+	clone.Parent = workspace
+
+	local labels = {}
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("TextLabel") then labels[#labels + 1] = d end
+	end
+	local function setState()
+		local on = getOn()
+		for i, l in ipairs(labels) do
+			pcall(function()
+				l.RichText = false
+				l.Text = (i == 1) and (on and "АВТО: ВКЛ" or "АВТО: ВЫКЛ") or "АВТО"
+				l.TextColor3 = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(242, 85, 90)
+				local g = l:FindFirstChildOfClass("UIGradient")
+				if g then g.Enabled = false end
+			end)
+		end
+	end
+	local cd = Instance.new("ClickDetector")
+	cd.MaxActivationDistance = 50
+	cd.Parent = clone:FindFirstChild("Main") or clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
+	setState()
+	track(cd.MouseClick:Connect(function()
 		toggle()
-		refresh()
+		setState()
 		saveConfig()
 	end))
-	table.insert(worldTablets, bb)
+	table.insert(worldClones, clone)
 end
 
 spawnLoop(function()
-	task.wait(1.5)
+	task.wait(2)
 	local gc = workspace:FindFirstChild("__GAME_CONTENT")
 	local ups = gc and gc:FindFirstChild("Upgrades")
 	if ups then
 		for _, board in ipairs(ups:GetChildren()) do
 			if not running then break end
 			local cat = board.Name
-			if Config.cats[cat] ~= nil then
-				local part = board:FindFirstChildWhichIsA("BasePart", true)
-				makeWorldToggle(part, "Oof: " .. cat, function()
+			if board:IsA("Model") and Config.cats[cat] ~= nil then
+				makeCloneToggle(board, 16, function()
 					return Config.cats[cat] ~= false
 				end, function()
 					Config.cats[cat] = not (Config.cats[cat] ~= false)
 				end)
+			end
+		end
+	end
+	local utf = gc and gc:FindFirstChild("UpgradeTree")
+	if utf then
+		for _, treeFolder in ipairs(utf:GetChildren()) do
+			if not running then break end
+			local tname = treeFolder.Name
+			if Config.floortrees[tname] ~= nil then
+				local node = treeFolder:FindFirstChildWhichIsA("Model")
+				if node then
+					makeCloneToggle(node, 7, function()
+						return Config.FloorTrees and Config.floortrees[tname] ~= false
+					end, function()
+						Config.floortrees[tname] = not (Config.floortrees[tname] ~= false)
+					end)
+				end
 			end
 		end
 	end
