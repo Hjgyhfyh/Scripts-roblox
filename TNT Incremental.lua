@@ -449,6 +449,18 @@ loop(8, function()
 	end)
 end)
 
+pcall(function()
+	local g = { VFX = false, LowGraphics = true, ExplosionSounds = false, CurrencyAnimation = false, PickupAnimation = false, HideOthers = true, OthersOverhead = false, Music = 0, Sfx = 0 }
+	for k, v in pairs(g) do pcall(function() Packets.ChangeSetting:Fire(k, v) end) end
+	pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+	pcall(function() UserSettings():GetService("UserGameSettings").SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1 end)
+	pcall(function()
+		for _, e in ipairs(game:GetService("Lighting"):GetDescendants()) do
+			if e:IsA("PostEffect") then e.Enabled = false end
+		end
+	end)
+end)
+
 if S.enableAntiAfk then
 	track(LP.Idled:Connect(function()
 		pcall(function()
