@@ -117,6 +117,26 @@ local function loop(interval, fn)
 	end)
 end
 
+if P.Tier == 0 then
+	for _ = 1, 60 do
+		if P.Tier > 0 or not running then break end
+		pcall(function()
+			if G.gte(P.Cash, PC.Tiers[1].Price) then
+				Packets.TierUp:Fire()
+			else
+				local box = workspace:FindFirstChild("TNTBox")
+				local sp = box and box:FindFirstChild("TNTSpawn")
+				if sp and BM then
+					local idx = {}
+					for i, b in pairs(BM.getBlocks()) do if b.part then idx[#idx + 1] = i end end
+					if #idx > 0 then Packets.TNTExplode:Fire(idx, sp.Position) end
+				end
+			end
+		end)
+		task.wait(0.2)
+	end
+end
+
 loop(function() return 1 / math.clamp(S.cashRate, 1, 8) end, function()
 	if not S.enableCash then return end
 	local box = workspace:FindFirstChild("TNTBox")
