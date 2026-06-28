@@ -406,7 +406,7 @@ for _, cat in UPGRADE_ORDER do
 								for _, key in keys do
 									if not running or not Config.UpgradeSweep or Config.cats[cat] == false then break end
 									local up = list[key]
-									if up then
+									if up and (Config.upgrades[cat] == nil or Config.upgrades[cat][key] ~= false) then
 										local lvl = tonumber(catData[key]) or 0
 										local okm, mx = pcall(up.max, LocalPlayer)
 										if not okm then okm, mx = pcall(up.max) end
