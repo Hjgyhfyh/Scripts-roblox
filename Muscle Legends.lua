@@ -129,6 +129,8 @@ local function log(msg)
 end
 
 local Weight, repTimeValue
+local muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
+local lastRep = 0
 local function findWeight()
     local w = LocalPlayer.Backpack:FindFirstChild("Weight")
     if not w and LocalPlayer.Character then
@@ -154,6 +156,14 @@ local function ensureLifting()
     local al = LocalPlayer:FindFirstChild("autoLiftEnabled")
     if al and al.Value ~= true then
         al.Value = true
+    end
+    if not muscleEvent or muscleEvent.Parent ~= LocalPlayer then
+        muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
+    end
+    local cd = repTimeValue and repTimeValue.Value or 1
+    if muscleEvent and tick() - lastRep >= cd then
+        lastRep = tick()
+        safeFire(muscleEvent, "rep")
     end
 end
 
