@@ -405,7 +405,7 @@ end
 
 spawnLoop(function()
     ensureLifting()
-    task.wait(1)
+    task.wait(0.15)
 end)
 
 spawnLoop(function()
