@@ -1531,11 +1531,7 @@ end
 local CollectionService = game:GetService("CollectionService")
 local worldClones = {}
 
-local function makeCloneToggle(source, height, getOn, toggle)
-	if not source or not source:IsA("Model") then return end
-	if not (source.PrimaryPart or source:FindFirstChildWhichIsA("BasePart")) then return end
-	local ok, clone = pcall(function() return source:Clone() end)
-	if not ok or not clone then return end
+local function cleanClone(clone)
 	for _, d in ipairs(clone:GetDescendants()) do
 		if d:IsA("ClickDetector") or d:IsA("Script") or d:IsA("LocalScript")
 			or d:IsA("ParticleEmitter") or d:IsA("ProximityPrompt") or d:IsA("Sound")
@@ -1543,11 +1539,9 @@ local function makeCloneToggle(source, height, getOn, toggle)
 			pcall(function() d:Destroy() end)
 		end
 	end
-	for _, d in ipairs(clone:GetDescendants()) do
-		pcall(function() for _, tg in ipairs(CollectionService:GetTags(d)) do CollectionService:RemoveTag(d, tg) end end)
-	end
 	pcall(function() for _, tg in ipairs(CollectionService:GetTags(clone)) do CollectionService:RemoveTag(clone, tg) end end)
 	for _, d in ipairs(clone:GetDescendants()) do
+		pcall(function() for _, tg in ipairs(CollectionService:GetTags(d)) do CollectionService:RemoveTag(d, tg) end end)
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			d.CanCollide = false
@@ -1555,10 +1549,118 @@ local function makeCloneToggle(source, height, getOn, toggle)
 			d.CanTouch = false
 		end
 	end
-	pcall(function() clone:PivotTo(source:GetPivot() + Vector3.new(0, height, 0)) end)
+end
+
+local function buildCard(parent, cat, key, def)
+	local card = Instance.new("TextButton")
+	card.Size = UDim2.fromOffset(150, 150)
+	card.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+	card.Text = ""
+	card.AutoButtonColor = false
+	card.Parent = parent
+	corner(card, 12)
+	local sk = stroke(card, Color3.fromRGB(43, 43, 61), 3, 0)
+
+	local icon = Instance.new("ImageLabel")
+	icon.BackgroundTransparency = 1
+	icon.Size = UDim2.fromOffset(74, 74)
+	icon.Position = UDim2.new(0.5, -37, 0, 10)
+	icon.Image = tostring(def.icon or "")
+	icon.Parent = card
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.new(1, -10, 0, 34)
+	title.Position = UDim2.new(0, 5, 0, 88)
+	title.Font = Enum.Font.GothamBold
+	title.Text = tostring(def.title or key)
+	title.TextColor3 = Color3.fromRGB(244, 245, 247)
+	title.TextSize = 18
+	title.TextWrapped = true
+	title.Parent = card
+
+	local badge = Instance.new("TextLabel")
+	badge.BackgroundTransparency = 1
+	badge.Size = UDim2.new(1, 0, 0, 22)
+	badge.Position = UDim2.new(0, 0, 1, -26)
+	badge.Font = Enum.Font.GothamBold
+	badge.TextSize = 17
+	badge.Parent = card
+
+	local function refresh()
+		local on = (Config.upgrades[cat] == nil) or (Config.upgrades[cat][key] ~= false)
+		badge.Text = on and "● АВТО" or "○ ВЫКЛ"
+		badge.TextColor3 = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(150, 152, 165)
+		sk.Color = on and Color3.fromRGB(43, 209, 126) or Color3.fromRGB(43, 43, 61)
+		card.BackgroundColor3 = on and Color3.fromRGB(20, 30, 25) or Color3.fromRGB(18, 18, 28)
+	end
+	refresh()
+	track(card.MouseButton1Click:Connect(function()
+		if Config.upgrades[cat] == nil then Config.upgrades[cat] = {} end
+		local on = Config.upgrades[cat][key] ~= false
+		Config.upgrades[cat][key] = not on
+		refresh()
+		saveConfig()
+	end))
+end
+
+local function makeUpgradeBoard(board, cat)
+	if not (Upgrades and Upgrades.List and Upgrades.List[cat]) then return end
+	local ok, clone = pcall(function() return board:Clone() end)
+	if not ok or not clone then return end
+	cleanClone(clone)
+	pcall(function() clone:PivotTo(board:GetPivot() + Vector3.new(0, 17, 0)) end)
 	clone.Name = "NIAutoTablet"
 	clone.Parent = workspace
 
+	local display = clone:FindFirstChild("Display")
+	local sg = display and display:FindFirstChildWhichIsA("SurfaceGui")
+	if sg then
+		for _, c in ipairs(sg:GetChildren()) do pcall(function() c:Destroy() end) end
+		sg.Enabled = true
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Size = UDim2.fromScale(1, 1)
+		scroll.BackgroundTransparency = 1
+		scroll.BorderSizePixel = 0
+		scroll.ScrollBarThickness = 6
+		scroll.ScrollBarImageColor3 = Color3.fromRGB(139, 108, 255)
+		scroll.ScrollingDirection = Enum.ScrollingDirection.X
+		scroll.CanvasSize = UDim2.new()
+		scroll.Active = true
+		scroll.Parent = sg
+		local p = Instance.new("UIPadding")
+		p.PaddingLeft = UDim.new(0, 10)
+		p.PaddingRight = UDim.new(0, 10)
+		p.PaddingTop = UDim.new(0, 8)
+		p.PaddingBottom = UDim.new(0, 8)
+		p.Parent = scroll
+		local lay = Instance.new("UIListLayout")
+		lay.FillDirection = Enum.FillDirection.Horizontal
+		lay.Padding = UDim.new(0, 12)
+		lay.SortOrder = Enum.SortOrder.LayoutOrder
+		lay.VerticalAlignment = Enum.VerticalAlignment.Center
+		lay.Parent = scroll
+		local count = 0
+		for key, def in pairs(Upgrades.List[cat]) do
+			if type(def) == "table" and def.icon then
+				buildCard(scroll, cat, key, def)
+				count += 1
+			end
+		end
+		scroll.CanvasSize = UDim2.fromOffset(count * 162 + 24, 0)
+	end
+	table.insert(worldClones, clone)
+end
+
+local function makeCloneToggle(source, height, getOn, toggle)
+	if not source or not source:IsA("Model") then return end
+	if not (source.PrimaryPart or source:FindFirstChildWhichIsA("BasePart")) then return end
+	local ok, clone = pcall(function() return source:Clone() end)
+	if not ok or not clone then return end
+	cleanClone(clone)
+	pcall(function() clone:PivotTo(source:GetPivot() + Vector3.new(0, height, 0)) end)
+	clone.Name = "NIAutoTablet"
+	clone.Parent = workspace
 	local labels = {}
 	for _, d in ipairs(clone:GetDescendants()) do
 		if d:IsA("TextLabel") then labels[#labels + 1] = d end
@@ -1595,12 +1697,8 @@ spawnLoop(function()
 		for _, board in ipairs(ups:GetChildren()) do
 			if not running then break end
 			local cat = board.Name
-			if board:IsA("Model") and Config.cats[cat] ~= nil then
-				makeCloneToggle(board, 16, function()
-					return Config.cats[cat] ~= false
-				end, function()
-					Config.cats[cat] = not (Config.cats[cat] ~= false)
-				end)
+			if board:IsA("Model") and Upgrades and Upgrades.List and Upgrades.List[cat] then
+				makeUpgradeBoard(board, cat)
 			end
 		end
 	end
