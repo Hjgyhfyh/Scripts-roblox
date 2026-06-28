@@ -707,23 +707,35 @@ spawnLoop(function()
 end)
 
 spawnLoop(function()
+	local maxTier = 1
+	if FactoriesMod and type(FactoriesMod.Tiers) == "table" then
+		for k in pairs(FactoriesMod.Tiers) do
+			local n = tonumber(k)
+			if n and n > maxTier then maxTier = n end
+		end
+	end
+	if maxTier < 2 then maxTier = 7 end
 	while running do
-		if Config.MergeFactories then
+		if Config.AutoFactory then
 			local data = readData()
-			local factories = data and data.FEATURES and data.FEATURES.FACTORIES
-			if type(factories) == "table" then
-				for tier = 1, 6 do
-					if not running or not Config.MergeFactories then break end
-					local v = factories[tier] or factories[tostring(tier)]
+			local fac = data and data.FEATURES and data.FEATURES.FACTORIES
+			if type(fac) == "table" then
+				local t1 = FactoriesMod and FactoriesMod.Tiers and FactoriesMod.Tiers["1"]
+				if t1 and type(t1.cost) == "function" then
+					local cnt1 = tonumber(fac["1"] or fac[1]) or 0
+					local okc, c = pcall(t1.cost, cnt1)
+					if okc and afford(data, "Cash", c) then fire("BuyFactory", true) end
+				end
+				for tier = 1, maxTier - 1 do
+					if not running or not Config.AutoFactory then break end
+					local v = fac[tostring(tier)] or fac[tier]
 					if type(v) == "table" then v = v.Value or v[1] end
 					local count = tonumber(v) or 0
-					if count >= 5 then
-						fire("MergeFactory", tier - 1, true)
-					end
+					if count >= 5 then fire("MergeFactory", tier - 1, true) end
 				end
 			end
 		end
-		task.wait(1)
+		task.wait(0.8)
 	end
 end)
 
@@ -1421,7 +1433,7 @@ addToggle("Апгрейды (параллельно)", "UpgradeSweep", "ПКМ �
 addToggle("Prism дерево", "UITree", "Узлы за Prism")
 addToggle("Lab дерево", "LabTree", "Узлы за HackPoints")
 addToggle("Напольные деревья", "FloorTrees", "ПКМ — выбрать деревья", "floortrees", FLOOR_TREES)
-addToggle("Слияние фабрик", "MergeFactories", "При 5+ в тире (необратимо)")
+addToggle("Авто-фабрики", "AutoFactory", "Покупка тир1 + слияние всех тиров")
 addToggle("Экспедиции", "Expeditions", "ПКМ — сложности", "exped", EXPED_NAMES)
 
 sectionLabel("Зоны / позиция")
