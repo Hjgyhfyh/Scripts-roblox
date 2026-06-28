@@ -731,7 +731,7 @@ spawnLoop(function()
 					local v = fac[tostring(tier)] or fac[tier]
 					if type(v) == "table" then v = v.Value or v[1] end
 					local count = tonumber(v) or 0
-					if count >= 5 then fire("MergeFactory", tier - 1, true) end
+					if count >= 5 then fire("MergeFactory", tier, true) end
 				end
 			end
 		end
