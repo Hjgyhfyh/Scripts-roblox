@@ -43,7 +43,7 @@ local function getCircleIds()
 end
 
 task.spawn(function()
-    while state.running do
+    while alive() do
         if state.circles then
             local ids = getCircleIds()
             if ids and #ids > 0 then
@@ -55,7 +55,7 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    while state.running do
+    while alive() do
         if state.diamonds and typeof(firetouchinterest) == "function" then
             local char = lp.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -354,7 +354,7 @@ stat.Text = "Собрано: 0 кружков · 0 алмазов"
 stat.Parent = body
 
 task.spawn(function()
-    while state.running do
+    while alive() do
         local c = (data["NumberValues.Collects"] or 0) - startCircles
         local d = (data["NumberValues.DiamondsCollected"] or 0) - startDiamonds
         stat.Text = string.format("Собрано: %d кружков · %d алмазов", math.max(c, 0), math.max(d, 0))
