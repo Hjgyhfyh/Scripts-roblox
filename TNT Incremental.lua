@@ -845,6 +845,124 @@ loop(0.4, function()
 	)
 end)
 
+local raceBar = Instance.new("Frame")
+raceBar.AnchorPoint = Vector2.new(0.5, 0)
+raceBar.Position = UDim2.new(0.5, 0, 0, 8)
+raceBar.Size = UDim2.fromOffset(460, 48)
+raceBar.BackgroundColor3 = palette.bg
+raceBar.BorderSizePixel = 0
+raceBar.Active = true
+raceBar.Parent = gui
+corner(raceBar, 10)
+stroke(raceBar, palette.stroke, 1.2)
+
+local raceTitle = Instance.new("TextLabel")
+raceTitle.BackgroundTransparency = 1
+raceTitle.Position = UDim2.fromOffset(14, 5)
+raceTitle.Size = UDim2.new(1, -28, 0, 14)
+raceTitle.Font = Enum.Font.GothamBold
+raceTitle.TextSize = 11
+raceTitle.TextColor3 = palette.text
+raceTitle.TextXAlignment = Enum.TextXAlignment.Left
+raceTitle.Text = "TOP-100 CASH RACE"
+raceTitle.Parent = raceBar
+
+local racePct = Instance.new("TextLabel")
+racePct.BackgroundTransparency = 1
+racePct.Position = UDim2.fromOffset(14, 5)
+racePct.Size = UDim2.new(1, -28, 0, 14)
+racePct.Font = Enum.Font.GothamBold
+racePct.TextSize = 11
+racePct.TextColor3 = palette.on
+racePct.TextXAlignment = Enum.TextXAlignment.Right
+racePct.Text = "--"
+racePct.Parent = raceBar
+
+local raceTrack = Instance.new("Frame")
+raceTrack.Position = UDim2.fromOffset(14, 23)
+raceTrack.Size = UDim2.new(1, -28, 0, 9)
+raceTrack.BackgroundColor3 = palette.off
+raceTrack.BorderSizePixel = 0
+raceTrack.Parent = raceBar
+corner(raceTrack, 4)
+
+local raceFill = Instance.new("Frame")
+raceFill.Size = UDim2.new(0, 0, 1, 0)
+raceFill.BackgroundColor3 = palette.on
+raceFill.BorderSizePixel = 0
+raceFill.Parent = raceTrack
+corner(raceFill, 4)
+local fillGrad = Instance.new("UIGradient")
+fillGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 99, 255)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(99, 102, 241)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(56, 189, 248)),
+})
+fillGrad.Parent = raceFill
+
+local raceInfo = Instance.new("TextLabel")
+raceInfo.BackgroundTransparency = 1
+raceInfo.Position = UDim2.fromOffset(14, 34)
+raceInfo.Size = UDim2.new(1, -28, 0, 12)
+raceInfo.Font = Enum.Font.Gotham
+raceInfo.TextSize = 10
+raceInfo.TextColor3 = palette.dim
+raceInfo.TextXAlignment = Enum.TextXAlignment.Left
+raceInfo.Text = "reading leaderboard..."
+raceInfo.Parent = raceBar
+
+local function orderOf(buf)
+	local ok, s = pcall(G.toScientific, buf)
+	if not ok or type(s) ~= "string" then return 0 end
+	local e = s:match("[eE]([%+%-]?%d+)")
+	if e then return tonumber(e) or 0 end
+	local n = tonumber(s)
+	return (n and n > 0) and math.log10(n) or 0
+end
+
+local function top100Threshold()
+	local lb = workspace:FindFirstChild("Leaderboards")
+	local board = lb and lb:FindFirstChild("CashLeadeboard")
+	if not board then return nil end
+	local minVal, minStr
+	for _, d in ipairs(board:GetDescendants()) do
+		if d:IsA("TextLabel") then
+			local t = d.Text
+			if t and #t >= 2 and t:sub(1, 1):match("%d") and t:sub(-1):match("%a") then
+				local ok, val = pcall(G.fromSuffix, t)
+				if ok and val and not G.isZero(val) then
+					if not minVal or G.lt(val, minVal) then minVal, minStr = val, t end
+				end
+			end
+		end
+	end
+	return minVal, minStr
+end
+
+local peakOrder = 0
+loop(2, function()
+	local co = orderOf(P.Cash)
+	if co > peakOrder then peakOrder = co end
+	local thr, thrStr = top100Threshold()
+	if not thr then
+		raceInfo.Text = "leaderboard loading..."
+		racePct.Text = "--"
+		return
+	end
+	local to = orderOf(thr)
+	local useOrder = math.max(co, peakOrder)
+	local prog = (to > 0) and math.clamp(useOrder / to, 0, 1) or 0
+	TweenService:Create(raceFill, TweenInfo.new(0.4), { Size = UDim2.new(prog, 0, 1, 0) }):Play()
+	racePct.Text = string.format("%.1f%%", prog * 100)
+	if useOrder >= to then
+		raceInfo.Text = "IN TOP-100!   peak x10^" .. string.format("%.0f", useOrder) .. "   |   #100 = " .. (thrStr or "?")
+		racePct.TextColor3 = palette.good
+	else
+		raceInfo.Text = "you " .. fmt(P.Cash) .. "   |   #100 " .. (thrStr or "?") .. "   |   need x10^" .. string.format("%.0f", to - useOrder) .. " more"
+		racePct.TextColor3 = palette.on
+	end
+end)
+
 local function unload()
 	running = false
 	for _, c in ipairs(conns) do
