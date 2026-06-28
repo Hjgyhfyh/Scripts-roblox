@@ -76,6 +76,7 @@ local Config = {
 	AutoTycoonReset = false,
 	noobs = {},
 	cats = {},
+	upgrades = {},
 	conv = {},
 	exped = {},
 	equip = {},
