@@ -34,6 +34,7 @@ local UpgradeTreesContainer = Modules:FindFirstChild("UpgradeTrees")
 local FrameworkClient = safeRequire(ReplicatedStorage:FindFirstChild("Framework") and ReplicatedStorage.Framework:FindFirstChild("Client"))
 local TycoonMod = safeRequire(Modules:FindFirstChild("Tycoon"))
 local ConvertsMod = safeRequire(Modules:FindFirstChild("Converts"))
+local FactoriesMod = safeRequire(Modules:FindFirstChild("Factories"))
 
 local NOOB_NAMES = {
 	"Starter", "Archer", "Cooker", "Farmer", "Soldier", "Fisherman",
@@ -57,7 +58,7 @@ local Config = {
 	UITree = true,
 	LabTree = false,
 	FloorTrees = true,
-	MergeFactories = false,
+	AutoFactory = true,
 	Expeditions = false,
 	RuneFarm = false,
 	NoobBuy = false,
