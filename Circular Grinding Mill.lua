@@ -392,3 +392,5 @@ end
 SESSION.unload = unload
 _G.__CGM_UNLOAD = unload
 closeBtn.MouseButton1Click:Connect(unload)
+
+end)
