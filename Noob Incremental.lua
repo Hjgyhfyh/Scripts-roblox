@@ -1527,6 +1527,93 @@ do
 	end))
 end
 
+local worldTablets = {}
+local function makeWorldToggle(adornee, labelText, getOn, toggle)
+	if not adornee then return end
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "NIWorldTablet"
+	bb.Adornee = adornee
+	bb.Size = UDim2.fromOffset(168, 50)
+	bb.StudsOffset = Vector3.new(0, 6, 0)
+	bb.MaxDistance = 160
+	bb.LightInfluence = 0
+	bb.ClipsDescendants = false
+	bb.Parent = screenGui
+
+	local card = Instance.new("TextButton")
+	card.Size = UDim2.fromScale(1, 1)
+	card.BackgroundColor3 = THEME.panel
+	card.BackgroundTransparency = 0.05
+	card.Text = ""
+	card.AutoButtonColor = false
+	card.Parent = bb
+	corner(card, 10)
+	local sk = stroke(card, THEME.line, 2, 0)
+
+	local accent = Instance.new("Frame")
+	accent.Size = UDim2.new(1, -8, 0, 3)
+	accent.Position = UDim2.fromOffset(4, 4)
+	accent.BorderSizePixel = 0
+	accent.BackgroundColor3 = THEME.violet
+	accent.Parent = card
+	corner(accent, 2)
+	gradient(accent, THEME.violet, THEME.cyan, 0)
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Position = UDim2.fromOffset(10, 8)
+	title.Size = UDim2.new(1, -20, 0, 18)
+	title.Font = Enum.Font.GothamBold
+	title.Text = labelText
+	title.TextColor3 = THEME.text
+	title.TextSize = 13
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Parent = card
+
+	local st = Instance.new("TextLabel")
+	st.BackgroundTransparency = 1
+	st.Position = UDim2.fromOffset(10, 28)
+	st.Size = UDim2.new(1, -20, 0, 16)
+	st.Font = Enum.Font.GothamBold
+	st.TextSize = 12
+	st.TextXAlignment = Enum.TextXAlignment.Left
+	st.Parent = card
+
+	local function refresh()
+		local on = getOn()
+		st.Text = on and "AUTO  ВКЛ" or "AUTO  ВЫКЛ"
+		st.TextColor3 = on and THEME.on or THEME.faint
+		sk.Color = on and THEME.on or THEME.line
+	end
+	refresh()
+	track(card.MouseButton1Click:Connect(function()
+		toggle()
+		refresh()
+		saveConfig()
+	end))
+	table.insert(worldTablets, bb)
+end
+
+spawnLoop(function()
+	task.wait(1.5)
+	local gc = workspace:FindFirstChild("__GAME_CONTENT")
+	local ups = gc and gc:FindFirstChild("Upgrades")
+	if ups then
+		for _, board in ipairs(ups:GetChildren()) do
+			if not running then break end
+			local cat = board.Name
+			if Config.cats[cat] ~= nil then
+				local part = board:FindFirstChildWhichIsA("BasePart", true)
+				makeWorldToggle(part, "Oof: " .. cat, function()
+					return Config.cats[cat] ~= false
+				end, function()
+					Config.cats[cat] = not (Config.cats[cat] ~= false)
+				end)
+			end
+		end
+	end
+end)
+
 local function unload()
 	if not running then return end
 	running = false
