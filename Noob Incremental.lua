@@ -1645,6 +1645,10 @@ local function unload()
 		pcall(task.cancel, t)
 	end
 	table.clear(threads)
+	for _, c in worldClones do
+		pcall(function() c:Destroy() end)
+	end
+	table.clear(worldClones)
 	if screenGui then
 		pcall(function() screenGui:Destroy() end)
 	end
