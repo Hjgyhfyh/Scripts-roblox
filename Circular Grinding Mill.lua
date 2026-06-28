@@ -1,4 +1,6 @@
-if _G.__CGM_LOADED then pcall(_G.__CGM_UNLOAD) end
+if _G.__CGM and _G.__CGM.unload then pcall(_G.__CGM.unload) end
+local SESSION = {}
+_G.__CGM = SESSION
 _G.__CGM_LOADED = true
 
 local Players          = game:GetService("Players")
@@ -21,6 +23,9 @@ local state = {
     diamonds = true,
     rate     = 15,
 }
+SESSION.state = state
+
+local function alive() return state.running and _G.__CGM == SESSION end
 
 local conns = {}
 local function track(c) conns[#conns + 1] = c return c end
