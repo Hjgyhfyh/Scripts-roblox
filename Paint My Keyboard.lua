@@ -53,7 +53,7 @@ local TOP_K = 64
 local State = {
 	farm = false, priority = true, autoBuyPaint = true, autoUpgrade = true,
 	autoHire = true, park = false, autoRoll = false, autoRngUp = false,
-	paintRate = 66, stepRate = 330, rollRate = 90,
+	paintRate = 150, stepRate = 250, rollRate = 90,
 }
 _G.PMK = State
 
@@ -219,10 +219,20 @@ local function farmStep(dt)
 	if total > MAX_TOTAL_RATE then local k = MAX_TOTAL_RATE / total pr, sr, rr = pr * k, sr * k, rr * k end
 	local cd = nList * 6.3
 	if sr > cd then sr = cd end
+	local nAll = #sortedCaps
 	pAcc = pAcc + pr * dt
 	local pc = math.floor(pAcc)
 	if pc > 0 then pAcc = pAcc - pc
-		for _ = 1, pc do if paintIdx > nList then paintIdx = 1 end local cap = list[paintIdx] paintIdx = paintIdx % nList + 1 if cap and cap.Parent then pcall(R.Paint.FireServer, R.Paint, cap, bestPaint) end end
+		for _ = 1, pc do
+			local cap
+			if paintTick % 2 == 0 then
+				if paintIdx > nList then paintIdx = 1 end cap = list[paintIdx] paintIdx = paintIdx % nList + 1
+			else
+				if paintAllIdx > nAll then paintAllIdx = 1 end cap = sortedCaps[paintAllIdx] paintAllIdx = paintAllIdx % nAll + 1
+			end
+			paintTick = paintTick + 1
+			if cap and cap.Parent then pcall(R.Paint.FireServer, R.Paint, cap, bestPaint) end
+		end
 	end
 	sAcc = sAcc + sr * dt
 	local sc = math.floor(sAcc)
