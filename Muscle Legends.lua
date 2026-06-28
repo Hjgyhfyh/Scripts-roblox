@@ -375,6 +375,75 @@ local function applyMaxSize()
     log("Запрошен макс. размер/скорость")
 end
 
+local function perkSum(pet)
+    local pf = pet and pet:FindFirstChild("perksFolder")
+    local s = 0
+    if pf then
+        for _, v in ipairs(pf:GetChildren()) do
+            if v:IsA("IntValue") or v:IsA("NumberValue") then
+                s = s + v.Value
+            end
+        end
+    end
+    return s
+end
+
+local function petThreshold(pet)
+    local m = ReplicatedStorage:FindFirstChild("petExpMultipliers")
+    m = m and m:FindFirstChild(pet.Parent.Name)
+    return pet.level.Value * (m and m.Value or 0)
+end
+
+local StatStacker = { target = nil, lastPerk = nil, lastLevel = nil, stacks = 0 }
+function StatStacker.pick()
+    local pets = allPets()
+    if CONFIG.statStackerPet ~= "" then
+        for _, p in ipairs(pets) do
+            if p.Name:lower() == CONFIG.statStackerPet:lower() then return p end
+        end
+    end
+    table.sort(pets, function(a, b) return petValue(a) > petValue(b) end)
+    return pets[1]
+end
+function StatStacker.step()
+    if not CONFIG.statStacker then
+        StatStacker.target = nil
+        return
+    end
+    local pet = StatStacker.target
+    if not pet or not pet.Parent then
+        pet = StatStacker.pick()
+        StatStacker.target = pet
+        StatStacker.lastPerk = pet and perkSum(pet) or nil
+        StatStacker.lastLevel = pet and pet.level.Value or nil
+        return
+    end
+    if not isEquipped(pet) then
+        safeFire(R.equipPet, "equipPet", pet)
+    end
+    if not muscleEvent or muscleEvent.Parent ~= LocalPlayer then
+        muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
+    end
+    local curPerk = perkSum(pet)
+    if StatStacker.lastPerk and curPerk > StatStacker.lastPerk and pet.level.Value == (StatStacker.lastLevel or pet.level.Value) then
+        local d = curPerk - StatStacker.lastPerk
+        StatStacker.stacks = StatStacker.stacks + d
+        log(("STAT STACK +%d  %s perk=%d"):format(d, pet.Name, curPerk))
+    end
+    StatStacker.lastPerk = curPerk
+    StatStacker.lastLevel = pet.level.Value
+    local gap = petThreshold(pet) - pet.exp.Value
+    if muscleEvent and gap > 0 and gap <= 28 then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local w = findWeight()
+        if w and hum and w.Parent ~= char then
+            pcall(function() hum:EquipTool(w) end)
+        end
+        safeFire(muscleEvent, "rep")
+    end
+end
+
 local TradeDupe = {}
 function TradeDupe.run(partnerName, loopOffer)
     local partner = Players:FindFirstChild(partnerName)
