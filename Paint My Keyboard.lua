@@ -47,8 +47,8 @@ end
 
 local UPGRADE_PRIORITY = { "WorkerSpeed", "PaintTankSize", "RollerSize", "WalkSpeed" }
 local RNG_KEYS = { "RollLuck", "RollSpeed" }
-local MAX_TOTAL_RATE = 380
-local TOP_K = 60
+local MAX_TOTAL_RATE = 400
+local TOP_K = 64
 
 local State = {
 	farm = false, priority = true, autoBuyPaint = true, autoUpgrade = true,
