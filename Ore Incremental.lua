@@ -647,7 +647,13 @@ local PAL = {
 	line="2B2B3D", text="F4F5F7", sub="A9ADBE", dim="6B6E80",
 	on="2BD17E", bad="F2555A", gold="FFD166", cyan="56C0FF", violet="8B6CFF", indigo="6E7BFF",
 }
-local function C(hex) return Color3.fromHex(hex) end
+local function C(hex)
+	hex = tostring(hex):gsub("#","")
+	return Color3.fromRGB(
+		tonumber(hex:sub(1,2),16) or 255,
+		tonumber(hex:sub(3,4),16) or 255,
+		tonumber(hex:sub(5,6),16) or 255)
+end
 
 local TI_FAST  = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local TI_PILL  = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
