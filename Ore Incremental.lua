@@ -684,25 +684,34 @@ local function brandStroke(p, t)
 	return s
 end
 
--- ScreenGui (hide from common detectors where possible)
-local gui = mk("ScreenGui", {Name="OreSuite_"..tostring(math.random(1000,9999)),
-	ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true})
-pcall(function() gui.DisplayOrder = 9999 end)
+-- Host the GUI OUTSIDE PlayerGui: the game runs a UI scale-converter over PlayerGui that
+-- rewrites every child's offset size into scale, which wrecks the layout. CoreGui-space is safe.
+local gui
 do
-	local target
+	local host
 	if gethui then
 		local ok, h = pcall(gethui)
-		if ok and typeof(h) == "Instance" and not h:IsA("LayerCollector") then
-			target = h
-		end
+		if ok and typeof(h) == "Instance" then host = h end
 	end
-	if not target then
-		local ok = pcall(function()
-			local probe = Instance.new("Folder"); probe.Parent = CoreGui; probe:Destroy()
-		end)
-		if ok then target = CoreGui end
+	if not host then
+		local ok = pcall(function() local f = Instance.new("Folder"); f.Parent = CoreGui; f:Destroy() end)
+		if ok then host = CoreGui end
 	end
-	gui.Parent = target or LocalPlayer:WaitForChild("PlayerGui")
+	local nm = "OreSuite_"..tostring(math.random(1000,9999))
+	if host and host:IsA("LayerCollector") then
+		-- some executors' gethui IS a ScreenGui (RobloxGui); a nested ScreenGui won't render,
+		-- so use a full-screen Frame as the root instead
+		gui = Instance.new("Frame")
+		gui.Name = nm; gui.BackgroundTransparency = 1; gui.BorderSizePixel = 0
+		gui.Size = UDim2.fromScale(1, 1); gui.Position = UDim2.fromScale(0, 0)
+		gui.Parent = host
+	else
+		gui = Instance.new("ScreenGui")
+		gui.Name = nm; gui.ResetOnSpawn = false
+		gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; gui.IgnoreGuiInset = true
+		pcall(function() gui.DisplayOrder = 9999 end)
+		gui.Parent = host or LocalPlayer:WaitForChild("PlayerGui")
+	end
 end
 
 -- window shadow (sibling, behind window)
