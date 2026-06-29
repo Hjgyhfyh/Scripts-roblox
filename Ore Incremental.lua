@@ -1032,7 +1032,7 @@ do
 	toggleRow(p, "Auto Rank Up", "Spends Level for LevelCrystal income", "rank", 7)
 	-- danger highlight on sacrifice card
 	local dangerNote = mk("TextLabel", {BackgroundTransparency=1, Size=UDim2.new(1,0,0,30), LayoutOrder=8,
-		Text="⚠ Sacrifice resets the whole tycoon. Off by default.", TextColor3=C(PAL.gold),
+		Text="Sacrifice resets the whole tycoon — kept off by default.", TextColor3=C(PAL.gold),
 		Font=Enum.Font.Gotham, TextSize=11, TextWrapped=true, ZIndex=4}, p)
 end
 
