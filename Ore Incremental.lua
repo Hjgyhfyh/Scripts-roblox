@@ -1180,7 +1180,10 @@ function Suite.Unload()
 	saveConfig()
 	for _, c in ipairs(Connections) do pcall(function() c:Disconnect() end) end
 	table.clear(Connections)
-	task.delay(0.1, function() pcall(function() gui:Destroy() end) end)
+	task.delay(0.1, function()
+		pcall(function() gui:Destroy() end)
+		pcall(function() if guiHolder then guiHolder:Destroy() end end)
+	end)
 	ENV.__OreIncrementalSuite = nil
 end
 
