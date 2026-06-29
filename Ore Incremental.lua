@@ -675,15 +675,6 @@ local function gradient(p, c1, c2, rot)
 	return mk("UIGradient", {Color=ColorSequence.new(C(c1), C(c2)), Rotation=rot or 90}, p)
 end
 
-local function topSheen(parent)
-	local s = mk("Frame", {BackgroundColor3=C("FFFFFF"), BorderSizePixel=0,
-		Size=UDim2.new(1,0,1,0), ZIndex=parent.ZIndex+1}, parent)
-	corner(s, 8)
-	mk("UIGradient", {Rotation=90, Transparency=NumberSequence.new({
-		NumberSequenceKeypoint.new(0,0.88), NumberSequenceKeypoint.new(0.5,0.97), NumberSequenceKeypoint.new(1,1)})}, s)
-	return s
-end
-
 local function brandStroke(p, t)
 	local s = stroke(p, PAL.violet, t or 1.2)
 	mk("UIGradient", {Color=ColorSequence.new({
