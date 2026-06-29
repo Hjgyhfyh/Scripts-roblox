@@ -738,17 +738,26 @@ local subtitle = mk("TextLabel", {BackgroundTransparency=1, Position=UDim2.new(0
 	Size=UDim2.new(1,-150,0,14), Text="idle suite", TextColor3=C(PAL.dim),
 	Font=Enum.Font.Gotham, TextSize=11, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=4}, header)
 
-local function headerBtn(x, glyph, col)
+local function headerBtn(x, kind, col)
 	local b = mk("TextButton", {BackgroundColor3=C(PAL.card), BorderSizePixel=0, AutoButtonColor=false,
-		Size=UDim2.new(0,26,0,26), Position=UDim2.new(1,x,0,10), Text=glyph, TextColor3=C(col or PAL.sub),
-		Font=Enum.Font.GothamBold, TextSize=14, ZIndex=4}, header)
+		Size=UDim2.new(0,26,0,26), Position=UDim2.new(1,x,0,10), Text="", ZIndex=4}, header)
 	corner(b, 7); stroke(b, PAL.line, 1)
+	local ic = C(col or PAL.sub)
+	if kind == "close" then
+		for _, r in ipairs({45, -45}) do
+			mk("Frame", {BackgroundColor3=ic, BorderSizePixel=0, AnchorPoint=Vector2.new(0.5,0.5),
+				Position=UDim2.new(0.5,0,0.5,0), Size=UDim2.new(0,12,0,2), Rotation=r, ZIndex=5}, b)
+		end
+	else
+		mk("Frame", {BackgroundColor3=ic, BorderSizePixel=0, AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.new(0.5,0,0.5,0), Size=UDim2.new(0,12,0,2), ZIndex=5}, b)
+	end
 	track(b.MouseEnter:Connect(function() TweenService:Create(b,TI_FAST,{BackgroundColor3=C(PAL.raise)}):Play() end))
 	track(b.MouseLeave:Connect(function() TweenService:Create(b,TI_FAST,{BackgroundColor3=C(PAL.card)}):Play() end))
 	return b
 end
-local btnClose = headerBtn(-40, "✕", PAL.bad)
-local btnMin   = headerBtn(-72, "—", PAL.sub)
+local btnClose = headerBtn(-40, "close", PAL.bad)
+local btnMin   = headerBtn(-72, "min", PAL.sub)
 
 -- status strip with master toggle
 local strip = mk("Frame", {BackgroundColor3=C(PAL.well), BorderSizePixel=0,
