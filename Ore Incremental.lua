@@ -689,12 +689,20 @@ local gui = mk("ScreenGui", {Name="OreSuite_"..tostring(math.random(1000,9999)),
 	ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true})
 pcall(function() gui.DisplayOrder = 9999 end)
 do
-	local parented = false
-	if gethui then local ok = pcall(function() gui.Parent = gethui() end) parented = ok end
-	if not parented then
-		local ok = pcall(function() gui.Parent = CoreGui end)
-		if not ok then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+	local target
+	if gethui then
+		local ok, h = pcall(gethui)
+		if ok and typeof(h) == "Instance" and not h:IsA("LayerCollector") then
+			target = h
+		end
 	end
+	if not target then
+		local ok = pcall(function()
+			local probe = Instance.new("Folder"); probe.Parent = CoreGui; probe:Destroy()
+		end)
+		if ok then target = CoreGui end
+	end
+	gui.Parent = target or LocalPlayer:WaitForChild("PlayerGui")
 end
 
 -- window shadow (sibling, behind window)
