@@ -648,6 +648,7 @@ local function makeToggle(label, key, desc)
 	sw.MouseButton1Click:Connect(function()
 		S[key] = not S[key]
 		render()
+		saveConfig()
 	end)
 	return row
 end
@@ -729,6 +730,7 @@ local function makeRate()
 	local function set(v)
 		S.clickRate = math.clamp(v, 5, 200)
 		val.Text = tostring(S.clickRate)
+		saveConfig()
 	end
 	minus.MouseButton1Click:Connect(function() set(S.clickRate - 5) end)
 	plus.MouseButton1Click:Connect(function() set(S.clickRate + 5) end)
