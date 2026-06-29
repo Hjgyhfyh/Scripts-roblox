@@ -831,6 +831,7 @@ masterBtn.MouseButton1Click:Connect(function()
 	masterBtn.Text = S.master and "■  ПАУЗА" or "▶  ЗАПУСК"
 	masterBtn.TextColor3 = S.master and PAL.on or PAL.muted
 	Suite.setStatus(S.master and "Фарм активен" or "Фарм на паузе")
+	saveConfig()
 end)
 makeButton("Выгрузить (Unload)", PAL.danger, function()
 	if _G.__MAGICEVO_SUITE and _G.__MAGICEVO_SUITE.unload then _G.__MAGICEVO_SUITE.unload() end
