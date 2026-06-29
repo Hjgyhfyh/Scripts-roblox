@@ -87,7 +87,6 @@ local UpgradesConfig = req(ReplicatedStorage.Shared.Configs.UpgradesConfig)
 local ResetShared    = req(ReplicatedStorage.Shared.KnitShared.ResetLayerShared)
 local MultShared     = req(ReplicatedStorage.Shared.Client.Utils.MultiplierUtils.MultiplierShared)
 local MultRunes      = req(ReplicatedStorage.Shared.Client.Utils.MultiplierUtils.MultiplierRunes)
-local Abbreviate     = req(ReplicatedStorage.Shared.Packages.Abbrievate)
 
 ----------------------------------------------------------------------
 -- Character helpers
