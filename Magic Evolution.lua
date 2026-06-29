@@ -21,6 +21,10 @@ local LocalPlayer = Players.LocalPlayer
 local Remotes = ReplicatedStorage:WaitForChild("Remotes", 15)
 if not Remotes then return end
 
+local PLACE_MAIN = 116223724643557
+local PLACE_DUNGEON = 140070560575882
+local MODE = (game.PlaceId == PLACE_DUNGEON) and "dungeon" or "main"
+
 ----------------------------------------------------------------------
 -- Данные игры (сняты из конфигов)
 ----------------------------------------------------------------------
