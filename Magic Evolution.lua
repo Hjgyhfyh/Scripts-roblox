@@ -911,15 +911,24 @@ local function makeStatus()
 
 	spawnLoop(function()
 		while state.run do
-			local lvl = fmt(attr("Level", 0))
-			local reb = tostring(attr("Rebirths", 0))
-			local troph = fmt(getTrophies())
-			local wins = fmt(getWins())
-			local mp = fmt(attr("MagicPower", 0))
-			local wand = tostring(attr("EquippedWand", "—"))
-			stats.Text = string.format(
-				"<font color='#9a9ab8'>Уровень</font> %s   <font color='#9a9ab8'>Ребирс</font> %s/75\n<font color='#9a9ab8'>Трофеи</font> %s   <font color='#9a9ab8'>Wins</font> %s\n<font color='#9a9ab8'>Магия</font> %s   <font color='#9a9ab8'>Палочка</font> %s",
-				lvl, reb, troph, wins, mp, wand)
+			if MODE == "dungeon" then
+				local mp = fmt(attr("MagicPower", 0))
+				local coins = fmt(attr("DungeonCoins", 0))
+				local dead = attr("DungeonDead", false) == true
+				stats.Text = string.format(
+					"<font color='#9a9ab8'>Волна</font> %s   <font color='#9a9ab8'>Стейдж</font> %s\n<font color='#9a9ab8'>Магия</font> %s   <font color='#9a9ab8'>Монеты</font> %s\n<font color='#9a9ab8'>Статус</font> %s",
+					tostring(dgnWave.wave), tostring(dgnWave.stage), mp, coins, dead and "мёртв → лобби" or "бой")
+			else
+				local lvl = fmt(attr("Level", 0))
+				local reb = tostring(attr("Rebirths", 0))
+				local troph = fmt(getTrophies())
+				local wins = fmt(getWins())
+				local mp = fmt(attr("MagicPower", 0))
+				local wand = tostring(attr("EquippedWand", "—"))
+				stats.Text = string.format(
+					"<font color='#9a9ab8'>Уровень</font> %s   <font color='#9a9ab8'>Ребирс</font> %s/75\n<font color='#9a9ab8'>Трофеи</font> %s   <font color='#9a9ab8'>Wins</font> %s\n<font color='#9a9ab8'>Магия</font> %s   <font color='#9a9ab8'>Палочка</font> %s",
+					lvl, reb, troph, wins, mp, wand)
+			end
 			task.wait(0.5)
 		end
 	end)
