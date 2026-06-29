@@ -727,8 +727,10 @@ local logo = mk("Frame", {BackgroundColor3=C(PAL.violet), BorderSizePixel=0,
 	Size=UDim2.new(0,26,0,26), Position=UDim2.new(0,14,0,10), ZIndex=4}, header)
 corner(logo, 7)
 gradient(logo, PAL.violet, PAL.cyan, 35)
-mk("TextLabel", {BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), Text="⛏",
-	TextColor3=C("FFFFFF"), Font=Enum.Font.GothamBold, TextSize=15, ZIndex=5}, logo)
+local gem = mk("Frame", {BackgroundColor3=C("FFFFFF"), BackgroundTransparency=0.08, BorderSizePixel=0,
+	AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,0,0.5,0), Size=UDim2.new(0,11,0,11),
+	Rotation=45, ZIndex=5}, logo)
+mk("UICorner", {CornerRadius=UDim.new(0,2)}, gem)
 local title = mk("TextLabel", {BackgroundTransparency=1, Position=UDim2.new(0,50,0,7),
 	Size=UDim2.new(1,-150,0,18), Text="ORE INCREMENTAL", TextColor3=C(PAL.text),
 	Font=Enum.Font.GothamBold, TextSize=14, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=4}, header)
