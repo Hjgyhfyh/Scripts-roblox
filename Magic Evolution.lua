@@ -95,6 +95,7 @@ local state = { run = true }
 local conns = {}
 local threads = {}
 local busy = false -- идёт выдача гира
+local Suite = {}
 
 local S = {
 	master       = true,
