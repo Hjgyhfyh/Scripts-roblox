@@ -286,36 +286,32 @@ local function tryEgg()
 	end
 end
 
--- Выдача гира (фоновая операция)
+-- Выдача гира: каждый предмет одним вызовом (по одной штуке)
 local function giveGear(kind)
 	if busy then return end
 	busy = true
 	spawnLoop(function()
-		local rate = 18
+		local rate = 12
 		if kind == "runes" or kind == "all" then
-			for _, r in ipairs(GIVE_RUNES) do
-				for _ = 1, r.count do
-					if not state.run then busy=false; return end
-					fire("RunePickedUp", r.name)
-					task.wait(1 / rate)
-				end
+			for _, name in ipairs(GIVE_RUNES) do
+				if not state.run then busy=false; return end
+				fire("RunePickedUp", name)
+				task.wait(1 / rate)
 			end
 			if S.giveBoss then
-				for _, n in ipairs(BOSS_RUNES) do
+				for _, name in ipairs(BOSS_RUNES) do
 					if not state.run then busy=false; return end
-					fire("RunePickedUp", n)
+					fire("RunePickedUp", name)
 					task.wait(1 / rate)
 				end
 			end
 			fire("EquipBestRunes")
 		end
 		if kind == "armor" or kind == "all" then
-			for _, a in ipairs(GIVE_ARMOR) do
-				for _ = 1, a.count do
-					if not state.run then busy=false; return end
-					fire("ArmorPickedUp", a.name)
-					task.wait(1 / rate)
-				end
+			for _, name in ipairs(GIVE_ARMOR) do
+				if not state.run then busy=false; return end
+				fire("ArmorPickedUp", name)
+				task.wait(1 / rate)
 			end
 			fire("EquipBestArmor")
 		end
