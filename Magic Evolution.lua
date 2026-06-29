@@ -1057,6 +1057,12 @@ _G.__MAGICEVO_SUITE = { unload = unload, S = S }
 ----------------------------------------------------------------------
 
 setupAntiAfk()
-setupClaims()
-startLoops()
-Suite.setStatus("Фарм запущен ✓")
+if MODE == "dungeon" then
+	setupDungeon()
+	startDungeonLoops()
+	Suite.setStatus("Авто-данж запущен ✓")
+else
+	setupClaims()
+	startLoops()
+	Suite.setStatus("Фарм запущен ✓")
+end
