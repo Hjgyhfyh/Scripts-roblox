@@ -103,20 +103,12 @@ end
 ----------------------------------------------------------------------
 local function fmt(n)
 	n = tonumber(n) or 0
-	if Abbreviate then
-		local ok, s = pcall(function()
-			if type(Abbreviate) == "function" then return Abbreviate(n) end
-			if Abbreviate.abbreviate then return Abbreviate.abbreviate(n) end
-			if Abbreviate.Abbreviate then return Abbreviate.Abbreviate(n) end
-		end)
-		if ok and s then return tostring(s) end
-	end
 	local abs = math.abs(n)
-	local units = {"","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","Dc"}
+	local units = {"","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","Dc","UD","DD","TD"}
 	local i = 1
-	while abs >= 1000 and i < #units do abs = abs/1000; i = i+1 end
+	while abs >= 1000 and i < #units do abs = abs / 1000; i = i + 1 end
 	if i == 1 then return tostring(math.floor(n)) end
-	return string.format("%.2f%s", (n<0 and -abs or abs), units[i])
+	return string.format("%.2f%s", (n < 0 and -abs or abs), units[i])
 end
 
 ----------------------------------------------------------------------
