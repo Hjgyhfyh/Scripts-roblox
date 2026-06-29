@@ -71,18 +71,18 @@ local EGG_COST = {
 	["Astral Egg"]=6500000, ["Demonic Egg"]=200000000,
 }
 
--- Топ стат-руны для прогресса (Power = больше магии за клик; Health/Defense = выживание)
+-- Топ стат-руны для прогресса (Power = больше магии за клик; Health/Defense = выживание). По одной.
 local GIVE_RUNES = {
-	{name="Legendary Power Rune",   count=50},
-	{name="Legendary Health Rune",  count=30},
-	{name="Legendary Defense Rune", count=20},
+	"Legendary Power Rune",
+	"Legendary Health Rune",
+	"Legendary Defense Rune",
 }
 -- Босс-руны (боевые проки) — опционально, по 1 шт
 local BOSS_RUNES = {"Lunar Rune","Angelic Rune","Gladiator Gem","Molten Rune","Acid Rune","Demonic Rune"}
--- Топ броня (фишинг качества пачкой)
+-- Топ броня — по одному предмету на слот
 local GIVE_ARMOR = {
-	{name="Angelic Chestplate", count=45},
-	{name="Angelic Boots",      count=45},
+	"Angelic Chestplate",
+	"Angelic Boots",
 }
 
 local FREE_REWARDS_GROUP = 7955090
@@ -339,9 +339,8 @@ local function setupClaims()
 	local frr = Remotes:FindFirstChild("FreeRewardsResult")
 	if frr then
 		track(frr.OnClientEvent:Connect(function(success, reason)
-			if reason == "not_in_group" and Suite and Suite.setStatus then
-				Suite.setStatus("Free Rewards: вступи в группу " .. FREE_REWARDS_GROUP)
-				pcall(function() GroupService:PromptJoinAsync and GroupService:PromptJoinAsync(FREE_REWARDS_GROUP) end)
+			if reason == "not_in_group" then
+				Suite.setStatus("Free Rewards: вступи в группу " .. FREE_REWARDS_GROUP .. " вручную")
 			end
 		end))
 	end
@@ -446,8 +445,6 @@ local PAL = {
 	off     = Color3.fromRGB(64, 62, 84),
 	danger  = Color3.fromRGB(248, 113, 113),
 }
-
-local Suite = {}
 
 local function corner(p, r) local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 8); c.Parent = p; return c end
 local function stroke(p, col, th) local s = Instance.new("UIStroke"); s.Color = col or PAL.stroke; s.Thickness = th or 1; s.Parent = p; return s end
