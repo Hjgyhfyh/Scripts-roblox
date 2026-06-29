@@ -110,6 +110,27 @@ local S = {
 	giveBoss     = false,  -- добавлять босс-руны при выдаче рун
 }
 
+-- Сохранение настроек между сессиями
+local CONFIG_FILE = "MagicEvolution_config.json"
+
+local function saveConfig()
+	if typeof(writefile) ~= "function" then return end
+	pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(S)) end)
+end
+
+local function loadConfig()
+	if typeof(readfile) ~= "function" then return end
+	local ok, raw = pcall(readfile, CONFIG_FILE)
+	if not ok or type(raw) ~= "string" or raw == "" then return end
+	local ok2, data = pcall(function() return HttpService:JSONDecode(raw) end)
+	if not ok2 or type(data) ~= "table" then return end
+	for k, v in pairs(data) do
+		if S[k] ~= nil and type(v) == type(S[k]) then S[k] = v end
+	end
+end
+
+loadConfig()
+
 local function track(c) conns[#conns+1] = c; return c end
 local function spawnLoop(fn)
 	local t = task.spawn(fn)
