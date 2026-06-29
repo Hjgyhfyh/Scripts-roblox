@@ -684,34 +684,28 @@ local function brandStroke(p, t)
 	return s
 end
 
--- Host the GUI OUTSIDE PlayerGui: the game runs a UI scale-converter over PlayerGui that
--- rewrites every child's offset size into scale, which wrecks the layout. CoreGui-space is safe.
+-- The game hooks PlayerGui.ChildAdded and converts every directly-added ScreenGui's offset sizes
+-- into scale (UIScaleConverter), which wrecks the layout. Nesting our ScreenGui inside a Folder hides
+-- it from that hook while it still renders normally. (CoreGui / gethui don't render in this environment.)
+local guiHolder
 local gui
 do
-	local host
-	if gethui then
-		local ok, h = pcall(gethui)
-		if ok and typeof(h) == "Instance" then host = h end
+	local pg = LocalPlayer:WaitForChild("PlayerGui")
+	for _, c in ipairs(pg:GetChildren()) do
+		if tostring(c.Name):match("^OreHost") or tostring(c.Name):match("^OreSuite") then
+			pcall(function() c:Destroy() end)
+		end
 	end
-	if not host then
-		local ok = pcall(function() local f = Instance.new("Folder"); f.Parent = CoreGui; f:Destroy() end)
-		if ok then host = CoreGui end
-	end
-	local nm = "OreSuite_"..tostring(math.random(1000,9999))
-	if host and host:IsA("LayerCollector") then
-		-- some executors' gethui IS a ScreenGui (RobloxGui); a nested ScreenGui won't render,
-		-- so use a full-screen Frame as the root instead
-		gui = Instance.new("Frame")
-		gui.Name = nm; gui.BackgroundTransparency = 1; gui.BorderSizePixel = 0
-		gui.Size = UDim2.fromScale(1, 1); gui.Position = UDim2.fromScale(0, 0)
-		gui.Parent = host
-	else
-		gui = Instance.new("ScreenGui")
-		gui.Name = nm; gui.ResetOnSpawn = false
-		gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; gui.IgnoreGuiInset = true
-		pcall(function() gui.DisplayOrder = 9999 end)
-		gui.Parent = host or LocalPlayer:WaitForChild("PlayerGui")
-	end
+	guiHolder = Instance.new("Folder")
+	guiHolder.Name = "OreHost_"..tostring(math.random(1000,9999))
+	guiHolder.Parent = pg
+	gui = Instance.new("ScreenGui")
+	gui.Name = "OreSuite_"..tostring(math.random(1000,9999))
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.IgnoreGuiInset = true
+	pcall(function() gui.DisplayOrder = 9999 end)
+	gui.Parent = guiHolder
 end
 
 -- window shadow (sibling, behind window)
