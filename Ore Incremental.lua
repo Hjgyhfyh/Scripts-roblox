@@ -1147,9 +1147,16 @@ end
 local handle
 local function makeHandle()
 	handle = mk("TextButton", {BackgroundColor3=C(PAL.panel), BorderSizePixel=0, AutoButtonColor=false,
-		Size=UDim2.new(0,150,0,40), Position=shadowHolder.Position, Text="  ⛏  Ore Suite",
+		Size=UDim2.new(0,150,0,40), Position=shadowHolder.Position, Text="Ore Suite",
 		TextColor3=C(PAL.text), Font=Enum.Font.GothamBold, TextSize=13, Visible=minimized, ZIndex=3}, gui)
 	corner(handle, 10); brandStroke(handle, 1.2)
+	local hgemBox = mk("Frame", {BackgroundColor3=C(PAL.violet), BorderSizePixel=0,
+		Size=UDim2.new(0,22,0,22), Position=UDim2.new(0,12,0.5,-11), ZIndex=4}, handle)
+	corner(hgemBox, 6); gradient(hgemBox, PAL.violet, PAL.cyan, 35)
+	local hgem = mk("Frame", {BackgroundColor3=C("FFFFFF"), BackgroundTransparency=0.08, BorderSizePixel=0,
+		AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,0,0.5,0), Size=UDim2.new(0,9,0,9),
+		Rotation=45, ZIndex=5}, hgemBox)
+	mk("UICorner", {CornerRadius=UDim.new(0,2)}, hgem)
 	track(handle.MouseButton1Click:Connect(function()
 		minimized=false Config.minimized=false handle.Visible=false win.Visible=true queueSave()
 	end))
