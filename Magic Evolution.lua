@@ -826,7 +826,7 @@ local function makeRate(keyName, labelText, hintText, minV, maxV, step)
 	lbl.Position = UDim2.new(0, 12, 0, 6)
 	lbl.Size = UDim2.new(1, -24, 0, 16)
 	lbl.Font = Enum.Font.GothamMedium
-	lbl.Text = "Скорость клика (вызовов/сек)"
+	lbl.Text = labelText
 	lbl.TextSize = 12
 	lbl.TextColor3 = PAL.text
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -844,7 +844,7 @@ local function makeRate(keyName, labelText, hintText, minV, maxV, step)
 	val.Position = UDim2.new(0, 48, 0, 24)
 	val.Size = UDim2.new(0, 60, 0, 18)
 	val.Font = Enum.Font.GothamBold
-	val.Text = tostring(S.clickRate)
+	val.Text = tostring(S[keyName])
 	val.TextSize = 14
 	val.TextColor3 = PAL.cyan
 	val.TextXAlignment = Enum.TextXAlignment.Center
