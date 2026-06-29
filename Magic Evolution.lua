@@ -807,8 +807,12 @@ local function makeButton(label, col, cb)
 	return b
 end
 
--- Слайдер скорости клика (кнопки -/+)
-local function makeRate()
+-- Слайдер числовой настройки (кнопки -/+)
+local function makeRate(keyName, labelText, hintText, minV, maxV, step)
+	keyName = keyName or "clickRate"
+	labelText = labelText or "Скорость клика (вызовов/сек)"
+	hintText = hintText or "безопасно ≤ 60"
+	minV = minV or 5; maxV = maxV or 200; step = step or 5
 	local row = Instance.new("Frame")
 	row.LayoutOrder = nextOrder()
 	row.Size = UDim2.new(1, 0, 0, 46)
