@@ -455,6 +455,134 @@ local function startLoops()
 end
 
 ----------------------------------------------------------------------
+-- Данж (отдельный плейс): wave-survival
+----------------------------------------------------------------------
+
+-- Приоритет карт усиления по эффекту (StaffUpgrade/Power двигают урон сильнее всего)
+local CARD_PRIO = {
+	StaffUpgrade=100, Power=95, Projectile=88, ExtraPull=86, MaxStat=84,
+	Vampire=78, SecondChance=76, LastStand=72, CritHits=68, BossSlayer=60,
+	Bounce=58, GladiatorGuard=56, ArmorUpgrade=54, BossRune=50, DeathExplosion=46,
+	Stat=44, Luck=20, LuckyStrike=18, KillSpeed=16, RandomPet=10,
+}
+local RAR_RANK = { Common=0, Uncommon=1, Rare=2, Epic=3, Legendary=4 }
+
+local dgnCardCfg = nil
+local function getCardConfig()
+	if dgnCardCfg ~= nil then return dgnCardCfg or nil end
+	local C = ReplicatedStorage:FindFirstChild("Configs")
+	local m = C and C:FindFirstChild("DungeonCardConfig")
+	if m then
+		local ok, cfg = pcall(require, m)
+		if ok and type(cfg) == "table" then dgnCardCfg = cfg; return cfg end
+	end
+	dgnCardCfg = false
+	return nil
+end
+
+local dgnWave = { wave = 0, stage = 0 }
+
+local function dungeonAOE()
+	if attr("DungeonDead", false) == true then return end
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	local box = workspace:FindFirstChild("DungeonMobs")
+	if not box then return end
+	local dm = Remotes:FindFirstChild("DealMobDamage")
+	if not dm then return end
+	local dmg = math.max(1, math.floor(tonumber(attr("MagicPower", 1)) or 1))
+	for _, m in ipairs(box:GetChildren()) do
+		if m:IsA("Model") and (m:GetAttribute("DungeonMob") or m:GetAttribute("DungeonSummon")) then
+			local hum = m:FindFirstChildOfClass("Humanoid")
+			local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart
+			if hum and hum.Health > 0 and r and (r.Position - hrp.Position).Magnitude <= 80 then
+				pcall(function() dm:FireServer(m, dmg) end)
+			end
+		end
+	end
+end
+
+local function setupDungeon()
+	local dc = Remotes:FindFirstChild("DungeonCards")
+	if dc then
+		track(dc.OnClientEvent:Connect(function(tag, p)
+			if tag ~= "offer" or not p or not p.cards then return end
+			if not (S.master and S.dgnCards) or attr("DungeonDead", false) == true then return end
+			local cfg = getCardConfig()
+			local best, score = 1, -math.huge
+			for i, c in ipairs(p.cards) do
+				local eff = cfg and cfg.Cards and cfg.Cards[c.Id] and cfg.Cards[c.Id].Effect
+				local s = (eff and CARD_PRIO[eff]) or 40
+				s = s + (RAR_RANK[c.Rarity or "Common"] or 0) * 0.5
+				if s > score then score = s; best = i end
+			end
+			task.wait(0.25)
+			pcall(function() dc:FireServer("pick", p.round or 1, best) end)
+		end))
+	end
+
+	local dmod = Remotes:FindFirstChild("DungeonModifiers")
+	if dmod then
+		track(dmod.OnClientEvent:Connect(function(tag, p)
+			if tag ~= "offer" or not p or not p.options then return end
+			if not (S.master and S.dgnMods) or attr("DungeonDead", false) == true then return end
+			local SAFE = { ["Juggernauts"]=true, ["Boss Bastion"]=true, ["BossBastion"]=true, ["Swarm"]=true }
+			local best, bestCoins = nil, -1
+			for i, o in ipairs(p.options) do
+				if SAFE[o.Name] and (tonumber(o.Coins) or 0) > bestCoins then best = i; bestCoins = tonumber(o.Coins) or 0 end
+			end
+			if best then task.wait(0.3); pcall(function() dmod:FireServer("vote", best) end) end
+		end))
+	end
+
+	local ws = Remotes:FindFirstChild("WaveState")
+	if ws then
+		track(ws.OnClientEvent:Connect(function(info)
+			if type(info) == "table" then
+				dgnWave.wave = info.wave or dgnWave.wave
+				dgnWave.stage = info.stage or dgnWave.stage
+			end
+		end))
+	end
+
+	local dd = Remotes:FindFirstChild("DungeonDeath")
+	local function handleDeath()
+		if not (S.master and S.dgnReturn) then return end
+		if attr("DungeonDead", false) ~= true then return end
+		task.wait(2)
+		if dd then pcall(function() dd:FireServer("return") end) end
+	end
+	track(LocalPlayer:GetAttributeChangedSignal("DungeonDead"):Connect(handleDeath))
+	if dd then
+		track(dd.OnClientEvent:Connect(function(st)
+			if st == "died" and S.master and S.dgnReturn then
+				task.wait(2)
+				pcall(function() dd:FireServer("return") end)
+			end
+		end))
+	end
+end
+
+local function startDungeonLoops()
+	-- AOE-урон по всей волне
+	spawnLoop(function()
+		while state.run do
+			if S.master and S.dgnAOE then pcall(dungeonAOE) end
+			local rate = math.clamp(tonumber(S.dgnRate) or 6, 1, 30)
+			task.wait(1 / rate)
+		end
+	end)
+	-- Петы дают множитель к урону — держим лучших
+	spawnLoop(function()
+		while state.run do
+			if S.master then pcall(function() fire("EquipBestPets") end) end
+			task.wait(12)
+		end
+	end)
+end
+
+----------------------------------------------------------------------
 -- GUI
 ----------------------------------------------------------------------
 
