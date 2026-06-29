@@ -863,19 +863,19 @@ local function makeRate(keyName, labelText, hintText, minV, maxV, step)
 	hint.Position = UDim2.new(1, -12, 0, 24)
 	hint.Size = UDim2.new(0, 150, 0, 18)
 	hint.Font = Enum.Font.Gotham
-	hint.Text = "безопасно ≤ 60"
+	hint.Text = hintText
 	hint.TextSize = 10
 	hint.TextColor3 = PAL.muted
 	hint.TextXAlignment = Enum.TextXAlignment.Right
 	hint.Parent = row
 
 	local function set(v)
-		S.clickRate = math.clamp(v, 5, 200)
-		val.Text = tostring(S.clickRate)
+		S[keyName] = math.clamp(v, minV, maxV)
+		val.Text = tostring(S[keyName])
 		saveConfig()
 	end
-	minus.MouseButton1Click:Connect(function() set(S.clickRate - 5) end)
-	plus.MouseButton1Click:Connect(function() set(S.clickRate + 5) end)
+	minus.MouseButton1Click:Connect(function() set(S[keyName] - step) end)
+	plus.MouseButton1Click:Connect(function() set(S[keyName] + step) end)
 end
 
 -- Статус-панель
