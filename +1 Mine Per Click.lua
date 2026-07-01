@@ -44,11 +44,6 @@ local DEFAULTS = {
 
     totalBudget      = 350,   -- combined FireServer calls/sec (hard ceiling < 400)
     clickRate        = 250,   -- Click calls/sec
-    hitRate          = 60,    -- extra HitWall calls/sec on tanky layers (native swing does the rest)
-
-    H_max            = 400,   -- max hits to break a layer before a stage is "too deep"
-    breakTimeout     = 12,    -- s to wait for a stage's layers before giving up/advancing
-    collectHop       = 0.14,  -- s between ore-collection hops
     sellOnSurface    = true,  -- GotoSurface before SellAllLoot
 
     auraFraction     = 0.5,
