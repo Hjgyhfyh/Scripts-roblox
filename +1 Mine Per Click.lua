@@ -772,12 +772,12 @@ local function applySpend(a)
     elseif a.act == "backpack" then
         local s0 = Data.BackpackSize or 0
         fire(R.UpgradeSlot, "Cash")
-        if not waitUntil(function() return (Data.BackpackSize or 0) > s0 end, 1) then noteFail("backpack") else noteOk("backpack") end
+        waitUntil(function() return (Data.BackpackSize or 0) > s0 end, 1)   -- affordability pre-gated; retry later if it misses
 
     elseif a.act == "walkspeed" then
         local w0 = Data.ExtraWalkSpeed or 0
         fire(R.UpgradeWalkspeed, "Cash")
-        if not waitUntil(function() return (Data.ExtraWalkSpeed or 0) > w0 end, 1) then noteFail("walkspeed") else noteOk("walkspeed") end
+        waitUntil(function() return (Data.ExtraWalkSpeed or 0) > w0 end, 1)
     end
 end
 
@@ -966,7 +966,7 @@ if guiOk and Rayfield then
         Callback = function(v) CFG.buyWalkspeed = v; saveConfig() end })
     E:CreateSlider({ Name = "Aura buy fraction (of cash)", Range = {0, 100}, Increment = 5, Suffix = "%", CurrentValue = CFG.auraFraction * 100, Flag = "mpc_af",
         Callback = function(v) CFG.auraFraction = v / 100; saveConfig() end })
-    E:CreateInput({ Name = "Rebirth stop level (0=never)", CurrentValue = tostring(CFG.rebirthStopLevel), RemoveTextAfterFocusLost = false, Flag = "mpc_rsl",
+    E:CreateInput({ Name = "Max rebirths (0 = unlimited)", CurrentValue = tostring(CFG.rebirthStopLevel), RemoveTextAfterFocusLost = false, Flag = "mpc_rsl",
         Callback = function(t) CFG.rebirthStopLevel = tonumber(t) or 0; saveConfig() end })
     dash.nextbuy = E:CreateLabel("Next: -")
 
