@@ -621,53 +621,6 @@ local guiOk = pcall(function()
     L.calls    = T:CreateLabel("Calls/sec: -")
     L.phase    = T:CreateLabel("Phase: -")
     L.warn     = T:CreateLabel("Status: ok")
-end
-
--- throttled stats updater (5 Hz), decoupled from hot loops
-task.spawn(function()
-    local function set(lbl, txt) if lbl then pcall(function() lbl:Set(txt) end) end end
-    local function fmt(n) n = n or 0; if n >= 1e6 then return string.format("%.2fM", n / 1e6) elseif n >= 1e3 then return string.format("%.1fK", n / 1e3) end return string.format("%.0f", n) end
-    while not unloaded do
-        if guiOk then
-            set(L.strength, "Strength: " .. fmt(Data.Strength))
-            set(L.level,    "Level: " .. getLevel(Data.Strength or 0) .. "  (rebirth @ " .. rebirthGate(Data.Rebirths or 0) .. ")")
-            set(L.cash,     "Cash: " .. fmt(Data.Cash))
-            set(L.reb,      "Rebirths: " .. tostring(Data.Rebirths or 0))
-            set(L.pick,     "Pickaxe: " .. tostring(Data.EquippedPickaxeId or "-"))
-            set(L.aura,     "Aura: " .. tostring(Data.EquippedAuraId or "none"))
-            set(L.stage,    "Mining stage: " .. (status.stage > 0 and status.stage or "-") .. " / deepest " .. (CFG._deepestReached or 1))
-            set(L.pack,     "Backpack: " .. backpackCount() .. " / " .. backpackCap())
-            set(L.calls,    "Calls this sec: " .. windowCount .. " / " .. CFG.totalBudget)
-            set(L.phase,    "Phase: " .. status.phase)
-            set(L.warn,     "Status: " .. (status.warn == "" and "ok" or status.warn))
-        end
-        task.wait(0.2)
-    end
+    Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle features independently. Stats tab is last.", Duration = 5 })
 end)
-
-----------------------------------------------------------------------
--- unload
-----------------------------------------------------------------------
-local function unload()
-    if unloaded then return end
-    unloaded = true
-    pcall(saveConfig)
-    for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
-    conns = {}
-    local _, hrp = getChar()
-    if hrp then pcall(function() hrp.Anchored = false; hrp.AssemblyLinearVelocity = Vector3.zero end) end
-    if guiOk and Rayfield then pcall(function() Rayfield:Destroy() end) end
-    getgenv().MinePerClick = nil
-end
-getgenv().MinePerClick.unload = unload
-getgenv().MinePerClick.CFG = CFG
-
--- periodic save of learned state
-task.spawn(function() while not unloaded do task.wait(15); pcall(saveConfig) end end)
-
--- auto-restore: start every feature that was left on
-for _, name in ipairs({ "autoMine","autoRebirth","autoBuyPickaxe","autoBuyAura","autoBackpack","autoWalkspeed" }) do
-    if CFG[name] then startLoop(name) end
-end
-
-if guiOk and Rayfield then pcall(function() Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle features independently. Stats tab is last.", Duration = 5 }) end) end
+if not guiOk then status.warn = "GUI build failed — features still run (getgenv().MinePerClick.setFeature)" end
