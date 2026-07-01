@@ -236,27 +236,6 @@ local function backpackCap() return Data.BackpackSize or 3 end
 ----------------------------------------------------------------------
 -- MINING  (verified recipe: raycast floor, force zone flags, damage == Strength)
 ----------------------------------------------------------------------
-local function getStandCFrame(S)
-    local st = StagesList[S]; if not st or not st.Folder then return end
-    local hb = st.Folder:FindFirstChild("Hitbox") or st.Hitbox
-    local char, hrp, hum = getChar()
-    if not (hb and hrp and hum) then return end
-    local rp = RaycastParams.new()
-    rp.FilterType = Enum.RaycastFilterType.Exclude
-    rp.FilterDescendantsInstances = { char, hb }
-    local origin = Vector3.new(hb.Position.X, hb.Position.Y + 25, hb.Position.Z)
-    local rc = Workspace:Raycast(origin, Vector3.new(0, -70, 0), rp)
-    local floorY = rc and rc.Position.Y or (hb.Position.Y)
-    local standY = floorY + (hum.HipHeight or 2) + hrp.Size.Y / 2
-    local pos = Vector3.new(hb.Position.X, standY, hb.Position.Z)
-    return CFrame.new(pos, pos + Vector3.new(0, 0, 1))
-end
-
-local function nextWall(S)
-    if StageClient and StageClient.GetNextWall then local ok, w = pcall(function() return StageClient:GetNextWall(S) end); if ok then return w end end
-    return 1
-end
-
 local function ensurePickaxeTool()
     local c, _, hum = getChar()
     if not (c and hum) then return end
@@ -267,50 +246,41 @@ local function ensurePickaxeTool()
     if t then pcall(function() hum:EquipTool(t) end) end
 end
 
-local function forceMineState(S)
-    local _, hrp = getChar(); if not hrp then return false end
-    local cf = getStandCFrame(S); if cf then pcall(function() hrp.CFrame = cf end) end
-    pcall(function() hrp.Anchored = false; hrp.AssemblyLinearVelocity = Vector3.zero end)
-    ensurePickaxeTool()
-    task.wait(0.12)
-    pcall(function()
-        if StageClient then
-            StageClient.BrokenWalls = StageClient.BrokenWalls or {}
-            StageClient.BrokenWalls[S] = {}
-            StageClient.IsMining = true
-            StageClient.CurrentStageId = S
-            StageClient.CurrentWallId = nextWall(S) or 1
-        end
-    end)
-    return true
+-- Entering the mine: the server sets the Player attribute "IsInMine" (required for any HitWall to
+-- register) when the character touches Workspace.Map.Markers.MineHitbox; that touch also drops us
+-- at Stage 1. From there the game's own swing breaks the floor and we fall deeper on our own.
+local MineHitbox
+local function getMineHitbox()
+    if MineHitbox and MineHitbox.Parent then return MineHitbox end
+    local map = Workspace:FindFirstChild("Map")
+    local markers = map and map:FindFirstChild("Markers")
+    MineHitbox = markers and markers:FindFirstChild("MineHitbox")
+    return MineHitbox
 end
-
-local function stageHardHP(S)
-    local st = StagesList[S]; local m = 0
-    if st and st.Stages then for _, w in pairs(st.Stages) do if type(w) == "table" and w.MaxHealth and w.MaxHealth > m then m = w.MaxHealth end end end
-    return m
-end
-local function deepestFeasible()
-    local str = math.max(1, Data.Strength or 1); local best = 1
-    for s = 1, STAGE_N do if stageHardHP(s) <= str * CFG.H_max then best = s end end
-    return best
-end
-
--- walk through a stage's ore models to collect (server touch -> LootAdded)
-local function collectOre(S)
-    local st = StagesList[S]; if not st or not st.Folder then return end
+local function inMine() return LocalPlayer:GetAttribute("IsInMine") == true end
+local firetouch = firetouchinterest or (syn and syn.firetouchinterest)
+local function enterMine()
     local _, hrp = getChar(); if not hrp then return end
-    local root = st.Folder:FindFirstChild("Spawnpoints") or st.Folder
-    for _, m in ipairs(root:GetDescendants()) do
+    local mh = getMineHitbox(); if not mh then return end
+    if firetouch then pcall(function() firetouch(hrp, mh, 0); task.wait(); firetouch(hrp, mh, 1) end)
+    else pcall(function() hrp.CFrame = mh.CFrame end) end
+end
+
+-- Ore is collected via each item's ProximityPrompt ("Pickup?"). Fire the enabled ones near us.
+local fireprompt = fireproximityprompt or (syn and syn.fireproximityprompt)
+local function collectOrePrompts()
+    if not fireprompt then return end
+    local _, hrp = getChar(); if not hrp then return end
+    local S = StageClient and StageClient.CurrentStageId
+    local root = (S and StagesList[S] and StagesList[S].Folder) or nil
+    if not root then return end
+    for _, d in ipairs(root:GetDescendants()) do
         if not CFG.autoMine or unloaded then break end
-        if backpackCount() >= backpackCap() then break end
-        local isLoot = false
-        pcall(function() isLoot = CollectionService:HasTag(m, "Loot") end)
-        if isLoot and m:GetAttribute("IsTaken") ~= true then
-            local pos
-            if m:IsA("Model") then pos = (m.PrimaryPart and m.PrimaryPart.Position) or select(1, m:GetBoundingBox()).Position
-            elseif m:IsA("BasePart") then pos = m.Position end
-            if pos then pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0)) end); task.wait(CFG.collectHop) end
+        if d:IsA("ProximityPrompt") and d.Enabled then
+            local par = d.Parent; local pos
+            if par and par:IsA("BasePart") then pos = par.Position
+            elseif par and par:IsA("Model") then local ok, cf = pcall(function() return par:GetPivot() end); if ok then pos = cf.Position end end
+            if pos and (pos - hrp.Position).Magnitude < 45 then pcall(function() fireprompt(d, d.HoldDuration or 0) end) end
         end
     end
 end
