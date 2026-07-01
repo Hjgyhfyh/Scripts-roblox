@@ -777,6 +777,7 @@ end
 -- supervisor (control loop, ~0.6s) - one action per tick
 ----------------------------------------------------------------------
 task.spawn(function()
+    local ticks = 0
     while not unloaded do
         if active then
             local ok, err = pcall(function()
@@ -792,6 +793,8 @@ task.spawn(function()
             end)
             if not ok then warnText = "supervisor: " .. tostring(err) end
         end
+        ticks = ticks + 1
+        if ticks % 20 == 0 then pcall(saveConfig) end   -- persist learned dmgRatio / deepestReached
         task.wait(0.6)
     end
 end)
@@ -976,8 +979,6 @@ if guiOk and Rayfield then
 
     -- SETTINGS
     local G = Window:CreateTab("Settings", 4483362458)
-    G:CreateToggle({ Name = "Auto Rejoin on disconnect", CurrentValue = CFG.autoRejoin, Flag = "mpc_rejoin",
-        Callback = function(v) CFG.autoRejoin = v; saveConfig() end })
     G:CreateParagraph({ Title = "Overnight survival", Content = "For guaranteed survival across server restarts, place this file in your executor's autoexec folder — it re-runs on every join and auto-starts (enabled state is saved)." })
     G:CreateButton({ Name = "Reset to defaults", Callback = function()
         for k, v in pairs(DEFAULTS) do CFG[k] = v end; saveConfig() end })
