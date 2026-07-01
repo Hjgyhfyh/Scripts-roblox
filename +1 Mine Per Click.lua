@@ -63,10 +63,8 @@ local DEFAULTS = {
 local CFG = {}
 for k, v in pairs(DEFAULTS) do CFG[k] = v end
 
-local function deepMerge(dst, src)
-    for k, v in pairs(src) do
-        if type(v) == "table" and type(dst[k]) == "table" then deepMerge(dst[k], v) else dst[k] = v end
-    end
+local function mergeKnown(dst, src)   -- only accept keys that exist in DEFAULTS (drops stale/legacy config)
+    for k, v in pairs(src) do if DEFAULTS[k] ~= nil then dst[k] = v end end
 end
 local function saveConfig()
     if not writefileFn then return end
@@ -80,7 +78,7 @@ local function loadConfig()
     local ok, raw = pcall(readfileFn, CONFIG_FILE)
     if not ok or not raw then return end
     local ok2, data = pcall(HttpService.JSONDecode, HttpService, raw)
-    if ok2 and type(data) == "table" then deepMerge(CFG, data)
+    if ok2 and type(data) == "table" then mergeKnown(CFG, data)
     else pcall(function() if writefileFn then writefileFn(CONFIG_FILE .. ".bad", raw) end end); saveConfig() end
 end
 loadConfig()
