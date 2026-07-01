@@ -644,6 +644,15 @@ local function noteOk(key) failCount[key] = 0 end
 
 local function amult(id) return (id and AURA[id] and AURA[id].mult) or 1 end
 
+local function backpackCost(size)
+    if UpgradesHelper then local ok, c = pcall(function() return UpgradesHelper:GetBackpackUpgradeCost(size) end); if ok and type(c) == "number" then return c end end
+    if size == 3 then return 180000 end   -- known anchor
+end
+local function walkspeedCost(extra)
+    if UpgradesHelper then local ok, c = pcall(function() return UpgradesHelper:GetWalkspeedUpgradeCost(extra) end); if ok and type(c) == "number" then return c end end
+    if extra == 0 then return 10000 end   -- known anchor
+end
+
 local rebirthBuffer = 0
 local rebirthFails = 0
 
@@ -692,15 +701,15 @@ local function decideSpend()
         if aura then return { act = "buyAura", id = aura } end
     end
 
-    -- 5) backpack when abundant
-    if CFG.buyBackpack and (Data.BackpackSize or 3) < math.min(15, CFG.maxBackpack)
-       and not blacklist["backpack"] then
-        return { act = "backpack" }
+    -- 5) backpack when abundant (gated on real cost so it never thrashes)
+    if CFG.buyBackpack and (Data.BackpackSize or 3) < math.min(15, CFG.maxBackpack) then
+        local cost = backpackCost(Data.BackpackSize or 3)
+        if cost and Cash >= CFG.backpackAbundance * cost then return { act = "backpack" } end
     end
     -- 6) walkspeed (walk-mode only)
-    if CFG.buyWalkspeed and (Data.ExtraWalkSpeed or 0) < CFG.maxExtraWalkspeed
-       and not blacklist["walkspeed"] then
-        return { act = "walkspeed" }
+    if CFG.buyWalkspeed and (Data.ExtraWalkSpeed or 0) < CFG.maxExtraWalkspeed then
+        local cost = walkspeedCost(Data.ExtraWalkSpeed or 0)
+        if cost and Cash >= cost then return { act = "walkspeed" } end
     end
     return nil
 end
