@@ -599,6 +599,7 @@ local function doSell()
     -- surface round-trip
     local _, hrp = getChar()
     local back = hrp and hrp.CFrame
+    anchorHRP(false)                                -- unanchor so the teleport can move us
     fire(R.GotoSurface)
     task.wait(0.5)
     fire(R.SellAllLoot)
