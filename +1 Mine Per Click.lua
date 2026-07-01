@@ -48,7 +48,6 @@ local DEFAULTS = {
     buyBackpack      = true,
     buyWalkspeed     = false,
     claimGroupReward = true,
-    autoRejoin       = true,
     anchorWhileMining= true,
 
     totalBudget      = 350,   -- combined FireServer calls / sec (hard ceiling < 400)
@@ -826,18 +825,19 @@ end)
 conn(LocalPlayer.Idled, function()
     pcall(function()
         VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new(0, 0), Workspace.CurrentCamera and Workspace.CurrentCamera.CFrame or CFrame.new())
+        VirtualUser:ClickButton2(Vector2.new())
     end)
 end)
 
 ----------------------------------------------------------------------
--- teleport survival + auto rejoin
+-- teleport survival (re-run from file on in-experience server hops)
 ----------------------------------------------------------------------
 if queueTeleport then
     conn(LocalPlayer.OnTeleport, function(state)
         if state == Enum.TeleportState.Started and not unloaded then
+            local path = getgenv().MinePerClick_path or "+1 Mine Per Click.lua"
             pcall(function()
-                queueTeleport('if readfile and isfile and isfile("' .. CONFIG_FILE .. '") then end')
+                queueTeleport('local ok,src=pcall(function() return readfile("' .. path .. '") end); if ok and src then local f=loadstring(src); if f then f() end end')
             end)
         end
     end)
