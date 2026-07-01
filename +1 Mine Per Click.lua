@@ -457,8 +457,8 @@ end
 ----------------------------------------------------------------------
 conn(LocalPlayer.Idled, function() pcall(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end) end)
 conn(LocalPlayer.CharacterAdded, function(c)
-    c:WaitForChild("HumanoidRootPart", 10); task.wait(0.4)
-    if CFG.autoMine then mineStage = 1 end
+    c:WaitForChild("HumanoidRootPart", 10); task.wait(0.6)
+    ensurePickaxeTool()   -- respawn lands us at the surface; mineBody re-enters the mine on its own
 end)
 if queueTeleport then
     conn(LocalPlayer.OnTeleport, function(state)
@@ -528,52 +528,44 @@ local guiOk = pcall(function()
         tab:CreateToggle({ Name = text, CurrentValue = CFG[key], Flag = "mpc_" .. key, Callback = function(v) setFeature(key, v) end })
     end
 
-    -- MINING
-    local M = Window:CreateTab("⛏️ Mining", 4483362458)
-    tog(M, "Auto Click (grow Strength)", "autoClick")
-    tog(M, "Auto Mine (descend + collect + sell)", "autoMine")
-    M:CreateSlider({ Name = "Click rate (calls/sec)", Range = {5, 380}, Increment = 5, CurrentValue = CFG.clickRate, Flag = "mpc_cr", Callback = function(v) CFG.clickRate = v; saveConfig() end })
-    M:CreateSlider({ Name = "Extra HitWall rate", Range = {0, 200}, Increment = 5, CurrentValue = CFG.hitRate, Flag = "mpc_hr", Callback = function(v) CFG.hitRate = v; saveConfig() end })
-    M:CreateSlider({ Name = "Max hits/layer (depth cap)", Range = {50, 2000}, Increment = 50, CurrentValue = CFG.H_max, Flag = "mpc_hmax", Callback = function(v) CFG.H_max = v; saveConfig() end })
-
-    -- ECONOMY
-    local E = Window:CreateTab("💰 Economy", 4483362458)
-    tog(E, "Auto Rebirth", "autoRebirth")
-    tog(E, "Auto Buy Pickaxe", "autoBuyPickaxe")
-    tog(E, "Auto Buy Aura", "autoBuyAura")
-    tog(E, "Auto Upgrade Backpack", "autoBackpack")
-    tog(E, "Auto Upgrade Walkspeed", "autoWalkspeed")
-    E:CreateSlider({ Name = "Aura buy fraction of cash", Range = {0, 100}, Increment = 5, Suffix = "%", CurrentValue = CFG.auraFraction * 100, Flag = "mpc_af", Callback = function(v) CFG.auraFraction = v / 100; saveConfig() end })
-    E:CreateInput({ Name = "Max rebirths (0 = unlimited)", CurrentValue = tostring(CFG.maxRebirths), RemoveTextAfterFocusLost = false, Flag = "mpc_mr", Callback = function(t) CFG.maxRebirths = tonumber(t) or 0; saveConfig() end })
-
-    -- SELLING
-    local Se = Window:CreateTab("🧺 Selling", 4483362458)
-    Se:CreateToggle({ Name = "Sell on surface (GotoSurface first)", CurrentValue = CFG.sellOnSurface, Flag = "mpc_sos", Callback = function(v) CFG.sellOnSurface = v; saveConfig() end })
-    Se:CreateButton({ Name = "Sell now", Callback = function() getgenv().MinePerClick.sellNow() end })
-
-    -- BUDGET
-    local B = Window:CreateTab("📊 Budget", 4483362458)
-    B:CreateSlider({ Name = "Total budget (calls/sec, <400)", Range = {40, 395}, Increment = 5, CurrentValue = CFG.totalBudget, Flag = "mpc_tb", Callback = function(v) CFG.totalBudget = math.min(395, v); saveConfig() end })
-
-    -- SETTINGS
-    local G = Window:CreateTab("⚙️ Settings", 4483362458)
-    G:CreateParagraph({ Title = "Overnight survival", Content = "For survival across server restarts, place this file in your executor's autoexec folder — it re-runs on every join and restores your toggles." })
-    G:CreateButton({ Name = "Reset to defaults", Callback = function() for k, v in pairs(DEFAULTS) do CFG[k] = v end; saveConfig() end })
-    G:CreateButton({ Name = "UNLOAD", Callback = function() if getgenv().MinePerClick and getgenv().MinePerClick.unload then getgenv().MinePerClick.unload() end end })
-
-    -- STATS  (LAST tab, per request)
-    local T = Window:CreateTab("📈 Stats", 4483362458)
-    L.strength = T:CreateLabel("Strength: -")
-    L.level    = T:CreateLabel("Level: -")
-    L.cash     = T:CreateLabel("Cash: -")
-    L.reb      = T:CreateLabel("Rebirths: -")
-    L.pick     = T:CreateLabel("Pickaxe: -")
-    L.aura     = T:CreateLabel("Aura: -")
-    L.stage    = T:CreateLabel("Mining stage: -")
-    L.pack     = T:CreateLabel("Backpack: -")
-    L.calls    = T:CreateLabel("Calls/sec: -")
-    L.phase    = T:CreateLabel("Phase: -")
-    L.warn     = T:CreateLabel("Status: ok")
-    Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle features independently. Stats tab is last.", Duration = 5 })
+    pcall(function()   -- MINING
+        local M = Window:CreateTab("⛏️ Mining", 4483362458)
+        tog(M, "Auto Click (grow Strength)", "autoClick")
+        tog(M, "Auto Mine (descend + collect + sell)", "autoMine")
+        M:CreateSlider({ Name = "Click rate (calls/sec)", Range = {5, 380}, Increment = 5, CurrentValue = CFG.clickRate, Flag = "mpc_cr", Callback = function(v) CFG.clickRate = v; saveConfig() end })
+    end)
+    pcall(function()   -- ECONOMY
+        local E = Window:CreateTab("💰 Economy", 4483362458)
+        tog(E, "Auto Rebirth", "autoRebirth")
+        tog(E, "Auto Buy Pickaxe", "autoBuyPickaxe")
+        tog(E, "Auto Buy Aura", "autoBuyAura")
+        tog(E, "Auto Upgrade Backpack", "autoBackpack")
+        tog(E, "Auto Upgrade Walkspeed", "autoWalkspeed")
+        E:CreateSlider({ Name = "Aura buy fraction of cash", Range = {0, 100}, Increment = 5, Suffix = "%", CurrentValue = CFG.auraFraction * 100, Flag = "mpc_af", Callback = function(v) CFG.auraFraction = v / 100; saveConfig() end })
+        E:CreateSlider({ Name = "Max rebirths (0 = unlimited)", Range = {0, 50}, Increment = 1, CurrentValue = CFG.maxRebirths, Flag = "mpc_mr", Callback = function(v) CFG.maxRebirths = v; saveConfig() end })
+    end)
+    pcall(function()   -- SELLING
+        local Se = Window:CreateTab("🧺 Selling", 4483362458)
+        Se:CreateToggle({ Name = "Sell on surface (GotoSurface first)", CurrentValue = CFG.sellOnSurface, Flag = "mpc_sos", Callback = function(v) CFG.sellOnSurface = v; saveConfig() end })
+        Se:CreateButton({ Name = "Sell now", Callback = function() getgenv().MinePerClick.sellNow() end })
+    end)
+    pcall(function()   -- BUDGET
+        local B = Window:CreateTab("📊 Budget", 4483362458)
+        B:CreateSlider({ Name = "Total budget (calls/sec, <400)", Range = {40, 395}, Increment = 5, CurrentValue = CFG.totalBudget, Flag = "mpc_tb", Callback = function(v) CFG.totalBudget = math.min(395, v); saveConfig() end })
+    end)
+    pcall(function()   -- SETTINGS
+        local G = Window:CreateTab("⚙️ Settings", 4483362458)
+        G:CreateParagraph({ Title = "Overnight survival", Content = "For survival across server restarts, place this file in your executor's autoexec folder — it re-runs on every join and restores your toggles." })
+        G:CreateButton({ Name = "Reset to defaults", Callback = function() for k, v in pairs(DEFAULTS) do CFG[k] = v end; saveConfig() end })
+        G:CreateButton({ Name = "UNLOAD", Callback = function() if getgenv().MinePerClick and getgenv().MinePerClick.unload then getgenv().MinePerClick.unload() end end })
+    end)
+    pcall(function()   -- STATS (LAST tab, per request)
+        local T = Window:CreateTab("📈 Stats", 4483362458)
+        L.strength = T:CreateLabel("Strength: -"); L.level = T:CreateLabel("Level: -"); L.cash = T:CreateLabel("Cash: -")
+        L.reb = T:CreateLabel("Rebirths: -"); L.pick = T:CreateLabel("Pickaxe: -"); L.aura = T:CreateLabel("Aura: -")
+        L.stage = T:CreateLabel("Mining stage: -"); L.pack = T:CreateLabel("Backpack: -"); L.calls = T:CreateLabel("Calls/sec: -")
+        L.phase = T:CreateLabel("Phase: -"); L.warn = T:CreateLabel("Status: ok")
+    end)
+    pcall(function() Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle features independently. Stats tab is last.", Duration = 5 }) end)
 end)
 if not guiOk then status.warn = "GUI build failed — features still run (getgenv().MinePerClick.setFeature)" end
