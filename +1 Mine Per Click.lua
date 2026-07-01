@@ -331,43 +331,26 @@ conn(RunService.Heartbeat, function(dt)
     if clickAccum > CFG.clickRate then clickAccum = CFG.clickRate end
 end)
 
--- Auto Mine: descend one stage at a time, break layers, collect ore, sell when full
-local mineStage = 1
+-- Auto Mine: enter the mine, let the game's own swing break the floor and drop us deeper, collect
+-- ore via prompts, sell when full. No teleporting between stages, no manual HitWall (anticheat-safe).
 local function mineBody()
-    if selling then task.wait(0.3); return end
+    if selling then task.wait(0.4); return end
     local char, hrp, hum = getChar()
-    if not (hrp and hum and hum.Health > 0) then task.wait(0.5); return end
-
-    if mineStage < 1 then mineStage = 1 end
-    if mineStage > math.min(STAGE_N, deepestFeasible()) then mineStage = 1 end   -- restart descent from top
-    local S = mineStage
-    status.phase = "mining"; status.stage = S
-
-    forceMineState(S)
-    -- actively break each layer ourselves (damage == Strength); the native swing also runs from the forced flags
-    local t0 = os.clock()
-    while CFG.autoMine and not unloaded and nextWall(S) and os.clock() - t0 < CFG.breakTimeout do
-        ensurePickaxeTool()
-        if StageClient and StageClient.IsMining ~= true then forceMineState(S) end
-        local w = nextWall(S)
-        if w then
-            local n = math.min(math.max(1, math.floor(CFG.hitRate * 0.25)), budgetLeft())
-            for _ = 1, math.max(1, n) do fire(R.HitWall, S, w) end
-        end
-        task.wait(0.25)
+    if not (hrp and hum and hum.Health > 0) then task.wait(0.6); return end
+    ensurePickaxeTool()
+    if not inMine() then status.phase = "entering mine"; enterMine(); task.wait(0.8); return end
+    if StageClient and StageClient.CurrentStageId then
+        status.stage = StageClient.CurrentStageId
+        if StageClient.CurrentStageId > (CFG._deepestReached or 1) then CFG._deepestReached = StageClient.CurrentStageId end
+        if StageClient.IsMining ~= true then pcall(function() StageClient.IsMining = true end) end
     end
-
-    collectOre(S)
-    if S > (CFG._deepestReached or 1) then CFG._deepestReached = S end
-
+    status.phase = "mining"
+    collectOrePrompts()
     if backpackCount() >= backpackCap() then
-        sellTrip(); mineStage = 1                                  -- full -> sell, restart descent
-    elseif S < math.min(STAGE_N, deepestFeasible()) then
-        mineStage = S + 1                                          -- advance one stage (sequential)
-    else
-        if backpackCount() > 0 then sellTrip() end
-        mineStage = 1
+        sellTrip()
+        if CFG.autoMine and not inMine() then enterMine() end
     end
+    task.wait(0.5)
 end
 
 -- Auto Rebirth
