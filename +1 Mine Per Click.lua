@@ -15,12 +15,10 @@ local Players            = game:GetService("Players")
 local ReplicatedStorage  = game:GetService("ReplicatedStorage")
 local RunService         = game:GetService("RunService")
 local HttpService        = game:GetService("HttpService")
-local TeleportService    = game:GetService("TeleportService")
 local VirtualUser        = game:GetService("VirtualUser")
 local Workspace          = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local PLACE_ID    = 74193805629461
 
 ----------------------------------------------------------------------
 -- executor compat
@@ -177,6 +175,7 @@ end
 local DataClient = reqByName("DataClient")
 local PickaxeList = reqByName("PickaxeList") or {}
 local AurasList   = reqByName("AurasList")   or {}
+local UpgradesHelper = reqByName("UpgradesHelper")
 
 -- live replica (re-acquired if it ever swaps)
 local replica, Data
@@ -1040,4 +1039,4 @@ if CFG.enabled then
     task.spawn(function() task.wait(1); setEnabled(true) end)
 end
 
-if guiOk and Rayfield then pcall(function() Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. " .. (#PICK > 0 and "" or "") .. "Toggle ENABLE on the Dashboard.", Duration = 5 }) end) end
+if guiOk and Rayfield then pcall(function() Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle ENABLE on the Dashboard.", Duration = 5 }) end) end
