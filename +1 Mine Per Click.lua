@@ -348,13 +348,15 @@ local function stageLuck(s) local st = StagesList[s]; return (st and st.Luck) or
 local function resolveHitbox(s)
     if hitboxCache[s] then return hitboxCache[s] end
     local st = StagesList[s]; if not st then return end
-    local h = st.Hitbox or st.Folder
+    local h = st.Hitbox
+    if not h and st.Folder then h = st.Folder:FindFirstChild("Hitbox") end   -- hitbox lives under the stage Folder
     local part
     if typeof(h) == "Instance" then
         if h:IsA("BasePart") then part = h
         elseif h:IsA("Model") then part = h.PrimaryPart or h:FindFirstChildWhichIsA("BasePart")
         else part = h:FindFirstChildWhichIsA("BasePart", true) end
     end
+    if not part and st.Folder then part = st.Folder:FindFirstChildWhichIsA("BasePart", true) end
     hitboxCache[s] = part
     return part
 end
@@ -642,7 +644,6 @@ local function noteFail(key)
 end
 local function noteOk(key) failCount[key] = 0 end
 
-local function pstr(id) return (id and PICK[id] and PICK[id].str) or ((id and containerHas and 0) or 0) or 0 end
 local function amult(id) return (id and AURA[id] and AURA[id].mult) or 1 end
 
 local rebirthBuffer = 0
@@ -655,12 +656,10 @@ local function decideSpend()
 
     -- 1) rebirth (free) when eligible
     if CFG.autoRebirth then
-        local lvl = getLevel(Data.Strength)
-        local stop = CFG.rebirthStopLevel or 0
-        if (stop == 0 or lvl < stop + 999999) and lvl >= rebirthGate(Data.Rebirths or 0) + rebirthBuffer then
-            if not (stop > 0 and (Data.Rebirths or 0) >= 0 and lvl < stop) then
-                return { act = "rebirth" }
-            end
+        local maxReb = CFG.rebirthStopLevel or 0   -- interpreted as max rebirths (0 = unlimited)
+        if (maxReb == 0 or (Data.Rebirths or 0) < maxReb)
+           and getLevel(Data.Strength) >= rebirthGate(Data.Rebirths or 0) + rebirthBuffer then
+            return { act = "rebirth" }
         end
     end
 
@@ -805,15 +804,6 @@ do
         if active and CFG.autoSell and full() then task.spawn(function() pcall(requestSell) end) end
     end) end
 end
-
-----------------------------------------------------------------------
--- replica change listeners (discrete only; NOT strength/click-rate)
-----------------------------------------------------------------------
-pcall(function()
-    if replica and replica.ListenToChange then
-        conn({ Connect = function(_, f) return replica:ListenToChange({ "Rebirths" }, f) end }, function() end)
-    end
-end)
 
 ----------------------------------------------------------------------
 -- character recovery
