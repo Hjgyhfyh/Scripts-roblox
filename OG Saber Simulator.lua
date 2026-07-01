@@ -68,6 +68,8 @@ local Config = {
 	AutoJump = false,
 	AutoPetsCraft = true,
 	AutoPetsEquip = true,
+	AutoSell = false,       -- sell weakest pets beyond the keep-cap (irreversible; never sells equipped/locked)
+	SellKeep = 40,          -- how many strongest unequipped pets to keep
 	AutoHatch = true,
 	AutoDaily = true,
 	AutoReconnect = true,
@@ -515,6 +517,31 @@ spawnLoop("pets", 4, function()
 				pcall(function() PetRemote:FireServer("toggle", uid) end)
 				task.wait(0.15)
 			end
+		end
+	end
+
+	-- sell weakest surplus pets (irreversible) — never touches equipped or locked,
+	-- keeps the strongest SellKeep. Runs after craft so merged groups survive.
+	if Config.AutoSell and PetRemote and PetsCfg and d.Pets.Owned then
+		local typeMul = (GlobalCfg and GlobalCfg.PetTypeMultiply) or {Normal=1,Golden=1.5,Shiny=2,Rainbow=2.5,Void=3}
+		local equipped = d.Pets.Equipped or {}
+		local locked = d.Pets.Locked or {}
+		local sellable = {}
+		for uid, petId in pairs(d.Pets.Owned) do
+			if not equipped[uid] and not locked[uid] then
+				local base = PetsCfg[petId] and num(PetsCfg[petId].StrengthMultiplier) or 0
+				local variant = d.Pets.OwnedType and d.Pets.OwnedType[uid] or "Normal"
+				table.insert(sellable, { uid = uid, score = base * (typeMul[variant] or 1) })
+			end
+		end
+		table.sort(sellable, function(a, b) return a.score > b.score end)
+		local keep = math.max(0, num(Config.SellKeep))
+		local sold = 0
+		for i = keep + 1, #sellable do
+			if sold >= 12 then break end -- throttle so we never machine-gun the remote
+			pcall(function() PetRemote:FireServer("delete", sellable[i].uid) end)
+			sold = sold + 1
+			task.wait(0.12)
 		end
 	end
 
@@ -970,6 +997,7 @@ toggleRow("Двойной прыжок", "AutoJump")
 sectionHeader("Питомцы")
 toggleRow("Авто-мердж", "AutoPetsCraft")
 toggleRow("Авто-экип лучших", "AutoPetsEquip")
+toggleRow("Авто-продажа слабых", "AutoSell")
 toggleRow("Авто-вылупление", "AutoHatch")
 
 sectionHeader("Прочее")

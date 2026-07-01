@@ -641,7 +641,7 @@ local function maxEnergy()
 	return true
 end
 
-local W, H = 382, 486
+local W, H = 382, 430
 
 local P = {
 	bg = Color3.fromRGB(16, 17, 27),
@@ -916,7 +916,7 @@ wStroke.Parent = window
 gradient(Color3.fromRGB(24, 26, 44), P.bg, 90).Parent = window
 window.Parent = holder
 
-local header = new("Frame", { BackgroundTransparency = 1, Active = true, Size = UDim2.new(1, 0, 0, 58), ZIndex = 2 })
+local header = new("Frame", { BackgroundTransparency = 1, Active = true, Size = UDim2.new(1, 0, 0, 50), ZIndex = 2 })
 header.Parent = window
 
 local titleLbl = new("TextLabel", {
@@ -936,7 +936,7 @@ titleLbl.Parent = header
 
 local subLbl = new("TextLabel", {
 	BackgroundTransparency = 1,
-	Position = UDim2.new(0, 16, 0, 32),
+	Position = UDim2.new(0, 16, 0, 30),
 	Size = UDim2.new(0, 200, 0, 14),
 	Font = Enum.Font.GothamMedium,
 	TextSize = 11,
@@ -952,7 +952,7 @@ local divider = new("Frame", {
 	BackgroundColor3 = P.stroke,
 	BackgroundTransparency = 0.5,
 	BorderSizePixel = 0,
-	Position = UDim2.new(0, 14, 0, 57),
+	Position = UDim2.new(0, 14, 0, 50),
 	Size = UDim2.new(1, -28, 0, 1),
 	ZIndex = 2,
 })
@@ -1104,8 +1104,8 @@ end
 local tabbar = new("Frame", {
 	BackgroundColor3 = P.card,
 	BorderSizePixel = 0,
-	Position = UDim2.new(0, 12, 0, 66),
-	Size = UDim2.new(1, -24, 0, 40),
+	Position = UDim2.new(0, 12, 0, 56),
+	Size = UDim2.new(1, -24, 0, 36),
 	ZIndex = 2,
 })
 corner(12).Parent = tabbar
@@ -1153,8 +1153,8 @@ end
 content = new("Frame", {
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
-	Position = UDim2.new(0, 0, 0, 114),
-	Size = UDim2.new(1, 0, 1, -174),
+	Position = UDim2.new(0, 0, 0, 100),
+	Size = UDim2.new(1, 0, 1, -152),
 	ClipsDescendants = true,
 	ZIndex = 2,
 })
@@ -1175,9 +1175,9 @@ for i = 1, 4 do
 		Visible = (i == 1),
 		ZIndex = 2,
 	})
-	local lay = new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center })
+	local lay = new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center })
 	lay.Parent = pg
-	pad(pg, 12, 14, 12, 12)
+	pad(pg, 10, 10, 12, 12)
 	track(lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		pg.CanvasSize = UDim2.new(0, 0, 0, lay.AbsoluteContentSize.Y + 22)
 	end))
@@ -1188,8 +1188,8 @@ end
 local statusCard = new("Frame", {
 	BackgroundColor3 = P.card,
 	BorderSizePixel = 0,
-	Position = UDim2.new(0, 12, 1, -50),
-	Size = UDim2.new(1, -24, 0, 42),
+	Position = UDim2.new(0, 12, 1, -44),
+	Size = UDim2.new(1, -24, 0, 36),
 	ZIndex = 2,
 })
 corner(11).Parent = statusCard
@@ -1277,7 +1277,7 @@ local function makeButton(parent, key, primary, onClick, sizeOverride)
 		AutoButtonColor = false,
 		BackgroundColor3 = primary and P.acc or P.card2,
 		BorderSizePixel = 0,
-		Size = sizeOverride or UDim2.new(1, 0, 0, 38),
+		Size = sizeOverride or UDim2.new(1, 0, 0, 34),
 		Text = "",
 		ClipsDescendants = true,
 	})
@@ -1321,7 +1321,7 @@ local function makeButton(parent, key, primary, onClick, sizeOverride)
 end
 
 local function makeInput(parent, labelKey, default, placeholderKey)
-	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 56) })
+	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 52) })
 	local lbl = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 2, 0, 0),
@@ -1337,8 +1337,8 @@ local function makeInput(parent, labelKey, default, placeholderKey)
 	local box = new("TextBox", {
 		BackgroundColor3 = P.card2,
 		BorderSizePixel = 0,
-		Position = UDim2.new(0, 0, 0, 20),
-		Size = UDim2.new(1, 0, 0, 36),
+		Position = UDim2.new(0, 0, 0, 18),
+		Size = UDim2.new(1, 0, 0, 34),
 		Font = Enum.Font.GothamSemibold,
 		TextSize = 15,
 		TextColor3 = P.txt,
@@ -1356,7 +1356,7 @@ local function makeInput(parent, labelKey, default, placeholderKey)
 	box.Parent = wrap
 	if placeholderKey then register(box, "PlaceholderText", placeholderKey) end
 	track(box:GetPropertyChangedSignal("Text"):Connect(function()
-		if #box.Text > 18 then box.Text = string.sub(box.Text, 1, 18) end
+		if #box.Text > 64 then box.Text = string.sub(box.Text, 1, 64) end
 	end))
 	track(box.Focused:Connect(function() tw(strk, T.fast, { Transparency = 0, Color = P.acc }) end))
 	track(box.FocusLost:Connect(function() tw(strk, T.fast, { Transparency = 0.5, Color = P.stroke }) end))
@@ -1366,7 +1366,7 @@ local function makeInput(parent, labelKey, default, placeholderKey)
 end
 
 local function makeToggle(parent, labelKey, onSet)
-	local row = new("TextButton", { BackgroundTransparency = 1, AutoButtonColor = false, Text = "", Size = UDim2.new(1, 0, 0, 34) })
+	local row = new("TextButton", { BackgroundTransparency = 1, AutoButtonColor = false, Text = "", Size = UDim2.new(1, 0, 0, 32) })
 	local lbl = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 2, 0, 0),
@@ -1518,7 +1518,7 @@ local function chevron(parent, left)
 end
 
 local function makeStepper(parent, labelKey, minV, maxV, default)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34) })
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 32) })
 	local lbl = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 2, 0, 0),
@@ -1566,7 +1566,7 @@ local function makeStepper(parent, labelKey, minV, maxV, default)
 end
 
 local function makeSelector(parent, captionKey, getCount, getLabel, emptyKey)
-	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50) })
+	local wrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48) })
 	local cap = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 2, 0, 0),
@@ -1650,13 +1650,13 @@ local function makeCard(parent, titleKey)
 	corner(14).Parent = card
 	stroke(P.stroke, 1, 0.5).Parent = card
 	gradient(Color3.fromRGB(30, 32, 50), P.card, 90).Parent = card
-	pad(card, 12, 12, 12, 12)
-	local list = new("UIListLayout", { Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder })
+	pad(card, 10, 10, 12, 12)
+	local list = new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder })
 	list.Parent = card
 	card.LayoutOrder = nextOrder(parent)
 	card.Parent = parent
 	track(list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		card.Size = UDim2.new(1, 0, 0, list.AbsoluteContentSize.Y + 24)
+		card.Size = UDim2.new(1, 0, 0, list.AbsoluteContentSize.Y + 20)
 	end))
 	if titleKey then
 		local t = new("TextLabel", {
@@ -1677,7 +1677,7 @@ local function makeCard(parent, titleKey)
 end
 
 local function makeRow(parent, h)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, h or 38) })
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, h or 34) })
 	local l = new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		Padding = UDim.new(0, 8),
@@ -1707,7 +1707,7 @@ do
 
 	local c2 = makeCard(gp, "sec_strength")
 	local strengthBox = makeInput(c2, "l_strength", "1111111", "ph_strength")
-	local row = makeRow(c2, 38)
+	local row = makeRow(c2, 34)
 	makeButton(row, "btn_safe", true, function()
 		busyGuard("strength", function()
 			local target = parseAmount(strengthBox.Text)
@@ -1812,7 +1812,7 @@ do
 			st("st_equipped", P.ok)
 		end)
 	end)
-	local row = makeRow(c3, 38)
+	local row = makeRow(c3, 34)
 	makeButton(row, "btn_combine", false, function()
 		busyGuard("combine", function()
 			st("st_working", P.work)
