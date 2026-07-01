@@ -257,10 +257,21 @@ local function nextWall(S)
     return 1
 end
 
+local function ensurePickaxeTool()
+    local c, _, hum = getChar()
+    if not (c and hum) then return end
+    local held = c:FindFirstChildWhichIsA("Tool")
+    if held and held:GetAttribute("Pickaxe") then return end
+    local function find(where) if not where then return end for _, t in ipairs(where:GetChildren()) do if t:IsA("Tool") and t:GetAttribute("Pickaxe") then return t end end end
+    local t = find(LocalPlayer:FindFirstChild("Backpack")) or find(c)
+    if t then pcall(function() hum:EquipTool(t) end) end
+end
+
 local function forceMineState(S)
     local _, hrp = getChar(); if not hrp then return false end
     local cf = getStandCFrame(S); if cf then pcall(function() hrp.CFrame = cf end) end
     pcall(function() hrp.Anchored = false; hrp.AssemblyLinearVelocity = Vector3.zero end)
+    ensurePickaxeTool()
     task.wait(0.12)
     pcall(function()
         if StageClient then
@@ -363,14 +374,15 @@ local function mineBody()
     status.phase = "mining"; status.stage = S
 
     forceMineState(S)
-    -- let the native 0.5s swing clear the 3 layers; nudge with our own hits on tanky ones
+    -- actively break each layer ourselves (damage == Strength); the native swing also runs from the forced flags
     local t0 = os.clock()
     while CFG.autoMine and not unloaded and nextWall(S) and os.clock() - t0 < CFG.breakTimeout do
+        ensurePickaxeTool()
         if StageClient and StageClient.IsMining ~= true then forceMineState(S) end
         local w = nextWall(S)
-        if w and stageHardHP(S) > (Data.Strength or 1) then       -- speed up tanky layers within budget
-            local n = math.min(3, budgetLeft())
-            for _ = 1, math.max(0, n) do fire(R.HitWall, S, w) end
+        if w then
+            local n = math.min(math.max(1, math.floor(CFG.hitRate * 0.25)), budgetLeft())
+            for _ = 1, math.max(1, n) do fire(R.HitWall, S, w) end
         end
         task.wait(0.25)
     end
