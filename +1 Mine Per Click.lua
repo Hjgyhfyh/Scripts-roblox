@@ -632,6 +632,7 @@ task.spawn(function()   -- stats updater ~5 Hz (labels are nil-guarded until the
         set(L.pick,     "Pickaxe: " .. tostring(Data.EquippedPickaxeId or "-"))
         set(L.aura,     "Aura: " .. tostring(Data.EquippedAuraId or "none"))
         set(L.stage,    "Mining stage: " .. (status.stage > 0 and status.stage or "-") .. " / deepest " .. (CFG._deepestReached or 1))
+        set(L.wall,     "Wall: " .. (hwState.stage and (hwState.stage .. "-" .. tostring(hwState.wall) .. "  " .. fmt(hwState.hp) .. " / " .. fmt(hwState.maxHp)) or "-"))
         set(L.pack,     "Backpack: " .. backpackCount() .. " / " .. backpackCap())
         set(L.calls,    "Calls this sec: " .. windowCount .. " / " .. CFG.totalBudget)
         set(L.phase,    "Phase: " .. status.phase)
