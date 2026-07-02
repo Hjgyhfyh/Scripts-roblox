@@ -549,10 +549,11 @@ local function walkspeedBody()
 end
 
 local BODIES = {
-    autoMine = mineBody, autoRebirth = rebirthBody, autoBuyPickaxe = buyPickBody,
+    autoMine = mineBody, autoHitWall = hitWallBody, autoRebirth = rebirthBody, autoBuyPickaxe = buyPickBody,
     autoBuyAura = buyAuraBody, autoBackpack = backpackBody, autoWalkspeed = walkspeedBody,
 }
-local function startLoop(name) if BODIES[name] then loop(name, BODIES[name], 0.3) end end
+local PERIODS = { autoHitWall = 0.05 }   -- hitWallBody paces itself inside; keep the gap tiny
+local function startLoop(name) if BODIES[name] then loop(name, BODIES[name], PERIODS[name] or 0.3) end end
 local function setFeature(name, on)
     CFG[name] = on and true or false
     saveConfig()
