@@ -336,10 +336,12 @@ task.spawn(function()
                 local aRate = acks / 2
                 if acks >= sent * 0.9 then
                     probeIn = probeIn - 1
-                    if probeIn <= 0 then adaptiveRate = adaptiveRate * 1.25; probeIn = 5 end   -- пробный подъём
+                    if probeIn <= 0 then adaptiveRate = adaptiveRate * 1.25; probeIn = 3 end   -- пробный подъём
                 else
-                    adaptiveRate = math.max(4, aRate * 1.05)   -- прижимаемся к измеренному капу
-                    probeIn = 5
+                    -- прижимаемся к измеренному капу; floor 12 — подтверждённый кап ~14/с,
+                    -- а реджекты в GCRA бесплатны (ts на отказе не двигается), лаг-просадка не должна душить рейт
+                    adaptiveRate = math.max(12, aRate * 1.05)
+                    probeIn = 3
                 end
                 adaptiveRate = math.min(adaptiveRate, 120)
                 status.clickInfo = string.format("ok %.0f/s (send %.0f/s, cap~%.0f/s)", aRate, sent / 2, math.min(adaptiveRate, CFG.clickRate))
@@ -523,6 +525,7 @@ task.spawn(function()   -- stats updater ~5 Hz (labels are nil-guarded until the
     local function fmt(n) n = n or 0; if n >= 1e6 then return string.format("%.2fM", n / 1e6) elseif n >= 1e3 then return string.format("%.1fK", n / 1e3) end return string.format("%.0f", n) end
     while not unloaded do
         set(L.strength, "Strength: " .. fmt(Data.Strength))
+        set(L.click,    "Click: " .. (status.clickInfo or "-"))
         set(L.level,    "Level: " .. getLevel(Data.Strength or 0) .. "  (rebirth @ " .. rebirthGate(Data.Rebirths or 0) .. ")")
         set(L.cash,     "Cash: " .. fmt(Data.Cash))
         set(L.reb,      "Rebirths: " .. tostring(Data.Rebirths or 0))
