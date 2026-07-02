@@ -88,7 +88,7 @@ do
     recent[#recent + 1] = nowEpoch
     CFG._bootTimes = recent
     if #recent > 6 then   -- safe mode: turn everything off
-        for _, k in ipairs({ "autoClick","autoMine","autoRebirth","autoBuyPickaxe","autoBuyAura","autoBackpack","autoWalkspeed" }) do CFG[k] = false end
+        for _, k in ipairs({ "autoClick","autoMine","autoHitWall","autoRebirth","autoBuyPickaxe","autoBuyAura","autoBackpack","autoWalkspeed" }) do CFG[k] = false end
     end
     saveConfig()
 end
@@ -382,6 +382,99 @@ local function mineBody()
     end
     task.wait(0.5)
 end
+
+-- Auto Break Walls: manually fires HitWall(stageId, wallId) on the first unbroken wall of the
+-- stage we are standing on, way faster than the native 2/s swing loop.
+-- Server rules (live-measured): stage is validated by our position — hits on any other stage are
+-- silently dropped, so we only ever hit the stage under our feet and never teleport (the old
+-- teleport+spam combo is what soft-flags). A 15-call instant burst was fully accepted, so the
+-- rate slider is the only throttle; a watchdog slows to 2/s if the server stops acking.
+local hwState = { stage = nil, wall = nil, hp = nil, maxHp = nil }
+local hwBrokenFB = {}                 -- fallback broken-wall map if StageClient didn't resolve
+local hwSentW, hwAckW, hwSlowUntil = 0, 0, 0
+do
+    local uwh = Cli:FindFirstChild("UpdateWallHealth")
+    if uwh then conn(uwh.OnClientEvent, function(sid, wid, hp, maxHp)
+        hwAckW = hwAckW + 1
+        hwState.stage, hwState.wall, hwState.hp, hwState.maxHp = sid, wid, hp, maxHp
+    end) end
+    local bw = Cli:FindFirstChild("BreakWall")
+    if bw then conn(bw.OnClientEvent, function(sid, wid, broken)
+        if type(sid) == "number" and type(wid) == "number" then
+            hwBrokenFB[sid] = hwBrokenFB[sid] or {}
+            hwBrokenFB[sid][wid] = broken and true or nil
+        end
+    end) end
+end
+local function getWallPart(sid, wid)
+    local s = StagesList[sid]
+    local w = s and s.Stages and s.Stages[wid]
+    return w and w.Wall
+end
+local function isWallBroken(sid, wid)
+    if StageClient and type(StageClient.BrokenWalls) == "table" then
+        local b = StageClient.BrokenWalls[sid]
+        if b and b[wid] then return true end
+    end
+    if hwBrokenFB[sid] and hwBrokenFB[sid][wid] then return true end
+    local wall = getWallPart(sid, wid)
+    return wall ~= nil and wall.Transparency >= 1   -- broken walls are hidden client-side
+end
+local function stageByPosition(hrp)
+    if StageClient and StageClient.CurrentStageId then return StageClient.CurrentStageId end
+    local best, bd   -- Zone state can be nil while standing in the mine — nearest Hitbox works
+    for sid, s in pairs(StagesList) do
+        if type(sid) == "number" and type(s) == "table" and s.Folder then
+            local hb = s.Folder:FindFirstChild("Hitbox")
+            if hb then
+                local d = (hb.Position - hrp.Position).Magnitude
+                if not bd or d < bd then best, bd = sid, d end
+            end
+        end
+    end
+    return best
+end
+local function nextWallId(sid)
+    local s = StagesList[sid]
+    if not (s and s.Stages) then return end
+    local n = #s.Stages; if n == 0 then n = 3 end
+    for wid = 1, n do
+        if not isWallBroken(sid, wid) then return wid end
+    end
+end
+local function hitWallBody()
+    if selling then task.wait(0.4); return end
+    local _, hrp, hum = getChar()
+    if not (hrp and hum and hum.Health > 0) then task.wait(0.6); return end
+    if not inMine() then status.phase = "entering mine"; enterMine(); task.wait(0.8); return end
+    ensurePickaxeTool()
+    local t0 = os.clock()
+    while CFG.autoHitWall and not unloaded and not selling and os.clock() - t0 < 1 do
+        local sid = stageByPosition(hrp)
+        local wid = sid and nextWallId(sid)
+        if not wid then status.phase = "falling to next stage"; task.wait(0.25); break end
+        local wall = getWallPart(sid, wid)
+        if wall and (wall.Position - hrp.Position).Magnitude > 60 then task.wait(0.4); break end   -- not landed yet
+        status.phase = string.format("breaking wall %d-%d", sid, wid)
+        local rate = (os.clock() < hwSlowUntil) and 2 or math.max(1, CFG.hitWallRate)
+        if budgetLeft() > 0 then fire(R.HitWall, sid, wid); hwSentW = hwSentW + 1 end
+        task.wait(1 / rate)
+    end
+end
+task.spawn(function()   -- watchdog: lots sent, zero UpdateWallHealth acks => server is ignoring us
+    while not unloaded do
+        task.wait(4)
+        if CFG.autoHitWall then
+            if hwSentW >= 12 and hwAckW == 0 then
+                status.warn = "HitWall ignored by server (softflag?) — slowed to 2/s, rejoin if it persists"
+                hwSlowUntil = os.clock() + 10
+            elseif hwAckW > 0 and status.warn:find("HitWall ignored") then
+                status.warn = ""
+            end
+        end
+        hwSentW, hwAckW = 0, 0
+    end
+end)
 
 -- Auto Rebirth
 local function rebirthBody()
