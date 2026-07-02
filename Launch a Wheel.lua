@@ -1334,9 +1334,14 @@ end
 
 --============================ BOOTSTRAP: CODES + FREE EXCLUSIVE EGGS ============================
 local CODES = {
+	-- original batch (verified earlier)
 	"money", "release", "lucky", "power", "cash", "time", "void", "update1", "update3",
 	"banana", "apple", "500k", "voidyy", "charmroot", "applepower", "coinbanana",
 	"mixpotion", "darkegg", "darkduo", "ancient", "eraeggs", "riftage", "grateful", "crownpotion",
+	-- web wave 2026-07-02 (rocodes/pockettactics/robloxden/pcgamesn cross-checked as active)
+	"clovy", "applo", "banzy", "brewz", "vexon", "duovo", "tikto", "chron", "eclip", "thank",
+	"rexal", "crown", "cheers", "riftpack", "agepack", "clockegg", "abyssduo", "abyssegg",
+	"mixdrink", "richfruit", "powerfruit", "luckyroot",
 }
 local Bootstrap = { B = nil, status = "idle" }
 function Bootstrap:Start()
@@ -1344,8 +1349,14 @@ function Bootstrap:Start()
 	RUNNING.bootstrap = true
 	self.B = bag()
 	self.B:track(task.spawn(function()
-		-- Phase 1: redeem all codes once (client cooldown 5s -> 6.2s spacing; expired = skip, no retry)
-		if not Persist.codes_done then
+		-- Phase 1: redeem codes (client cooldown 5s -> 6.2s spacing; expired = skip, no retry).
+		-- Gate is PER CODE (Persist.redeemed), not the legacy codes_done flag: codes added in an
+		-- update are picked up even on profiles where the original run already completed.
+		local codesPending = false
+		for _, code in ipairs(CODES) do
+			if not Persist.redeemed[code] then codesPending = true break end
+		end
+		if codesPending then
 			local total, done = #CODES, 0
 			for _, code in ipairs(CODES) do
 				if not (self.B and self.B.alive and State.Alive and RUNNING.bootstrap) then return end
@@ -1439,10 +1450,20 @@ end
 
 --============================ PERIODIC CLAIMS ============================
 -- Invalid claim = quiet no-op; 12 min cadence is negligible traffic. Admin* services NEVER touched.
+-- PlaytimeRewardService is NOT in the blind batch anymore: the server silently no-ops its Claim
+-- while the Player attribute "PlaytimeReward" (accrued playtime seconds, unbounded past ready) is
+-- < MiscConfig.PlaytimeRewardTime (900), and a ~12-min cadence never reliably lands the 15-min
+-- window. LIVE-VERIFIED 2026-07-02: no-arg Claim at attr=1239 reset it to ~0 and granted the
+-- reward, so it gets its own readiness poller below (claims within ~31s of every 15-min cycle).
 local CLAIM_SERVICES = {
-	"DailyRewardsService", "ChestService", "PlaytimeRewardService", "AchievementService", "SeasonpassService",
+	"DailyRewardsService", "ChestService", "AchievementService", "SeasonpassService",
 }
-local Claims = { B = nil, rounds = 0, status = "idle" }
+local function playtimeReadySec()
+	local mc = ConfigModules.MiscConfig
+	local t = type(mc) == "table" and tonumber(mc.PlaytimeRewardTime) or nil
+	return t or 900
+end
+local Claims = { B = nil, rounds = 0, playtimeClaims = 0, status = "idle" }
 function Claims:Start()
 	if RUNNING.claims then return end
 	RUNNING.claims = true
@@ -1456,10 +1477,21 @@ function Claims:Start()
 				task.wait(1.2)
 			end
 			self.rounds = self.rounds + 1
-			self.status = "claim rounds: " .. tostring(self.rounds)
+			self.status = string.format("claim rounds: %d | playtime x%d", self.rounds, self.playtimeClaims)
 			task.wait(700 + math.random(0, 60))
 		end
 	end))
+	-- Playtime Reward: attribute-gated poller — fire ONLY when actually ready (attr resets on success)
+	self.B:every(31, function()
+		if not RUNNING.claims then return end
+		local acc = 0
+		pcall(function() acc = num(LocalPlayer:GetAttribute("PlaytimeReward")) end)
+		if acc >= playtimeReadySec() then
+			fireRE("PlaytimeRewardService", "Claim") -- VERIFIED form: no args, no tier/index
+			self.playtimeClaims = self.playtimeClaims + 1
+			self.status = string.format("playtime reward claimed x%d", self.playtimeClaims)
+		end
+	end)
 end
 function Claims:Stop()
 	RUNNING.claims = false
