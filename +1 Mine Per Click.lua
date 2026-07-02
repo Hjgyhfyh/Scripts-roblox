@@ -616,7 +616,13 @@ getgenv().MinePerClick.CFG = CFG
 
 task.spawn(function()   -- stats updater ~5 Hz (labels are nil-guarded until the GUI builds them)
     local function set(lbl, txt) if lbl then pcall(function() lbl:Set(txt) end) end end
-    local function fmt(n) n = n or 0; if n >= 1e6 then return string.format("%.2fM", n / 1e6) elseif n >= 1e3 then return string.format("%.1fK", n / 1e3) end return string.format("%.0f", n) end
+    local function fmt(n)
+        n = n or 0
+        if n >= 1e15 then return string.format("%.2fQa", n / 1e15) elseif n >= 1e12 then return string.format("%.2fT", n / 1e12)
+        elseif n >= 1e9 then return string.format("%.2fB", n / 1e9) elseif n >= 1e6 then return string.format("%.2fM", n / 1e6)
+        elseif n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+        return string.format("%.0f", n)
+    end
     while not unloaded do
         set(L.strength, "Strength: " .. fmt(Data.Strength))
         set(L.click,    "Click: " .. (status.clickInfo or "-"))
