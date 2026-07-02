@@ -315,15 +315,48 @@ local function loop(name, body, period)
     end)
 end
 
--- Auto Click: grow Strength (position-independent)
+-- Auto Click: grow Strength (position-independent).
+-- Сервер гоняет Click через Utils.RateLimiter (GCRA): принимает ~14/сек на игрока,
+-- всё сверх — молча дропает (замерено: 380/сек шлёшь → те же ~14/сек засчитаны).
+-- Каждый ЗАСЧИТАННЫЙ клик сервер подтверждает через Click.OnClientEvent (попап "+X"),
+-- так что шлём адаптивно: держим send-rate у реального accept-rate, изредка пробуем выше
+-- (вдруг кап отличается по зонам/после апдейта). CFG.clickRate — верхняя планка слайдера.
 local clickAccum = 0
+local adaptiveRate = 16          -- стартовая оценка, тюнится каждые 2с по подтверждениям
+local sentW, ackW = 0, 0         -- окно тюнера (отправлено / подтверждено)
+conn(R.Click.OnClientEvent, function() ackW = ackW + 1 end)
+task.spawn(function()
+    local probeIn = 0
+    while not unloaded do
+        task.wait(2)
+        if CFG.autoClick then
+            local sent, acks = sentW, ackW
+            sentW, ackW = 0, 0
+            if sent > 0 then
+                local aRate = acks / 2
+                if acks >= sent * 0.9 then
+                    probeIn = probeIn - 1
+                    if probeIn <= 0 then adaptiveRate = adaptiveRate * 1.25; probeIn = 5 end   -- пробный подъём
+                else
+                    adaptiveRate = math.max(4, aRate * 1.05)   -- прижимаемся к измеренному капу
+                    probeIn = 5
+                end
+                adaptiveRate = math.min(adaptiveRate, 120)
+                status.clickInfo = string.format("ok %.0f/s (send %.0f/s, cap~%.0f/s)", aRate, sent / 2, math.min(adaptiveRate, CFG.clickRate))
+            end
+        else
+            sentW, ackW = 0, 0
+        end
+    end
+end)
 conn(RunService.Heartbeat, function(dt)
     if unloaded or not CFG.autoClick then clickAccum = 0; return end
     if dt > 0.3 then dt = 0.3 end
-    clickAccum = clickAccum + CFG.clickRate * dt
+    local rate = math.min(adaptiveRate, CFG.clickRate)
+    clickAccum = clickAccum + rate * dt
     local n = math.min(math.floor(clickAccum), budgetLeft(), math.ceil(CFG.totalBudget * 0.15))
-    if n > 0 then for _ = 1, n do fire(R.Click) end; clickAccum = clickAccum - n end
-    if clickAccum > CFG.clickRate then clickAccum = CFG.clickRate end
+    if n > 0 then for _ = 1, n do fire(R.Click) end; sentW = sentW + n; clickAccum = clickAccum - n end
+    if clickAccum > rate then clickAccum = rate end
 end)
 
 -- Auto Mine: enter the mine, let the game's own swing break the floor and drop us deeper, collect
