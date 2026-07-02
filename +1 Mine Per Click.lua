@@ -45,8 +45,8 @@ local DEFAULTS = {
     autoBackpack     = false,
     autoWalkspeed    = false,
 
-    totalBudget      = 350,   -- combined FireServer calls/sec (hard ceiling < 400)
-    clickRate        = 250,   -- Click calls/sec
+    totalBudget      = 350,   -- combined FireServer calls/sec (hard ceiling <= 400)
+    clickMode        = "perfect", -- "perfect" = ровно 14/с (кап сервера, ноль реджектов) | "max" = 400/с в потолок
     sellOnSurface    = true,  -- GotoSurface before SellAllLoot
 
     auraFraction     = 0.5,
