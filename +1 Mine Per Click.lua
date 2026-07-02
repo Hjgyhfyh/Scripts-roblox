@@ -322,11 +322,11 @@ end
 -- так что шлём адаптивно: держим send-rate у реального accept-rate, изредка пробуем выше
 -- (вдруг кап отличается по зонам/после апдейта). CFG.clickRate — верхняя планка слайдера.
 local clickAccum = 0
-local adaptiveRate = 16          -- стартовая оценка, тюнится каждые 2с по подтверждениям
+local adaptiveRate = 18          -- send-rate: всегда ~30% выше оценки капа => acks прибиты к капу
+local emaAck = 14                -- оценка серверного капа (подтверждений/с), 14 — замеренный
 local sentW, ackW = 0, 0         -- окно тюнера (отправлено / подтверждено)
 conn(R.Click.OnClientEvent, function() ackW = ackW + 1 end)
 task.spawn(function()
-    local probeIn = 0
     while not unloaded do
         task.wait(2)
         if CFG.autoClick then
@@ -334,17 +334,13 @@ task.spawn(function()
             sentW, ackW = 0, 0
             if sent > 0 then
                 local aRate = acks / 2
-                if acks >= sent * 0.9 then
-                    probeIn = probeIn - 1
-                    if probeIn <= 0 then adaptiveRate = adaptiveRate * 1.25; probeIn = 3 end   -- пробный подъём
-                else
-                    -- прижимаемся к измеренному капу; floor 12 — подтверждённый кап ~14/с,
-                    -- а реджекты в GCRA бесплатны (ts на отказе не двигается), лаг-просадка не должна душить рейт
-                    adaptiveRate = math.max(12, aRate * 1.05)
-                    probeIn = 3
-                end
-                adaptiveRate = math.min(adaptiveRate, 120)
-                status.clickInfo = string.format("ok %.0f/s (send %.0f/s, cap~%.0f/s)", aRate, sent / 2, math.min(adaptiveRate, CFG.clickRate))
+                -- вверх мгновенно (нашли кап выше), вниз медленно (разовый лаг не душит рейт)
+                if aRate > emaAck then emaAck = aRate else emaAck = emaAck * 0.8 + aRate * 0.2 end
+                -- шлём с постоянным запасом над капом: в GCRA реджекты бесплатны (ts на отказе
+                -- не двигается), зато каждый слот сервера гарантированно занят. Если кап в зоне
+                -- выше — запас сам раскручивает оценку вверх за несколько окон (14→120 за ~20с).
+                adaptiveRate = math.clamp(math.max(16, emaAck * 1.3), 16, 150)
+                status.clickInfo = string.format("ok %.0f/s (send %.0f/s, cap~%.0f/s)", aRate, sent / 2, emaAck)
             end
         else
             sentW, ackW = 0, 0
