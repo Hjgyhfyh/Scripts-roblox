@@ -1885,6 +1885,7 @@ function InfoTicker:Start()
 		setStatus("Throw Status", ThrowFarm.status)
 		setStatus("Buy Status", AutoBuy.status)
 		setStatus("Hatch Status", HatchFarm.status)
+		setStatus("EventEgg Status", EventEgg.status)
 		setStatus("Bootstrap Status", Bootstrap.status)
 		setStatus("Spin Status", DailySpin.status)
 		setStatus("Claims Status", Claims.status)
@@ -1897,6 +1898,203 @@ end
 function InfoTicker:Stop()
 	RUNNING.info = false
 	if self.B then self.B:kill() self.B = nil end
+end
+
+--============================ FLOATING QUICK BAR (client-only) ============================
+-- Draggable bubble + compact quick toggles in gethui()/CoreGui. Every toggle goes through
+-- Window:SetModuleEnabled -> the SAME modDef Callback as a click in the main menu (one code
+-- path, one RUNNING state, main-menu checkbox stays in sync automatically). Button colors are
+-- polled from RUNNING, so menu-side toggles reflect here too. Zero remotes. Removed by
+-- unloadAll / window close (QuickBar is listed in FEATURES).
+local UserInputService = game:GetService("UserInputService")
+
+local QuickBar = {
+	gui = nil,
+	B = nil,
+	expanded = cfgCtl("quickbar_expanded", true) == true,
+	items = {},
+}
+local QUICK_DEFS = {
+	{ label = "TRN", running = "train", feature = TrainFarm, tab = "Farm", module = "Auto Train (Power)" },
+	{ label = "THR", running = "throw", feature = ThrowFarm, tab = "Farm", module = "Auto Throw (Cash)" },
+	{ label = "BUY", running = "buy", feature = AutoBuy, tab = "Economy", module = "Auto Buy" },
+	{ label = "EGG", running = "eventegg", feature = EventEgg, tab = "Economy", module = "Event Egg (10M)" },
+	{ label = "UI", special = "menu" },
+}
+local function mainGuiRoot()
+	local ok, sgui = pcall(function() return (gethui and gethui()) or game:GetService("CoreGui") end)
+	if not ok or not sgui then return nil end
+	return sgui:FindFirstChild("SigmatikClickGui")
+end
+function QuickBar:toggle(def)
+	if def.special == "menu" then
+		local root = mainGuiRoot()
+		if root then root.Enabled = not root.Enabled end
+		return
+	end
+	local on = not (RUNNING[def.running] == true)
+	local synced = false
+	pcall(function()
+		if State.Window and State.Window.SetModuleEnabled then
+			-- fires the module Callback (Config.modules save + feature Start/Stop) + menu visuals
+			State.Window:SetModuleEnabled(def.tab, def.module, on)
+			synced = true
+		end
+	end)
+	if not synced then -- window object unavailable: drive the exact same state keys directly
+		Config.modules[def.module] = on
+		saveConfig()
+		if on then
+			pcall(function() def.feature:Start() end)
+		else
+			pcall(function() def.feature:Stop() end)
+		end
+	end
+end
+function QuickBar:applyColors()
+	if not self.gui then return end
+	for _, item in ipairs(self.items) do
+		local on
+		if item.def.special == "menu" then
+			local root = mainGuiRoot()
+			on = root ~= nil and root.Enabled == true
+		else
+			on = RUNNING[item.def.running] == true
+		end
+		item.btn.BackgroundColor3 = on and Color3.fromRGB(249, 115, 22) or Color3.fromRGB(52, 52, 60)
+		item.btn.TextColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(168, 168, 178)
+	end
+end
+function QuickBar:Build()
+	if self.gui or not State.Alive then return end
+	elevate() -- identity 8 right before touching gethui()/CoreGui
+	local ok, sgui = pcall(function() return (gethui and gethui()) or game:GetService("CoreGui") end)
+	if not ok or not sgui then return end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "SigmatikLWQuickBar"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 999999999
+
+	local holder = Instance.new("Frame")
+	holder.Name = "Holder"
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.fromOffset(46 + 6 + #QUICK_DEFS * 50, 46)
+	local pos = Config.controls.quickbar_pos
+	local px = (type(pos) == "table" and tonumber(pos[1])) or 24
+	local py = (type(pos) == "table" and tonumber(pos[2])) or 300
+	pcall(function()
+		local cam = Workspace.CurrentCamera
+		if cam then
+			px = math.clamp(px, 0, math.max(0, cam.ViewportSize.X - 60))
+			py = math.clamp(py, 0, math.max(0, cam.ViewportSize.Y - 60))
+		end
+	end)
+	holder.Position = UDim2.fromOffset(px, py)
+	holder.Parent = gui
+
+	local bubble = Instance.new("TextButton")
+	bubble.Name = "Bubble"
+	bubble.Size = UDim2.fromOffset(46, 46)
+	bubble.BackgroundColor3 = Color3.fromRGB(249, 115, 22)
+	bubble.Text = "LW"
+	bubble.Font = Enum.Font.GothamBold
+	bubble.TextSize = 15
+	bubble.TextColor3 = Color3.fromRGB(255, 255, 255)
+	bubble.AutoButtonColor = true
+	bubble.BorderSizePixel = 0
+	bubble.Parent = holder
+	do
+		local c = Instance.new("UICorner") c.CornerRadius = UDim.new(1, 0) c.Parent = bubble
+		local s = Instance.new("UIStroke") s.Color = Color3.fromRGB(24, 24, 28) s.Thickness = 1.5 s.Parent = bubble
+	end
+
+	local row = Instance.new("Frame")
+	row.Name = "Row"
+	row.BackgroundTransparency = 1
+	row.Position = UDim2.fromOffset(52, 8)
+	row.Size = UDim2.fromOffset(#QUICK_DEFS * 50, 30)
+	row.Visible = self.expanded
+	row.Parent = holder
+	do
+		local l = Instance.new("UIListLayout")
+		l.FillDirection = Enum.FillDirection.Horizontal
+		l.Padding = UDim.new(0, 4)
+		l.SortOrder = Enum.SortOrder.LayoutOrder
+		l.Parent = row
+	end
+
+	self.items = {}
+	for i, def in ipairs(QUICK_DEFS) do
+		local btn = Instance.new("TextButton")
+		btn.Name = def.label
+		btn.LayoutOrder = i
+		btn.Size = UDim2.fromOffset(46, 30)
+		btn.BackgroundColor3 = Color3.fromRGB(52, 52, 60)
+		btn.Text = def.label
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 12
+		btn.TextColor3 = Color3.fromRGB(168, 168, 178)
+		btn.AutoButtonColor = true
+		btn.BorderSizePixel = 0
+		btn.Parent = row
+		local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, 8) c.Parent = btn
+		local s = Instance.new("UIStroke") s.Color = Color3.fromRGB(24, 24, 28) s.Thickness = 1 s.Parent = btn
+		btn.MouseButton1Click:Connect(function()
+			self:toggle(def)
+			self:applyColors()
+		end)
+		table.insert(self.items, { def = def, btn = btn })
+	end
+
+	-- drag on the bubble; a press without movement (<=6 px) toggles collapse/expand instead
+	local dragging, moved, dragStart, startPos = false, false, nil, nil
+	bubble.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging, moved = true, false
+			dragStart = input.Position
+			startPos = holder.Position
+		end
+	end)
+	bubble.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if dragging and not moved then
+				self.expanded = not self.expanded
+				row.Visible = self.expanded
+				Config.controls.quickbar_expanded = self.expanded
+				saveConfig()
+			elseif dragging and moved then
+				Config.controls.quickbar_pos = { holder.Position.X.Offset, holder.Position.Y.Offset }
+				saveConfig()
+			end
+			dragging = false
+		end
+	end)
+	self.B = bag()
+	self.B:track(UserInputService.InputChanged:Connect(function(input)
+		if not dragging or not dragStart then return end
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			local delta = input.Position - dragStart
+			if math.abs(delta.X) + math.abs(delta.Y) > 6 then moved = true end
+			if moved then
+				holder.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
+			end
+		end
+	end))
+	self.B:every(0.4, function() self:applyColors() end)
+
+	gui.Parent = sgui
+	self.gui = gui
+	self:applyColors()
+end
+function QuickBar:Start()
+	self:Build()
+end
+function QuickBar:Stop()
+	if self.B then self.B:kill() self.B = nil end
+	pcall(function() if self.gui then self.gui:Destroy() end end)
+	self.gui = nil
+	self.items = {}
 end
 
 --============================ UNLOAD ============================
