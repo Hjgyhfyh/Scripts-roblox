@@ -673,7 +673,7 @@ local guiOk = pcall(function()
         tog(M, "Auto Click (grow Strength)", "autoClick")
         tog(M, "Auto Mine (descend + collect + sell)", "autoMine")
         tog(M, "Auto Break Walls (HitWall on unbroken walls)", "autoHitWall")
-        M:CreateSlider({ Name = "HitWall rate (hits/sec)", Range = {1, 40}, Increment = 1, CurrentValue = CFG.hitWallRate, Flag = "mpc_hwr", Callback = function(v) CFG.hitWallRate = v; saveConfig() end })
+        M:CreateSlider({ Name = "HitWall rate (hits/sec)", Range = {1, 395}, Increment = 5, CurrentValue = CFG.hitWallRate, Flag = "mpc_hwr", Callback = function(v) CFG.hitWallRate = v; saveConfig() end })
         M:CreateSlider({ Name = "Click rate cap (auto-tunes to server ~14/s)", Range = {5, 380}, Increment = 5, CurrentValue = CFG.clickRate, Flag = "mpc_cr", Callback = function(v) CFG.clickRate = v; saveConfig() end })
     end)
     pcall(function()   -- ECONOMY
