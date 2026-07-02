@@ -663,7 +663,19 @@ local guiOk = pcall(function()
         tog(M, "Auto Mine (descend + collect + sell)", "autoMine")
         tog(M, "Auto Break Walls (HitWall on unbroken walls)", "autoHitWall")
         M:CreateSlider({ Name = "HitWall rate (hits/sec)", Range = {1, 395}, Increment = 5, CurrentValue = CFG.hitWallRate, Flag = "mpc_hwr", Callback = function(v) CFG.hitWallRate = v; saveConfig() end })
-        M:CreateSlider({ Name = "Click rate cap (auto-tunes to server ~14/s)", Range = {5, 380}, Increment = 5, CurrentValue = CFG.clickRate, Flag = "mpc_cr", Callback = function(v) CFG.clickRate = v; saveConfig() end })
+        local MODE_PERFECT = "Perfect 14/s — кап сервера, каждый клик засчитан"
+        local MODE_MAX     = "Max 400/s — спам в потолок (засчитает те же ~14/s)"
+        M:CreateDropdown({
+            Name = "Click mode", Options = { MODE_PERFECT, MODE_MAX },
+            CurrentOption = { CFG.clickMode == "max" and MODE_MAX or MODE_PERFECT },
+            Flag = "mpc_cm",
+            Callback = function(opt)
+                local v = type(opt) == "table" and opt[1] or opt
+                CFG.clickMode = (v == MODE_MAX) and "max" or "perfect"
+                if CFG.clickMode == "max" and CFG.totalBudget < 400 then CFG.totalBudget = 400 end
+                saveConfig()
+            end,
+        })
     end)
     pcall(function()   -- ECONOMY
         local E = Window:CreateTab("💰 Economy", 4483362458)
