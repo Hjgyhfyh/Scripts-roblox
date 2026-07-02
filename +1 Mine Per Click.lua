@@ -321,41 +321,30 @@ end
 -- Auto Click: grow Strength (position-independent).
 -- Сервер гоняет Click через Utils.RateLimiter (GCRA): принимает ~14/сек на игрока,
 -- всё сверх — молча дропает (замерено: 380/сек шлёшь → те же ~14/сек засчитаны).
--- Каждый ЗАСЧИТАННЫЙ клик сервер подтверждает через Click.OnClientEvent (попап "+X"),
--- так что шлём адаптивно: держим send-rate у реального accept-rate, изредка пробуем выше
--- (вдруг кап отличается по зонам/после апдейта). CFG.clickRate — верхняя планка слайдера.
+-- Каждый ЗАСЧИТАННЫЙ клик сервер подтверждает через Click.OnClientEvent (попап "+X").
+-- Два режима (CFG.clickMode, выбор в GUI):
+--   "perfect" — ровно 14/с, равномерно по кадрам: send == серверный кап, каждый вызов
+--               засчитывается, ноль реджектов — чистейший профиль;
+--   "max"     — 400/с в потолок (общий бюджет поднимается до 400): сервер всё равно
+--               засчитает те же ~14/с, излишек молча съест RateLimiter (реджекты у GCRA
+--               бесплатны, ts на отказе не двигается) — профита сверх perfect нет.
 local clickAccum = 0
-local adaptiveRate = 30          -- send-rate: всегда ×2 над оценкой капа => acks прибиты к капу
-local emaAck = 14                -- оценка серверного капа (подтверждений/с), ~12-14 замеренный
-local sentW, ackW = 0, 0         -- окно тюнера (отправлено / подтверждено)
+local sentW, ackW = 0, 0         -- окно статистики (отправлено / подтверждено)
 conn(R.Click.OnClientEvent, function() ackW = ackW + 1 end)
 task.spawn(function()
     while not unloaded do
         task.wait(2)
         if CFG.autoClick then
-            local sent, acks = sentW, ackW
-            sentW, ackW = 0, 0
-            if sent > 0 then
-                local aRate = acks / 2
-                -- вверх мгновенно (нашли кап выше), вниз медленно (разовый лаг не душит рейт)
-                if aRate > emaAck then emaAck = aRate else emaAck = emaAck * 0.8 + aRate * 0.2 end
-                -- шлём с запасом ×2 над капом (floor 30/с): реджекты у лимитера бесплатны
-                -- (GCRA, ts на отказе не двигается), а движковый троттлинг входящих ремоутов
-                -- добивает кап только при send заметно выше него (замер: 18/с→11.3 ok,
-                -- 30-48/с→13.2-13.4 ok, дальше плато). Кап выше в другой зоне — оценка сама
-                -- раскрутится вверх через запас за несколько окон.
-                adaptiveRate = math.clamp(math.max(30, emaAck * 2), 30, 150)
-                status.clickInfo = string.format("ok %.0f/s (send %.0f/s, cap~%.0f/s)", aRate, sent / 2, emaAck)
-            end
-        else
-            sentW, ackW = 0, 0
+            status.clickInfo = string.format("%s: ok %.1f/s (send %.0f/s)",
+                CFG.clickMode == "max" and "max 400/s" or "perfect 14/s", ackW / 2, sentW / 2)
         end
+        sentW, ackW = 0, 0
     end
 end)
 conn(RunService.Heartbeat, function(dt)
     if unloaded or not CFG.autoClick then clickAccum = 0; return end
     if dt > 0.3 then dt = 0.3 end
-    local rate = math.min(adaptiveRate, CFG.clickRate)
+    local rate = (CFG.clickMode == "max") and 400 or 14
     clickAccum = clickAccum + rate * dt
     local n = math.min(math.floor(clickAccum), budgetLeft(), math.ceil(CFG.totalBudget * 0.15))
     if n > 0 then for _ = 1, n do fire(R.Click) end; sentW = sentW + n; clickAccum = clickAccum - n end
