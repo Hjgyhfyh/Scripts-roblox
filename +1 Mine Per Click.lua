@@ -450,6 +450,7 @@ local function hitWallBody()
     if not inMine() then status.phase = "entering mine"; enterMine(); task.wait(0.8); return end
     ensurePickaxeTool()
     local t0 = os.clock()
+    local acc, last = 0, os.clock()   -- accumulator: task.wait quantizes to a frame, so batch per frame
     while CFG.autoHitWall and not unloaded and not selling and os.clock() - t0 < 1 do
         local sid = stageByPosition(hrp)
         local wid = sid and nextWallId(sid)
@@ -458,8 +459,14 @@ local function hitWallBody()
         if wall and (wall.Position - hrp.Position).Magnitude > 60 then task.wait(0.4); break end   -- not landed yet
         status.phase = string.format("breaking wall %d-%d", sid, wid)
         local rate = (os.clock() < hwSlowUntil) and 2 or math.max(1, CFG.hitWallRate)
-        if budgetLeft() > 0 then fire(R.HitWall, sid, wid); hwSentW = hwSentW + 1 end
-        task.wait(1 / rate)
+        local now = os.clock()
+        acc = math.min(acc + (now - last) * rate, rate); last = now
+        local n = math.min(math.floor(acc), budgetLeft(), 40)
+        if n > 0 then
+            for _ = 1, n do fire(R.HitWall, sid, wid) end
+            hwSentW = hwSentW + n; acc = acc - n
+        end
+        task.wait()
     end
 end
 task.spawn(function()   -- watchdog: lots sent, zero UpdateWallHealth acks => server is ignoring us
