@@ -3,6 +3,7 @@
     tg: @sigmatik323
 
     Independent toggles (each runs on its own): Auto Click, Auto Mine (descend+collect+sell),
+    Auto Break Walls (manual HitWall spam on the current stage's unbroken walls),
     Auto Rebirth, Auto Buy Pickaxe, Auto Buy Aura, Auto Upgrade Backpack/Walkspeed.
 ]]
 
@@ -697,7 +698,7 @@ local guiOk = pcall(function()
         local T = Window:CreateTab("📈 Stats", 4483362458)
         L.strength = T:CreateLabel("Strength: -"); L.click = T:CreateLabel("Click: -"); L.level = T:CreateLabel("Level: -"); L.cash = T:CreateLabel("Cash: -")
         L.reb = T:CreateLabel("Rebirths: -"); L.pick = T:CreateLabel("Pickaxe: -"); L.aura = T:CreateLabel("Aura: -")
-        L.stage = T:CreateLabel("Mining stage: -"); L.pack = T:CreateLabel("Backpack: -"); L.calls = T:CreateLabel("Calls/sec: -")
+        L.stage = T:CreateLabel("Mining stage: -"); L.wall = T:CreateLabel("Wall: -"); L.pack = T:CreateLabel("Backpack: -"); L.calls = T:CreateLabel("Calls/sec: -")
         L.phase = T:CreateLabel("Phase: -"); L.warn = T:CreateLabel("Status: ok")
     end)
     pcall(function() Rayfield:Notify({ Title = "+1 Mine Per Click", Content = "Loaded. Toggle features independently. Stats tab is last.", Duration = 5 }) end)
