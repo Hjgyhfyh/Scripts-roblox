@@ -14,10 +14,19 @@
 	  PowerBoost/CashBoost/TrainSpeed > RebirthButton, одно действие за тик, каждое подтверждается
 	  следующим серверным пушем. Saving-mode на мир. Форма аргумента Upgrade подтверждается первым вызовом.
 	- Auto Hatch Eggs: HatchEgg(<лучшее Cash-яйцо>, "Triple") на <=15% Cash, шаг >=4.6s, EquipBest с дебаунсом.
-	- Redeem Codes + Free Eggs: одноразовый прогон 24 промокодов (CodesService.RF.Claim, пауза 6s),
-	  затем открытие всех Timeless/Void Egg (OpenExclusiveEgg, шаг 4.6s) + EquipBest. Прогресс персистится.
+	- Event Egg (10M): авто-открытие ивентового "10M Egg" (HatchEgg, Triple/Octo по геймпассу) в рамках
+	  бюджета % Cash, подтверждение по пушу, авто-стоп после MiscConfig.EventEndTimestamp
+	  (охота на Midnight Kitty 0.001% x4,000,000 и Masquerade 0.0002%).
+	- Redeem Codes + Free Eggs: прогон 46 промокодов (CodesService.RF.Claim, пауза 6s), гейт по каждому
+	  коду отдельно (свежедобавленные коды доклеймятся даже после первого прогона), затем открытие всех
+	  Timeless/Void Egg (OpenExclusiveEgg, шаг 4.6s) + EquipBest. Прогресс персистится.
 	- Auto Daily Spin: SpinsService.RE.Spin раз в 24ч по DailySpinClaimedTime из профиля.
-	- Auto Claim Rewards: DailyRewards/Chest/PlaytimeReward/Achievement/Seasonpass .RE.Claim раз в ~12 мин.
+	- Auto Claim Rewards: DailyRewards/Chest/Achievement/Seasonpass .RE.Claim раз в ~12 мин;
+	  PlaytimeReward — ОТДЕЛЬНЫЙ поллер (31s) по атрибуту игрока PlaytimeReward >= 900s: слепой Claim
+	  до готовности — тихий серверный no-op, поэтому клейм строго по готовности (проверено вживую).
+	- Floating Quick Bar: перетаскиваемый пузырь (gethui/CoreGui) с быстрыми тумблерами Train/Throw/Buy/Egg/Menu —
+	  дёргают те же :Start()/:Stop() через Window:SetModuleEnabled (единый стейт RUNNING, меню синхронно),
+	  снимается Unload'ом и закрытием окна.
 	- Auto Potions: InventoryService.RE.Use("<Potion>", 1) под активные фармы, с подтверждением декремента.
 	- Auto Class Roll: ClassesService.RE.Roll до выпадения Wheelborn / The Insane Wheeler, затем Equip + StopAuto.
 	- Auto Rebirth: одноразовая туториал-проба (гейт фич) + steady-state по регринду Power, подтверждение по счётчику.
@@ -936,6 +945,12 @@ end
 
 --============================ THROW FARM (Cash) ============================
 -- Hard server cooldown ThrowTimeCooldown=10s. Strictly 1 Throw = 1 Finish, no args on either.
+-- LIVE-VERIFIED 2026-07-02: distance is 100% server-authoritative = f(Power) + ~1-2% RNG jitter.
+-- The client sends NOTHING tunable (no distance/power/angle/charge/timing); junk args on
+-- Throw/Finish are ignored by the server (same distance at the same Power). So there is
+-- deliberately NO "distance argument" here. The only throughput lever — Finish right after
+-- Throw to skip the 15s roll — is already implemented below; payout grows only via
+-- Power / world multiplier / Cash multipliers, not via throw arguments.
 local ThrowFarm = {
 	B = nil,
 	cycleBase = math.clamp(cfgCtl("throw_interval", 10.7), 10.5, 15),
@@ -1224,6 +1239,95 @@ function HatchFarm:Start()
 end
 function HatchFarm:Stop()
 	RUNNING.hatch = false
+	if self.B then self.B:kill() self.B = nil end
+	self.status = "idle"
+end
+
+--============================ EVENT EGG (10M Egg — limited event) ============================
+-- LIVE-VERIFIED 2026-07-02: EggsService.RE.HatchEgg:FireServer("10M Egg", "Single"|"Triple"|"Octo")
+-- works headless (no proximity check) and is fully server-validated: exactly -10M Cash per Single,
+-- the pet is rolled + granted server-side. Costs top-level Cash (NOT Robux / NOT EventCash).
+-- "Octo" (x8 price, up to 8 pets) needs the OctoHatch gamepass, otherwise "Triple" (x3) is best
+-- pets-per-paid-open. Chases Midnight Kitty (0.001%, income x4,000,000) / Masquerade (0.0002%).
+-- The loop parks itself once MiscConfig.EventEndTimestamp passes.
+local EventEgg = {
+	B = nil,
+	eggName = "10M Egg",
+	budgetPct = math.clamp(cfgCtl("eventegg_budget", 30), 5, 90),
+	hatches = 0,
+	misses = 0,
+	backoffUntil = 0,
+	status = "idle",
+}
+function EventEgg:price()
+	local ec = ConfigModules.EggsConfig
+	local def = type(ec) == "table" and ec[self.eggName] or nil
+	local p = type(def) == "table" and tonumber(def.Price or def.Cost) or nil
+	return p or 1e7
+end
+function EventEgg:mode()
+	local octo = false
+	pcall(function() octo = LocalPlayer:GetAttribute("OctoHatch") == true end)
+	if octo then return "Octo", 8 end
+	return "Triple", 3
+end
+function EventEgg:eventOver()
+	local mc = ConfigModules.MiscConfig
+	local ts = type(mc) == "table" and tonumber(mc.EventEndTimestamp) or nil
+	return ts ~= nil and os.time() > ts
+end
+function EventEgg:Start()
+	if RUNNING.eventegg then return end
+	RUNNING.eventegg = true
+	self.B = bag()
+	self.B:track(task.spawn(function()
+		while self.B and self.B.alive and State.Alive and RUNNING.eventegg do
+			local step = 4.7 + math.random() * 0.5 -- server HatchTime=4.5 -> >=4.6s cadence
+			local p = Mirror.profile
+			if self:eventOver() then
+				self.status = "event over (EventEndTimestamp passed)"
+				task.wait(30)
+			elseif not p then
+				self.status = "waiting for profile push"
+				task.wait(1)
+			elseif os.clock() < self.backoffUntil then
+				self.status = string.format("backoff %ds after no-ops", math.max(1, math.ceil(self.backoffUntil - os.clock())))
+				task.wait(2)
+			elseif savingModeActive() then
+				self.status = "paused: saving mode"
+				task.wait(step)
+			else
+				local mode, mult = self:mode()
+				local cost = self:price() * mult
+				if cost <= Cash() * (self.budgetPct / 100) then
+					local cashBefore, petsBefore = Cash(), petCount()
+					local s = Mirror.serial
+					fireRE("EggsService", "HatchEgg", self.eggName, mode) -- VERIFIED form: (string, string)
+					waitFreshPush(s, 4)
+					if Cash() < cashBefore or petCount() > petsBefore then
+						self.misses = 0
+						self.hatches = self.hatches + 1
+						self.status = string.format("hatched %s (%s) x%d", self.eggName, mode, self.hatches)
+						equipBest(false)
+					else
+						self.misses = self.misses + 1
+						self.status = string.format("%s no-op x%d", self.eggName, self.misses)
+						if self.misses >= 3 then
+							self.misses = 0
+							self.backoffUntil = os.clock() + 60
+						end
+					end
+					task.wait(step)
+				else
+					self.status = string.format("waiting budget: need %s <= %d%% of %s", fmt(cost), self.budgetPct, fmt(Cash()))
+					task.wait(step)
+				end
+			end
+		end
+	end))
+end
+function EventEgg:Stop()
+	RUNNING.eventegg = false
 	if self.B then self.B:kill() self.B = nil end
 	self.status = "idle"
 end
