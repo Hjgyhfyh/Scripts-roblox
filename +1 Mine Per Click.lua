@@ -694,7 +694,7 @@ local guiOk = pcall(function()
     end)
     pcall(function()   -- BUDGET
         local B = Window:CreateTab("📊 Budget", 4483362458)
-        B:CreateSlider({ Name = "Total budget (calls/sec, <400)", Range = {40, 395}, Increment = 5, CurrentValue = CFG.totalBudget, Flag = "mpc_tb", Callback = function(v) CFG.totalBudget = math.min(395, v); saveConfig() end })
+        B:CreateSlider({ Name = "Total budget (calls/sec, ≤400)", Range = {40, 400}, Increment = 5, CurrentValue = CFG.totalBudget, Flag = "mpc_tb", Callback = function(v) CFG.totalBudget = math.min(400, v); saveConfig() end })
     end)
     pcall(function()   -- SETTINGS
         local G = Window:CreateTab("⚙️ Settings", 4483362458)
