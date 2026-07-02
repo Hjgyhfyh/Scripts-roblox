@@ -2100,8 +2100,8 @@ end
 --============================ UNLOAD ============================
 local unloaded = false
 local FEATURES = {
-	TrainFarm, ThrowFarm, AutoBuy, HatchFarm, Bootstrap,
-	DailySpin, Claims, Potions, ClassRoll, AutoRebirth, InfoTicker,
+	TrainFarm, ThrowFarm, AutoBuy, HatchFarm, EventEgg, Bootstrap,
+	DailySpin, Claims, Potions, ClassRoll, AutoRebirth, InfoTicker, QuickBar,
 }
 local function unloadAll()
 	if unloaded then return end
@@ -2295,6 +2295,17 @@ State.Window = Library:Create({
 						para("Hatch Info", "HatchEgg(<best cash egg>, \"Triple\") every >=4.6s within the budget, EquipBest debounced. Pauses in saving mode."),
 					} },
 				}),
+				modDef("Event Egg (10M)", EventEgg, false, {
+					{ Name = "Tuning", Controls = {
+						ctlSlider("eventegg_budget", "Batch budget % of Cash", 5, 90, 5, 30, function(v)
+							EventEgg.budgetPct = math.clamp(v, 5, 90)
+						end),
+					} },
+					{ Name = "Status", Controls = {
+						para("EventEgg Status", "idle"),
+						para("EventEgg Info", "Limited-event 10M Egg: HatchEgg(\"10M Egg\", Triple/Octo-with-gamepass) every >=4.6s while the batch cost fits the budget %. Price and rolls are fully server-side (live-verified: exact -10M per Single), credit confirmed via the profile push with no-op backoff. Chases Midnight Kitty (0.001%, x4,000,000 income) and Masquerade (0.0002%, Best +200). Pauses in saving mode and parks after EventEndTimestamp."),
+					} },
+				}),
 			},
 		},
 		{
@@ -2304,7 +2315,7 @@ State.Window = Library:Create({
 				modDef("Redeem Codes + Free Eggs", Bootstrap, false, {
 					{ Name = "Status", Controls = {
 						para("Bootstrap Status", "idle"),
-						para("Bootstrap Info", "One-time: 24 promo codes via CodesService.RF.Claim (6.2s spacing, expired = skip), then every Timeless/Void Egg is opened (4.7s step) and EquipBest fires. Progress persists across restarts."),
+						para("Bootstrap Info", "Runs " .. tostring(#CODES) .. " promo codes via CodesService.RF.Claim (6.2s spacing, expired = skip; per-code gate, so freshly added codes redeem even after the first run), then every Timeless/Void Egg is opened (4.7s step) and EquipBest fires. Progress persists across restarts."),
 					} },
 				}),
 				modDef("Auto Daily Spin", DailySpin, false, {
@@ -2315,7 +2326,7 @@ State.Window = Library:Create({
 				modDef("Auto Claim Rewards", Claims, false, {
 					{ Name = "Status", Controls = {
 						para("Claims Status", "idle"),
-						para("Claims Info", "Daily/Chest/Playtime/Achievement/Seasonpass Claim() every ~12 min. Admin services are never touched."),
+						para("Claims Info", "Daily/Chest/Achievement/Seasonpass Claim() every ~12 min. Playtime Reward has its own 31s poller: it claims the moment the PlaytimeReward attribute reaches 900s (blind claims before readiness are a silent server no-op — that was why it never collected). Admin services are never touched."),
 					} },
 				}),
 				modDef("Auto Potions", Potions, false, {
