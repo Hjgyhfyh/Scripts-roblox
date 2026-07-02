@@ -634,7 +634,7 @@ task.spawn(function()   -- stats updater ~5 Hz (labels are nil-guarded until the
     end
 end)
 task.spawn(function() while not unloaded do task.wait(15); pcall(saveConfig) end end)   -- periodic save
-for _, name in ipairs({ "autoMine","autoRebirth","autoBuyPickaxe","autoBuyAura","autoBackpack","autoWalkspeed" }) do
+for _, name in ipairs({ "autoMine","autoHitWall","autoRebirth","autoBuyPickaxe","autoBuyAura","autoBackpack","autoWalkspeed" }) do
     if CFG[name] then startLoop(name) end                              -- auto-restore left-on features
 end
 
@@ -657,6 +657,8 @@ local guiOk = pcall(function()
         local M = Window:CreateTab("⛏️ Mining", 4483362458)
         tog(M, "Auto Click (grow Strength)", "autoClick")
         tog(M, "Auto Mine (descend + collect + sell)", "autoMine")
+        tog(M, "Auto Break Walls (HitWall on unbroken walls)", "autoHitWall")
+        M:CreateSlider({ Name = "HitWall rate (hits/sec)", Range = {1, 40}, Increment = 1, CurrentValue = CFG.hitWallRate, Flag = "mpc_hwr", Callback = function(v) CFG.hitWallRate = v; saveConfig() end })
         M:CreateSlider({ Name = "Click rate cap (auto-tunes to server ~14/s)", Range = {5, 380}, Increment = 5, CurrentValue = CFG.clickRate, Flag = "mpc_cr", Callback = function(v) CFG.clickRate = v; saveConfig() end })
     end)
     pcall(function()   -- ECONOMY
